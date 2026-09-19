@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, timingSafeEqual } from "node:crypto";
 import {
+  collection,
   parseId,
   type CaregiverId,
   type DeviceId,
@@ -15,6 +16,7 @@ import {
   type DeviceTokenClaims,
 } from "@memory-glasses/shared";
 import { z } from "zod";
+import { getDb } from "./db";
 import { requireEnv } from "./env";
 
 // Two ways in, per README "Caregiver dashboard": a caregiver session cookie,
@@ -39,7 +41,7 @@ const sessionClaimsSchema = z
 
 export type Principal =
   | { kind: "caregiver"; caregiverId: CaregiverId; patientId: PatientId }
-  | { kind: "device"; deviceId: DeviceId | null; patientId: PatientId };
+  | { kind: "device"; deviceId: DeviceId; patientId: PatientId };
 
 /** For hex that a signed credential already vouched for. */
 function trustedId<TId extends Id<string>>(hex: string): TId {
@@ -82,17 +84,20 @@ export async function principalFromSession(
   return { kind: "caregiver", caregiverId: trustedId(session.claims.cid), patientId: trustedId(patient) };
 }
 
-export async function principalFromRequest(request: Request, sessionCookie: string | undefined) {
+export async function principalFromRequest(
+  request: Request,
+  sessionCookie: string | undefined,
+): Promise<Principal | null> {
   const authorization = request.headers.get("authorization");
   if (authorization?.startsWith("Bearer ")) {
     const verified = await verifyDeviceToken(authorization.slice("Bearer ".length), requireEnv("DEVICE_TOKEN_SECRET"));
-    if (verified.kind !== "valid" || verified.claims.scope !== "api") return null;
-    const { sub, pid } = verified.claims;
-    return {
-      kind: "device",
-      deviceId: sub ? trustedId<DeviceId>(sub) : null,
-      patientId: trustedId<PatientId>(pid),
-    } satisfies Principal;
+    // API tokens must name a device, or revoking it couldn't cut them off.
+    if (verified.kind !== "valid" || verified.claims.scope !== "api" || !verified.claims.sub) return null;
+    const deviceId = trustedId<DeviceId>(verified.claims.sub);
+    const patientId = trustedId<PatientId>(verified.claims.pid);
+    const device = await collection(getDb(), "devices").findOne({ _id: deviceId, patientId, revokedAt: null });
+    if (!device || device.tokenVersion !== verified.claims.tv) return null;
+    return { kind: "device", deviceId, patientId };
   }
   return principalFromSession(sessionCookie, request.headers.get("x-patient-id"));
 }

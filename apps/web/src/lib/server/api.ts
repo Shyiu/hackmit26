@@ -2,6 +2,7 @@ import "server-only";
 import {
   collection,
   ConflictError,
+  describeValidationFailure,
   InvalidInputError,
   MongoServerSelectionError,
   parseId,
@@ -42,7 +43,8 @@ export function errorResponse(error: unknown): Response {
   if (error instanceof MongoServerSelectionError) {
     return problem(503, "The database is unreachable. Check MONGODB_URI and that MongoDB is running.");
   }
-  console.error(error);
+  // A validator rejection means code wrote a shape the schema forbids; the details say where.
+  console.error(describeValidationFailure(error) ?? error);
   return problem(500, "Something went wrong");
 }
 
