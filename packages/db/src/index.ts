@@ -1,7 +1,7 @@
 // The MongoDB layer for memory-glasses. Server-only: never import this from a
 // client component. Seeding helpers live at "@memory-glasses/db/observations".
 
-export { ObjectId, type Db, type MongoClient } from "mongodb";
+export { MongoServerSelectionError, ObjectId, type Db, type MongoClient } from "mongodb";
 
 export * from "./ids";
 export * from "./errors";
