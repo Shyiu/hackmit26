@@ -1,19 +1,25 @@
 import type { MetadataRoute } from "next";
 
-// "Add to Home Screen" opens the headset without browser chrome. iPhone Safari
-// has no element fullscreen, so this is how the headset gets the whole screen there.
+// One installable app for both people who use it. The landing page sends the
+// wearer's phone to /wear and the caregiver to the dashboard. Installed from
+// the home screen it runs without browser chrome, which /wear needs on iPhone:
+// Safari has no element fullscreen, and wake lock works in home screen apps
+// from iOS 18.4.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    id: "/headset",
-    name: "Memory glasses headset",
-    short_name: "Headset",
-    description: "The wearer's view for the 3D-printed phone headset.",
-    start_url: "/headset",
+    id: "/",
+    name: "Memory glasses",
+    short_name: "Memory",
+    description: "A wearable camera that remembers where things are, for people living with dementia.",
+    start_url: "/",
     scope: "/",
-    display: "fullscreen",
-    orientation: "landscape",
+    display: "standalone",
     background_color: "#000000",
     theme_color: "#000000",
-    icons: [{ src: "/favicon.ico", sizes: "any", type: "image/x-icon" }],
+    icons: [
+      { src: "/icons/192", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icons/512", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icons/maskable", sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ],
   };
 }
