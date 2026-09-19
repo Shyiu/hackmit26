@@ -739,6 +739,30 @@ pnpm build:sim                                             # simulator build wit
 
 See `apps/ios/README.md` for signing and limits.
 
+## Deploying
+
+The web app deploys to Vercel as the project `memory-glasses`, at <https://memory-glasses.vercel.app>. The GitHub repo is connected: a push to `main` deploys production, and every other branch and pull request gets a preview URL. `services/perception` does not run on Vercel. It holds a WebSocket open and loads model weights, so it needs a long-running host with a `wss://` URL.
+
+Project settings that matter, all set on Vercel and not in a `vercel.json`:
+
+- Root Directory is `apps/web`. Vercel still installs from the workspace root, so `packages/shared` and `packages/db` resolve.
+- `ENABLE_EXPERIMENTAL_COREPACK=1` makes the build use the `pnpm@11.5.0` named in `packageManager`. Without it Vercel picks a pnpm from the lockfile version.
+- Node 24.
+
+Env vars are per environment. `AUTH_SECRET`, `DEVICE_TOKEN_SECRET`, `MONGODB_DB`, `CAREGIVER_EMAIL`, and `CAREGIVER_PASSWORD` are set for production and preview, with values different from anyone's local file. The build passes without the rest because routes read env when they run. Until `MONGODB_URI` is set, pages load and `/api/health` answers 503 with `"db":"unreachable"`.
+
+```bash
+vercel link --yes --project memory-glasses     # once per checkout; writes the ignored .vercel/
+vercel env add MONGODB_URI production          # an Atlas URI; repeat for preview
+vercel env ls
+vercel deploy                                  # preview from the working tree
+vercel deploy --prod
+```
+
+`vercel link` appends `.env*` to `.gitignore` and writes a root `.env.local`. Revert the first, since it cancels the `!.env.example` rule, and delete the second. `vercel git connect` fails in a git worktree; run it from a normal clone.
+
+To bring up a new database, point the local scripts at it once: put the Atlas URI in `apps/web/.env.local`, then `pnpm db:setup` and `pnpm db:seed`. Atlas has to allow Vercel's addresses, which for a hackathon means allowing `0.0.0.0/0` under Network Access. The seeded caregiver signs in with the `CAREGIVER_EMAIL` and `CAREGIVER_PASSWORD` stored on Vercel, so set those to values you know. Wherever perception runs, give it the same `DEVICE_TOKEN_SECRET` and `MONGODB_URI`, and set `NEXT_PUBLIC_PERCEPTION_WS_URL` on Vercel to its `wss://…/ws/frames` URL, then redeploy.
+
 ## Testing
 
 What runs today: `pnpm test` runs the zod contract fixtures and the database tests, and `uv run pytest` in `services/perception` runs the write path, protocol, and token tests. Both suites use a real MongoDB with the generated validators, so start one with `pnpm db:up` first. The list below is the plan for the rest.
