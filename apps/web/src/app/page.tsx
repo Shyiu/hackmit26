@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 export default function Home() {
   return (
@@ -7,15 +7,21 @@ export default function Home() {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Memory glasses</h1>
         <p className="mt-2 max-w-md text-muted-foreground">
-          Smart glasses that remember where things are, for people living with dementia.
-          Ask &ldquo;where are my keys?&rdquo; out loud, get an answer back.
+          A wearable camera that remembers where things are, for people living with dementia.
+          Ask &ldquo;where are my keys?&rdquo; out loud and hear the answer. This build runs on
+          a phone in a 3D-printed headset.
         </p>
       </div>
-      <div className="flex gap-3">
-        <Button render={<Link href="/dashboard" />}>Caregiver dashboard</Button>
-        <Button render={<Link href="/sim" />} variant="outline">
+      <div className="flex flex-wrap justify-center gap-3">
+        <Link href="/headset" className={buttonVariants()}>
+          Headset
+        </Link>
+        <Link href="/dashboard" className={buttonVariants({ variant: "outline" })}>
+          Caregiver dashboard
+        </Link>
+        <Link href="/sim" className={buttonVariants({ variant: "outline" })}>
           Simulator
-        </Button>
+        </Link>
       </div>
     </div>
   );

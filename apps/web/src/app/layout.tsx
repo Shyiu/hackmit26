@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Memory glasses",
-  description: "Smart glasses that remember where things are, for people living with dementia.",
+  description: "A wearable camera that remembers where things are, for people living with dementia.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
