@@ -7,7 +7,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Keep the screen on while the app is in the foreground. iOS stops the camera when the
+        // screen locks, and the web Wake Lock API isn't reliable inside WKWebView.
+        application.isIdleTimerDisabled = true
         return true
     }
 
