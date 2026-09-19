@@ -400,8 +400,9 @@ def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_fram
         assert (sighting["itemId"], sighting["firstSeq"], sighting["lastSeq"]) == (keys_item, 1, 3)
         assert (sighting["sessionId"], sighting["source"]) == (ObjectId(session_id), "headset")
         assert sighting["eventId"] == f"{session_id}:1"
-        item = db["items"].find_one({"_id": keys_item})
-        assert item is not None and item["lastSighting"]["sightingId"] == sighting["_id"]
+        # The snapshot is written after the sighting, so it needs its own wait.
+        snapshot = {"_id": keys_item, "lastSighting.sightingId": sighting["_id"]}
+        _wait_for(lambda: db["items"].find_one(snapshot))
         ws.close()
         _wait_for(lambda: db["sightings"].find_one({"_id": sighting["_id"], "status": "closed"}))
 
