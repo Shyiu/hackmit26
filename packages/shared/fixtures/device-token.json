@@ -1,0 +1,15 @@
+{
+  "secret": "fixture-secret-not-for-real-use-0123456789",
+  "claims": {
+    "v": 1,
+    "pid": "5eed00000000000000000001",
+    "sub": "5eed00000000000000000d01",
+    "scope": "frames",
+    "tv": 0,
+    "iat": 1790000000,
+    "exp": 1790000900
+  },
+  "token": "eyJ2IjoxLCJwaWQiOiI1ZWVkMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJzdWIiOiI1ZWVkMDAwMDAwMDAwMDAwMDAwMDBkMDEiLCJzY29wZSI6ImZyYW1lcyIsInR2IjowLCJpYXQiOjE3OTAwMDAwMDAsImV4cCI6MTc5MDAwMDkwMH0.9X6kPT4_yAKndqhtaK-vrS8SK8QPxNaHUHYu7127fOo",
+  "validAt": 1790000100,
+  "expiredAt": 1790000900
+}

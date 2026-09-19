@@ -1,0 +1,37 @@
+{
+  "clientMessages": [
+    { "type": "hello", "v": 1, "token": "eyJ2IjoxfQ.c2ln" },
+    { "type": "capture", "v": 1, "state": "live" },
+    { "type": "capture", "v": 1, "state": "paused" }
+  ],
+  "frameHeaders": [
+    {
+      "v": 1,
+      "sessionId": "5eed00000000000000000c01",
+      "seq": 42,
+      "capturedAtMs": 183520.4,
+      "sentAtMs": 183561.9,
+      "width": 1280,
+      "height": 720,
+      "bytes": 148213
+    }
+  ],
+  "serverMessages": [
+    { "type": "session", "v": 1, "sessionId": "5eed00000000000000000c01", "state": "paused" },
+    {
+      "type": "detections",
+      "v": 1,
+      "seq": 42,
+      "detections": [
+        {
+          "itemId": "5eed00000000000000000101",
+          "label": "keys",
+          "bbox": [0.42, 0.55, 0.08, 0.06],
+          "confidence": 0.87
+        }
+      ]
+    },
+    { "type": "detections", "v": 1, "seq": 43, "detections": [] },
+    { "type": "error", "v": 1, "code": "unauthorized", "message": "Token expired" }
+  ]
+}

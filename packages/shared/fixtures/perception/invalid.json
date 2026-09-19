@@ -1,0 +1,21 @@
+{
+  "clientMessages": [
+    { "type": "hello", "v": 1 },
+    { "type": "hello", "v": 2, "token": "abc" },
+    { "type": "capture", "v": 1, "state": "recording" },
+    { "type": "subscribe", "v": 1 },
+    { "type": "hello", "v": 1, "token": "abc", "patientId": "5eed00000000000000000001" }
+  ],
+  "frameHeaders": [
+    { "v": 1, "sessionId": "not-an-id", "seq": 1, "capturedAtMs": 1, "sentAtMs": 2, "width": 1280, "height": 720, "bytes": 10 },
+    { "v": 1, "sessionId": "5eed00000000000000000c01", "seq": -1, "capturedAtMs": 1, "sentAtMs": 2, "width": 1280, "height": 720, "bytes": 10 },
+    { "v": 1, "sessionId": "5eed00000000000000000c01", "seq": 1, "capturedAtMs": 1, "sentAtMs": 2, "width": 1280, "height": 720, "bytes": 0 },
+    { "v": 1, "sessionId": "5eed00000000000000000c01", "seq": 1.5, "capturedAtMs": 1, "sentAtMs": 2, "width": 1280, "height": 720, "bytes": 10 }
+  ],
+  "serverMessages": [
+    { "type": "session", "v": 1, "sessionId": "5eed00000000000000000c01", "state": "recording" },
+    { "type": "detections", "v": 1, "seq": 1, "detections": [{ "itemId": "x", "label": "keys", "bbox": [0.1, 0.2, 0.3], "confidence": 0.5 }] },
+    { "type": "detections", "v": 1, "seq": 1, "detections": [{ "itemId": "x", "label": "keys", "bbox": [0.1, 0.2, 0.3, 0.4], "confidence": 1.5 }] },
+    { "type": "error", "v": 1, "code": "teapot", "message": "no" }
+  ]
+}
