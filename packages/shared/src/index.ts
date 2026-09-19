@@ -2,3 +2,6 @@ export * from "./schemas/item";
 export * from "./schemas/sighting";
 export * from "./schemas/room";
 export * from "./schemas/interaction";
+export * from "./schemas/detection";
+export * from "./schemas/notification";
+export * from "./schemas/recording";
