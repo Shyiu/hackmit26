@@ -2,6 +2,7 @@ import "server-only";
 import {
   locationStatus,
   ObjectId,
+  type CaptureSessionDoc,
   type InteractionDoc,
   type ItemDoc,
   type NotificationDoc,
@@ -65,6 +66,27 @@ export function roomView(room: RoomDoc) {
 
 export function notificationView(notification: NotificationDoc) {
   return toJson(without(notification, ["patientId"]));
+}
+
+// A frame socket that hasn't sent anything for this long counts as gone, even
+// if the service never got to mark its session ended.
+const CAPTURE_STALE_AFTER_MS = 15_000;
+
+export type CaptureState = "live" | "paused" | "offline";
+
+/** Whether the chest camera is live, paused, or offline, from its newest capture session. */
+export function captureView(session: CaptureSessionDoc, now: Date) {
+  const heardFrom = session.lastFrameAt ?? session.updatedAt;
+  const quiet = now.getTime() - heardFrom.getTime() > CAPTURE_STALE_AFTER_MS;
+  const state: CaptureState = session.state === "ended" || quiet ? "offline" : session.state;
+  return {
+    state,
+    source: session.source,
+    startedAt: session.startedAt.toISOString(),
+    lastFrameAt: session.lastFrameAt?.toISOString() ?? null,
+    framesReceived: session.framesReceived,
+    framesDropped: session.framesDropped,
+  };
 }
 
 export type ItemView = ReturnType<typeof itemView>;
