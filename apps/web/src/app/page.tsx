@@ -1,4 +1,5 @@
-import { Glasses, Laptop, LayoutDashboard, LogIn } from "lucide-react";
+import { Glasses, Laptop, LayoutDashboard, UserPlus } from "lucide-react";
+import Link from "next/link";
 import { Wordmark } from "@/components/brand";
 import { Tile } from "@/components/home/tiles";
 
@@ -19,8 +20,14 @@ export default function Home() {
         <Tile href="/wear" title="Wear" icon={Glasses} tone="terracotta" />
         <Tile href="/dashboard" title="Dashboard" icon={LayoutDashboard} tone="lavender" />
         <Tile href="/sim" title="Simulator" icon={Laptop} tone="sky" />
-        <Tile href="/login" title="Sign in" icon={LogIn} tone="butter" />
+        <Tile href="/signup" title="Sign up" icon={UserPlus} tone="butter" />
       </nav>
+      <p className="text-center text-sm text-muted-foreground">
+        Already have an account?{" "}
+        <Link href="/login" className="font-semibold text-terracotta-deep">
+          Sign in
+        </Link>
+      </p>
     </div>
   );
 }
