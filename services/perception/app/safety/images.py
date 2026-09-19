@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
+from bson import ObjectId
+
 
 @dataclass(frozen=True, slots=True)
 class StoredImage:
@@ -24,6 +26,13 @@ class LocalFrameStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(jpeg)
         return StoredImage(key=key, sha256=hashlib.sha256(jpeg).hexdigest(), bytes=len(jpeg))
+
+    def put_reference(self, patient_id, photo: bytes, captured_at: datetime) -> str:
+        key = f"people/{patient_id}/{captured_at:%Y/%m/%d}/{ObjectId()}.jpg"
+        path = self.directory / key
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(photo)
+        return key
 
     def get(self, key: str) -> bytes:
         return (self.directory / key).read_bytes()

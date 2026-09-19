@@ -33,8 +33,8 @@ class SafetyStore:
         embeddings: list[Any],
         embedding_model: str,
     ) -> dict[str, Any]:
-        now = datetime.now(UTC)
-        expires = now + timedelta(days=await self._observations.retention_days(patient_id))
+        now = to_ms(datetime.now(UTC))
+        expires = to_ms(now + timedelta(days=await self._observations.retention_days(patient_id)))
         doc = {
             "_id": ObjectId(),
             "patientId": patient_id,
@@ -93,7 +93,7 @@ class SafetyStore:
         image_key: str,
         analysis: FrameAnalysis,
     ) -> ObjectId:
-        now = datetime.now(UTC)
+        now = to_ms(datetime.now(UTC))
         doc = {
             "_id": ObjectId(),
             "patientId": patient_id,
@@ -149,29 +149,30 @@ class SafetyStore:
         if existing is not None:
             if existing["verification"] == "model_confirmed":
                 verification = "model_confirmed"
-            frame_ids = [*existing["frameObservationIds"], frame_id][-200:]
             await self._events.update_one(
                 {"_id": existing["_id"], "patientId": patient_id},
                 {
                     "$set": {
                         "lastSeenAt": seen,
-                        "confidence": max(existing["confidence"], candidate.confidence),
+                        "bbox": [
+                            candidate.bbox.x,
+                            candidate.bbox.y,
+                            candidate.bbox.w,
+                            candidate.bbox.h,
+                        ],
+                        "frameSize": [analysis.width, analysis.height],
                         "keyframeKey": frame_key,
                         "verification": verification,
                         "updatedAt": now,
                     },
-                    "$setOnInsert": {"expiresAt": now},
-                    "$addToSet": {"frameObservationIds": {"$each": [frame_id]}},
+                    "$max": {"confidence": candidate.confidence},
+                    "$push": {"frameObservationIds": {"$each": [frame_id], "$slice": -200}},
                 },
             )
-            if len(frame_ids) != len(existing["frameObservationIds"]) + 1:
-                await self._events.update_one(
-                    {"_id": existing["_id"]}, {"$set": {"frameObservationIds": frame_ids}}
-                )
             return existing["_id"]
 
         event_id = ObjectId()
-        expires = now + timedelta(days=await self._observations.retention_days(patient_id))
+        expires = to_ms(now + timedelta(days=await self._observations.retention_days(patient_id)))
         doc = {
             "_id": event_id,
             "patientId": patient_id,
@@ -209,7 +210,20 @@ class SafetyStore:
         }
         await self._events.insert_one(doc)
         try:
-            text = f"Safety signal to check: {candidate.kind.replace('_', ' ')} visible."
+            text_by_kind = {
+                "weapon_visible": (
+                    "Possible knife or firearm in view. Single frame, unverified — worth a look."
+                ),
+                "medication_or_chemical_visible": (
+                    "Possible medication or chemical container in view. Single frame, unverified."
+                ),
+                "hot_surface_visible": "Possible hot surface or stove in view. Single frame, unverified.",
+                "unknown_face": "Someone unfamiliar may be in view. Single frame, unverified.",
+            }
+            text = text_by_kind.get(
+                candidate.kind,
+                f"Possible {candidate.hazard_label or 'hazard'} in view. Single frame, unverified.",
+            )
             notification = {
                 "_id": ObjectId(),
                 "patientId": patient_id,
@@ -225,7 +239,7 @@ class SafetyStore:
             }
             await self._notifications.insert_one(notification)
             await self._events.update_one(
-                {"_id": event_id},
+                {"_id": event_id, "patientId": patient_id},
                 {
                     "$set": {
                         "notification": {
@@ -237,7 +251,8 @@ class SafetyStore:
             )
         except Exception:
             await self._events.update_one(
-                {"_id": event_id}, {"$set": {"notification": {"status": "failed", "notificationId": None}}}
+                {"_id": event_id, "patientId": patient_id},
+                {"$set": {"notification": {"status": "failed", "notificationId": None}}},
             )
         return event_id
 
@@ -266,9 +281,9 @@ class SafetyStore:
         status: str,
         acknowledged_by: str | None = None,
     ) -> dict[str, Any] | None:
-        update: dict[str, Any] = {"status": status, "updatedAt": datetime.now(UTC)}
+        update: dict[str, Any] = {"status": status, "updatedAt": to_ms(datetime.now(UTC))}
         if status == "acknowledged":
-            update["acknowledgedAt"] = datetime.now(UTC)
+            update["acknowledgedAt"] = to_ms(datetime.now(UTC))
             update["acknowledgedBy"] = acknowledged_by
         return await self._events.find_one_and_update(
             {"_id": event_id, "patientId": patient_id},

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from pathlib import Path
-from uuid import uuid4
+from io import BytesIO
 
 import numpy as np
+from bson import ObjectId
 from PIL import Image
 
 from ..config import Settings
@@ -30,9 +30,9 @@ class SafetyService:
 
     async def process(
         self,
-        patient_id,
-        device_id,
-        session_id,
+        patient_id: ObjectId,
+        device_id: ObjectId | None,
+        session_id: ObjectId | None,
         jpeg: bytes,
         captured_at: datetime,
         *,
@@ -67,7 +67,7 @@ class SafetyService:
 
     async def enroll(
         self,
-        patient_id,
+        patient_id: ObjectId,
         name: str,
         relation: str | None,
         consented_by: str,
@@ -76,21 +76,16 @@ class SafetyService:
         embeddings = []
         keys = []
         now = datetime.now(UTC)
-        root = Path(self.settings.frame_image_dir)
         for item in photos:
             filename, photo = item if isinstance(item, tuple) else ("", item)
-            image = Image.open(__import__("io").BytesIO(photo)).convert("RGB")
+            image = Image.open(BytesIO(photo)).convert("RGB")
             array = np.asarray(image)
             faces = await asyncio.to_thread(self.adapters.face_detector.detect, array, filename=filename)
             if len(faces) != 1:
                 raise ValueError("each photo must contain exactly one face")
             embedding = await asyncio.to_thread(self.adapters.face_embedder.embed, array, faces)
             embeddings.append(embedding[0])
-            key = f"people/{patient_id}/{now:%Y/%m/%d}/{uuid4()}.jpg"
-            path = root / key
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(photo)
-            keys.append(key)
+            keys.append(await asyncio.to_thread(self.frame_store.put_reference, patient_id, photo, now))
         return await self.store.enroll_person(
             patient_id,
             name,

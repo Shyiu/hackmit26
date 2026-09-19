@@ -37,7 +37,7 @@ from .protocol import (
     parse_frame,
     session_message,
 )
-from .safety.adapters.registry import build_adapters
+from .safety.adapters.registry import Adapters, build_adapters
 from .safety.images import LocalFrameStore
 from .safety.routes import router as safety_router
 from .safety.service import SafetyService
@@ -77,6 +77,7 @@ def create_app(
     settings: Settings | None = None,
     *,
     detector: Detector | None = None,
+    safety_adapters: Adapters | None = None,
     token_clock: Callable[[], float] = time.time,
 ) -> FastAPI:
     """Settings default to the environment. Tests pass their own, and a clock for token expiry."""
@@ -97,8 +98,17 @@ def create_app(
             safety = SafetyService(
                 resolved,
                 SafetyStore(db, store, resolved),
-                build_adapters(resolved),
+                safety_adapters or build_adapters(resolved),
                 LocalFrameStore(resolved.frame_image_dir),
+            )
+            log.info(
+                "safety adapters configured",
+                extra={
+                    "safety_detector": safety.adapters.detector.name,
+                    "safety_face_detector": safety.adapters.face_detector.name,
+                    "safety_face_embedder": safety.adapters.face_embedder.name,
+                    "safety_vlm": safety.adapters.vlm.name if safety.adapters.vlm else None,
+                },
             )
         app.state.services = Services(resolved, store, detector or NullDetector(), token_clock, safety)
         try:
@@ -134,7 +144,24 @@ async def health(request: Request) -> JSONResponse:
     except (PyMongoError, TimeoutError):
         db = "unreachable"
     ok = db == "ok"
-    body = {"ok": ok, "detector": services.detector.name, "db": db, "queueDepth": queue_depth}
+    safety = services.safety
+    safety_names = (
+        {
+            "detector": safety.adapters.detector.name,
+            "faceDetector": safety.adapters.face_detector.name,
+            "faceEmbedder": safety.adapters.face_embedder.name,
+            "vlm": safety.adapters.vlm.name if safety.adapters.vlm else None,
+        }
+        if safety
+        else None
+    )
+    body = {
+        "ok": ok,
+        "detector": services.detector.name,
+        "db": db,
+        "queueDepth": queue_depth,
+        "safety": safety_names,
+    }
     # 503 lets a tunnel or load balancer health check see that the database is gone.
     return JSONResponse(body, status_code=200 if ok else 503)
 

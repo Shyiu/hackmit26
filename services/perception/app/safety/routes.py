@@ -39,9 +39,9 @@ def _claims(request: Request, scope: str):
         )
     except (InvalidTokenError, ValueError):
         raise HTTPException(401, detail={"code": "unauthorized", "message": "Invalid token"}) from None
-    if claims.scope not in {scope, "api"}:
+    if claims.scope != scope and not (scope != "frames" and claims.scope == "api"):
         raise HTTPException(403, detail={"code": "forbidden", "message": "Insufficient token scope"})
-    return ObjectId(claims.pid)
+    return claims
 
 
 def _captured_at(value: str | None) -> datetime:
@@ -62,8 +62,12 @@ def _object_id(raw: str) -> ObjectId:
 
 @router.post("/frames", status_code=201)
 async def ingest_frame(request: Request):
-    patient_id = _claims(request, "frames")
+    claims = _claims(request, "frames")
+    patient_id = ObjectId(claims.pid)
     services = _services(request)
+    device_id = ObjectId(claims.sub) if claims.sub else None
+    if device_id is not None and await services.store.device_source(patient_id, device_id, claims.tv) is None:
+        raise HTTPException(401, detail={"code": "unauthorized", "message": "Unknown or revoked device"})
     content_type = request.headers.get("content-type", "")
     filename = ""
     captured = None
@@ -91,13 +95,13 @@ async def ingest_frame(request: Request):
     if not data.startswith(b"\xff\xd8\xff"):
         raise HTTPException(415, "JPEG upload required")
     captured_at = _captured_at(str(captured) if captured else None)
-    result = await services.safety.process(patient_id, None, None, data, captured_at, filename=filename)
+    result = await services.safety.process(patient_id, device_id, None, data, captured_at, filename=filename)
     return _jsonable(result)
 
 
 @router.post("/people", status_code=201)
 async def enroll_person(request: Request):
-    patient_id = _claims(request, "api")
+    patient_id = ObjectId(_claims(request, "api").pid)
     form = await request.form()
     photos = form.getlist("photos")
     if not photos:
@@ -118,13 +122,13 @@ async def enroll_person(request: Request):
 
 @router.get("/people")
 async def list_people(request: Request):
-    patient_id = _claims(request, "api")
+    patient_id = ObjectId(_claims(request, "api").pid)
     return _jsonable(await _services(request).safety.store.list_people(patient_id))
 
 
 @router.delete("/people/{person_id}", status_code=204)
 async def delete_person(person_id: str, request: Request):
-    patient_id = _claims(request, "api")
+    patient_id = ObjectId(_claims(request, "api").pid)
     if not await _services(request).safety.store.delete_person(patient_id, _object_id(person_id)):
         raise HTTPException(404, "Not found")
     return Response(status_code=204)
@@ -132,7 +136,7 @@ async def delete_person(person_id: str, request: Request):
 
 @router.get("/frame-observations")
 async def list_frames(request: Request, limit: int = 50, before: str | None = None):
-    patient_id = _claims(request, "api")
+    patient_id = ObjectId(_claims(request, "api").pid)
     before_at = _captured_at(before) if before else None
     docs = await _services(request).safety.store.list_frame_observations(
         patient_id, min(limit, 100), before_at
@@ -142,14 +146,14 @@ async def list_frames(request: Request, limit: int = 50, before: str | None = No
 
 @router.get("/danger-events")
 async def list_events(request: Request, status: str = "open", limit: int = 50):
-    patient_id = _claims(request, "api")
+    patient_id = ObjectId(_claims(request, "api").pid)
     docs = await _services(request).safety.store.list_danger_events(patient_id, status, min(limit, 100))
     return _jsonable(docs)
 
 
 @router.patch("/danger-events/{event_id}")
 async def update_event(event_id: str, request: Request):
-    patient_id = _claims(request, "api")
+    patient_id = ObjectId(_claims(request, "api").pid)
     body = await request.json()
     if body.get("status") not in {"open", "acknowledged", "dismissed", "escalated", "closed"}:
         raise HTTPException(422, "invalid status")

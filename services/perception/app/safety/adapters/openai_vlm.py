@@ -22,9 +22,10 @@ def image_media_type(image_bytes: bytes) -> str:
 class OpenAIVLM:
     name = "openai"
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, client: httpx.Client | None = None):
         self.settings = settings
         self.model = settings.vlm_model
+        self.client = client or httpx.Client()
 
     def verify(self, image_bytes: bytes, candidate_event_types: list[str]) -> VlmResult:
         content = [
@@ -50,7 +51,7 @@ class OpenAIVLM:
         }
         if self.settings.vlm_reasoning_effort:
             body["reasoning_effort"] = self.settings.vlm_reasoning_effort
-        response = httpx.post(
+        response = self.client.post(
             f"{self.settings.vlm_base_url.rstrip('/')}/chat/completions",
             headers={"Authorization": f"Bearer {self.settings.resolved_vlm_api_key}"},
             json=body,

@@ -53,7 +53,8 @@ Safety routes use a bearer device token. `/frames` requires `frames` scope; all 
 
 ```bash
 TOKEN="$(uv run python -m app.tokens --patient <patient-id> --scope api)"
-curl -H "Authorization: Bearer $TOKEN" \
+FRAME_TOKEN="$(uv run python -m app.tokens --patient <patient-id> --scope frames)"
+curl -H "Authorization: Bearer $FRAME_TOKEN" \
   -F file=@frame.jpg -F capturedAt=2026-09-19T18:00:00Z \
   http://localhost:8000/frames
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/people
@@ -66,7 +67,20 @@ curl -X PATCH -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/js
 
 Enroll people with `POST /people` and multipart fields `name`, `consentedBy`, optional `relation`, and one or more `photos`. Each photo must contain exactly one face. Face embeddings are encrypted at rest and are never returned by the API. Raw images stay under `FRAME_IMAGE_DIR`; only object keys are stored in MongoDB. Obtain explicit consent before enrollment, set a durable `FACE_EMBEDDING_KEY` outside local development, and apply the configured retention window.
 
-## Evaluation and extension points
+## Evaluation
+
+Run the mock evaluation fixture or another labeled image directory:
+
+```bash
+uv run python scripts/evaluate.py tests/fixtures/eval_sample \
+  --labels tests/fixtures/eval_sample/labels.json
+```
+
+`labels.json` maps each image filename to a list of expected categories, for example
+`{"knife_01.png": ["weapon"], "plain.png": []}`. The report includes per-category and overall
+precision, recall, false-positive count, and average, P50, and P95 processing time in milliseconds.
+
+## Extension points
 
 The mock adapters support deterministic filename/label hints and are intended for offline evaluation. Keep evaluation fixtures and adapter contracts stable while measuring category precision/recall and latency. Add temporal confirmation, pose, action classification, or additional detector providers as new lazy adapters and fields under the existing observation/event evidence shape; do not merge the safety adapter seam into `app.detector.Detector`.
 
