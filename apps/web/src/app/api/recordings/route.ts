@@ -1,14 +1,24 @@
-import { NextRequest, NextResponse } from "next/server";
 import { createRecordingSchema } from "@memory-glasses/shared";
+import { HttpError, readBody, withTenant } from "@/lib/server/api";
+import { recordingView } from "@/lib/server/views";
 
-// Optional, after M3. Registers a recording that's about to leave the phone. In
-// the MVP recordings stay on the phone and nothing calls this.
-export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const parsed = createRecordingSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+// Optional, after M3. GET: the caregiver lists recordings that left the phone.
+// POST: the phone registers one that's about to. The caregiver's settings gate
+// both recording and upload; with either off, the recording stays on the phone.
+export const GET = withTenant("caregiver", async ({ tenant }) => {
+  const recordings = await tenant.recordings.listRecent();
+  return Response.json({ recordings: recordings.map(recordingView) });
+});
+
+export const POST = withTenant("any", async ({ request, principal, tenant, settings }) => {
+  const input = await readBody(request, createRecordingSchema);
+  if (!settings.recordingAllowed) throw new HttpError(403, "Recording is off in this wearer's settings");
+  if (settings.recordingUploadEnabled !== true) {
+    throw new HttpError(403, "Recording upload is off in this wearer's settings; recordings stay on the phone");
   }
-
-  return NextResponse.json({ error: "not implemented" }, { status: 501 });
-}
+  const { recording, created } = await tenant.recordings.create({
+    ...input,
+    deviceId: principal.kind === "device" ? principal.deviceId : null,
+  });
+  return Response.json(recordingView(recording), { status: created ? 201 : 200 });
+});

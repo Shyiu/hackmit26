@@ -34,9 +34,22 @@ export const createRecordingSchema = recordingSchema.pick({
 });
 
 // The server assigns the storage key and answers with a signed upload URL.
-export const createRecordingChunkSchema = recordingChunkSchema.omit({ key: true });
+// `final` marks the last chunk; the recording's `endedAt` comes from it.
+export const createRecordingChunkSchema = recordingChunkSchema.omit({ key: true }).extend({
+  final: z.boolean().optional(),
+});
+
+export const recordingChunkUploadSchema = z.object({
+  recordingId: z.string(),
+  seq: z.number().int().nonnegative(),
+  key: z.string(),
+  /** Signed PUT URL for the chunk body, `content-type` set to the recording's mime type. */
+  uploadUrl: z.string().url(),
+  expiresAt: z.coerce.date(),
+});
 
 export type RecordingChunk = z.infer<typeof recordingChunkSchema>;
 export type Recording = z.infer<typeof recordingSchema>;
 export type CreateRecording = z.infer<typeof createRecordingSchema>;
 export type CreateRecordingChunk = z.infer<typeof createRecordingChunkSchema>;
+export type RecordingChunkUpload = z.infer<typeof recordingChunkUploadSchema>;

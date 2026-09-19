@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "f7e8267ffa41e9d5c06379a6209f2695292eabeed8d5f6c75e5f5482d88b5586",
+  "fingerprint": "fb4ec1a318b86404ba7db4f0e9cec0b26d51ab7c7f45aa3b220f743a646c2fa9",
   "collections": {
     "patients": {
       "validator": {
@@ -57,6 +57,9 @@
                 "recordingAllowed": {
                   "type": "boolean"
                 },
+                "recordingUploadEnabled": {
+                  "type": "boolean"
+                },
                 "retentionDays": {
                   "minimum": 1,
                   "maximum": 365,
@@ -93,6 +96,7 @@
                 "speakingRate",
                 "hudLevel",
                 "recordingAllowed",
+                "recordingUploadEnabled",
                 "retentionDays",
                 "staleAfterMinutes",
                 "wakeWordEnabled",

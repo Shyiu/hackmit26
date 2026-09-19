@@ -95,6 +95,7 @@ class Seed:
                     "speakingRate": 0.9,
                     "hudLevel": "everything",
                     "recordingAllowed": False,
+                    "recordingUploadEnabled": False,
                     "retentionDays": retention_days,
                     "staleAfterMinutes": 15,
                     "wakeWordEnabled": False,

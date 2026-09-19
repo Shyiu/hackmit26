@@ -3,6 +3,7 @@
 import { Download, Share } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { LocalRecording } from "@/hooks/use-recorder";
+import type { UploadStatus } from "@/lib/client/recording-upload";
 
 function formatDuration(ms: number) {
   const seconds = Math.round(ms / 1000);
@@ -21,10 +22,33 @@ async function share(file: File) {
   }
 }
 
+function uploadLabel(status: UploadStatus | undefined) {
+  if (!status) return null;
+  switch (status.state) {
+    case "queued":
+      return "Upload queued";
+    case "uploading":
+      return `Uploading ${status.partsDone}/${status.partsTotal}`;
+    case "waiting":
+      return `Upload paused at ${status.partsDone}/${status.partsTotal}, retrying`;
+    case "done":
+      return "Uploaded";
+    case "failed":
+      return `Upload refused: ${status.error}`;
+  }
+}
+
 // Recordings made on this device since the page loaded. They live in memory, so
 // save them before closing the page. Share opens the phone's share sheet, which
-// on iPhone can save straight to Photos.
-export function RecordingsList({ recordings }: { recordings: LocalRecording[] }) {
+// on iPhone can save straight to Photos. `uploads` is only set when the
+// caregiver turned upload on.
+export function RecordingsList({
+  recordings,
+  uploads = {},
+}: {
+  recordings: LocalRecording[];
+  uploads?: Record<string, UploadStatus>;
+}) {
   if (recordings.length === 0) return null;
 
   return (
@@ -37,6 +61,7 @@ export function RecordingsList({ recordings }: { recordings: LocalRecording[] })
           <span className="tabular-nums">
             {recording.startedAt.toLocaleTimeString()}, {formatDuration(recording.durationMs)},{" "}
             {(recording.file.size / 1_000_000).toFixed(1)} MB
+            {uploads[recording.id] && <span className="opacity-70">, {uploadLabel(uploads[recording.id])}</span>}
           </span>
           <span className="flex gap-2">
             <a

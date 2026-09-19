@@ -171,7 +171,12 @@ export function SetupPanel({
           <h2 className="font-medium">Recording</h2>
           {client.recordingAllowed ? (
             <>
-              <p className="text-white/70">Video only, no sound. It stays on this phone until you save it.</p>
+              <p className="text-white/70">
+                Video only, no sound.{" "}
+                {client.recordingUploadEnabled
+                  ? "Finished recordings upload to the caregiver's Recordings page."
+                  : "It stays on this phone until you save it."}
+              </p>
               <Button
                 size="lg"
                 variant={recorder.recording ? "destructive" : "outline"}
@@ -190,7 +195,7 @@ export function SetupPanel({
             <p className="text-white/70">Recording is off. A caregiver can allow it in the dashboard settings.</p>
           )}
           {recorder.error && <p className="text-red-400">{recorder.error}</p>}
-          <RecordingsList recordings={recorder.recordings} />
+          <RecordingsList recordings={recorder.recordings} uploads={client.uploads} />
         </section>
 
         <section className="flex flex-col gap-2">

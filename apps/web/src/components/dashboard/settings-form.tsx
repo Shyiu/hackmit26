@@ -129,6 +129,14 @@ export function SettingsForm({ initial, timeZones }: { initial: Settings; timeZo
           onCheckedChange={(checked) => set("recordingAllowed", checked)}
         />
         <SwitchRow
+          id="recording-upload"
+          label="Upload recordings"
+          hint="Finished recordings leave the phone for storage and show up under Recordings. Off, they stay on the phone."
+          checked={values.recordingUploadEnabled}
+          disabled={!values.recordingAllowed}
+          onCheckedChange={(checked) => set("recordingUploadEnabled", checked)}
+        />
+        <SwitchRow
           id="wake-word"
           label={
             <span className="flex items-center gap-2">

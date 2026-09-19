@@ -12,6 +12,8 @@ export const updateSettingsSchema = z
     speakingRate: z.number().min(0.5).max(1.5),
     hudLevel: z.enum(["everything", "captions", "off"]),
     recordingAllowed: z.boolean(),
+    /** Finished recordings leave the phone for the bucket. Off by default: they stay on the phone. */
+    recordingUploadEnabled: z.boolean(),
     retentionDays: z.number().int().min(1).max(365),
     staleAfterMinutes: z.number().int().min(1).max(24 * 60),
     wakeWordEnabled: z.boolean(),

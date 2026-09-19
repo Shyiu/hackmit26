@@ -14,6 +14,11 @@ export type ServerEnvName =
   | "DEEPGRAM_STT_MODEL"
   | "ELEVENLABS_API_KEY"
   | "OPENAI_API_KEY"
+  | "S3_ENDPOINT"
+  | "S3_BUCKET"
+  | "S3_ACCESS_KEY_ID"
+  | "S3_SECRET_ACCESS_KEY"
+  | "S3_REGION"
   | "NEXT_PUBLIC_PERCEPTION_WS_URL";
 
 export class MissingEnvError extends Error {

@@ -157,7 +157,7 @@ export function SimulatorView() {
         Speech to text: {voice.engine ?? "not checked yet"} · Frames: {perception.status}
         {perception.framesSent > 0 && `, ${perception.framesSent} sent`}
       </p>
-      <RecordingsList recordings={recorder.recordings} />
+      <RecordingsList recordings={recorder.recordings} uploads={client.uploads} />
     </div>
   );
 }

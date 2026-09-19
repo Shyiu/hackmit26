@@ -6,6 +6,7 @@ import {
   type InteractionDoc,
   type ItemDoc,
   type NotificationDoc,
+  type RecordingDoc,
   type RoomDoc,
   type SightingDoc,
 } from "@memory-glasses/db";
@@ -68,6 +69,24 @@ export function notificationView(notification: NotificationDoc) {
   return toJson(without(notification, ["patientId"]));
 }
 
+export type RecordingUploadState = "uploading" | "complete" | "empty";
+
+/** A recording with its upload state: chunks landed so far, and whether the phone sent the last one. */
+export function recordingView(recording: RecordingDoc) {
+  const chunks = recording.chunks;
+  const bytes = chunks.reduce((sum, chunk) => sum + chunk.bytes, 0);
+  const uploadedMs = chunks.reduce((sum, chunk) => sum + chunk.durationMs, 0);
+  const uploadState: RecordingUploadState =
+    recording.endedAt !== null ? "complete" : chunks.length === 0 ? "empty" : "uploading";
+  return {
+    ...toJson(without(recording, ["patientId", "chunks"])),
+    chunkCount: chunks.length,
+    bytes,
+    uploadedMs,
+    uploadState,
+  };
+}
+
 // A frame socket that hasn't sent anything for this long counts as gone, even
 // if the service never got to mark its session ended.
 const CAPTURE_STALE_AFTER_MS = 15_000;
@@ -94,3 +113,4 @@ export type SightingView = ReturnType<typeof sightingView>;
 export type InteractionView = ReturnType<typeof interactionView>;
 export type RoomView = ReturnType<typeof roomView>;
 export type NotificationView = ReturnType<typeof notificationView>;
+export type RecordingView = ReturnType<typeof recordingView>;

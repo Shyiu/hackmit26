@@ -2,10 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type LocalRecording = {
   id: string;
+  /** Stable across upload retries; the server registers a recording once per session id. */
+  sessionId: string;
   url: string;
   file: File;
   startedAt: Date;
   durationMs: number;
+  width: number;
+  height: number;
 };
 
 // MP4 first because it plays everywhere, including the iPhone Photos app.
@@ -23,8 +27,9 @@ function fileName(startedAt: Date, mimeType: string) {
   return `memory-${date}-${time}.${mimeType.includes("webm") ? "webm" : "mp4"}`;
 }
 
-// Records a camera stream to a file on the device. Nothing uploads it. The
-// camera stream has no mic track, so recordings are video only.
+// Records a camera stream to a file on the device. Uploading, if the caregiver
+// turned it on, is useRecordingUpload's job. The camera stream has no mic
+// track, so recordings are video only.
 export function useRecorder(stream: MediaStream | null) {
   const [recording, setRecording] = useState(false);
   const [recordings, setRecordings] = useState<LocalRecording[]>([]);
@@ -54,6 +59,8 @@ export function useRecorder(stream: MediaStream | null) {
 
     const chunks: Blob[] = [];
     const startedAt = new Date();
+    const sessionId = crypto.randomUUID();
+    const { width = 1280, height = 720 } = stream.getVideoTracks()[0]?.getSettings() ?? {};
     const limit = window.setTimeout(() => {
       if (recorder.state !== "inactive") recorder.stop();
     }, MAX_RECORDING_MS);
@@ -72,7 +79,7 @@ export function useRecorder(stream: MediaStream | null) {
       const url = URL.createObjectURL(file);
       urlsRef.current.push(url);
       setRecordings((previous) => [
-        { id: url, url, file, startedAt, durationMs: Date.now() - startedAt.getTime() },
+        { id: url, sessionId, url, file, startedAt, durationMs: Date.now() - startedAt.getTime(), width, height },
         ...previous,
       ]);
     });

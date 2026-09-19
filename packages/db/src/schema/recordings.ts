@@ -32,3 +32,4 @@ export const recordingDocSchema = z.strictObject({
 });
 
 export type RecordingDoc = z.infer<typeof recordingDocSchema>;
+export type RecordingChunk = z.infer<typeof recordingChunkSchema>;

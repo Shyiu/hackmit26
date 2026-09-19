@@ -24,6 +24,8 @@ export const patientSettingsSchema = z.strictObject({
   speakingRate: z.number().min(0.5).max(1.5),
   hudLevel,
   recordingAllowed: z.boolean(),
+  /** Finished recordings leave the phone for the bucket. Off: they stay a file on the phone. */
+  recordingUploadEnabled: z.boolean().default(false),
   retentionDays: z.int().min(1).max(365),
   /** Observations older than this get the stale wording. */
   staleAfterMinutes: z.int().min(1).max(24 * 60),
@@ -40,6 +42,7 @@ export const DEFAULT_PATIENT_SETTINGS: PatientSettings = {
   speakingRate: 0.9,
   hudLevel: "everything",
   recordingAllowed: false,
+  recordingUploadEnabled: false,
   retentionDays: 30,
   staleAfterMinutes: 15,
   wakeWordEnabled: false,

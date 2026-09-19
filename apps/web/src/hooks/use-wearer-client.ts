@@ -6,12 +6,13 @@ import { CAMERA_SETTING, parseCameraChoice, useCamera, type CameraChoice } from 
 import { useHudMessage } from "./use-hud-message";
 import { usePerception } from "./use-perception";
 import { useRecorder } from "./use-recorder";
+import { useRecordingUpload } from "./use-recording-upload";
 import { enterFullscreen, useWakeLock } from "./use-screen";
 import { readStoredString, writeStoredString } from "./use-stored-setting";
 import { useFeedWatchdog } from "./use-video-frames";
 import { useVoiceTurn, type TurnResult } from "./use-voice-turn";
 
-type WearerSettings = { speakingRate: number; recordingAllowed: boolean };
+type WearerSettings = { speakingRate: number; recordingAllowed: boolean; recordingUploadEnabled?: boolean };
 type InteractionView = { _id: string; status: string; answerText?: string };
 type NotificationView = { _id: string; text: string };
 
@@ -121,6 +122,9 @@ export function useWearerClient({ turnMode, fullscreen = false }: { turnMode: Tu
   const started = camera.status !== "idle";
   const rate = settings?.speakingRate ?? 0.9;
   const recordingAllowed = settings?.recordingAllowed ?? false;
+  // Off unless the caregiver turned it on: recordings stay on the phone.
+  const recordingUploadEnabled = recordingAllowed && settings?.recordingUploadEnabled === true;
+  const uploads = useRecordingUpload(recorder.recordings, recordingUploadEnabled);
 
   const wakeLock = useWakeLock(started);
   // A camera that never opened shows its own error; the stall card is for a
@@ -335,6 +339,8 @@ export function useWearerClient({ turnMode, fullscreen = false }: { turnMode: Tu
     lastQuestion,
     lastError,
     recordingAllowed,
+    recordingUploadEnabled,
+    uploads,
     video,
     setVideo,
     start,
