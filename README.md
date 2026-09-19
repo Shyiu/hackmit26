@@ -468,7 +468,7 @@ Next.js:
 | `GET /api/perception/token` | Mints a short-lived token for the frame socket. A browser can't set headers on a WebSocket, so the page sends it as the first message |
 | `GET, POST /api/items`, `PATCH /api/items/:id` | Item CRUD and photo enrollment |
 | `GET /api/sightings` | Filter by item and time range |
-| `GET, POST /api/rooms` | Room CRUD and enrollment |
+| `GET, POST /api/rooms`, `PATCH /api/rooms/:id` | Room CRUD, the private flag, and later enrollment |
 | `GET /api/interactions` | Question log and latency stats |
 | `GET /api/interactions/:id` | Poll authorized answer text, status, and final server timings |
 | `POST /api/interactions/:id/playback` | Record client playback/turn timings, labeled as client-reported telemetry |
