@@ -1,0 +1,45 @@
+[project]
+name = "memory-glasses-perception"
+version = "0.0.0"
+description = "Takes frames from the headset, detects tracked items, and writes sightings to MongoDB"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.141",
+  "uvicorn[standard]>=0.53",
+  # The native async API, AsyncMongoClient. Motor is deprecated.
+  "pymongo>=4.18",
+  "pydantic>=2.13",
+  "pydantic-settings>=2.15",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.1",
+  "pytest-asyncio>=1.4",
+  # Starlette's TestClient runs on httpx2 and warns if it finds only httpx.
+  "httpx2>=2.13",
+]
+
+[tool.uv]
+# A service, not a library: nothing to build or install, the app runs from this directory.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+# One event loop for the whole run, so the module-scoped database fixture and
+# the tests that use it share the loop its AsyncMongoClient is bound to.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+filterwarnings = [
+  # Raised inside starlette.testclient itself, not by anything here.
+  "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "DTZ"]
