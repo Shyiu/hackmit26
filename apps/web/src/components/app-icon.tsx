@@ -18,7 +18,7 @@ export function AppIcon({ size, padding = 0 }: { size: number; padding?: number 
           width: inner * 0.56,
           height: inner * 0.56,
           borderRadius: "50%",
-          border: `${inner * 0.07}px solid #fde047`,
+          border: `${inner * 0.07}px solid #c65d3b`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
