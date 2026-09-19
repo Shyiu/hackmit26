@@ -14,7 +14,7 @@ import { navRowClass, SignOutButton } from "./sign-out-button";
 export function Sidebar() {
   const pathname = usePathname();
   return (
-    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-6 border-r px-3 py-6 md:flex">
+    <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col gap-5 border-r px-2.5 py-5 md:flex">
       <Link href="/dashboard" className="px-3 text-sm" aria-label="Memior home">
         <Wordmark />
       </Link>
@@ -73,7 +73,7 @@ export function TabBar() {
   // The active tab sits in a soft terracotta pill; the rest keep tinted icons.
   const tabClass = (active: boolean) =>
     cn(
-      "my-1.5 flex flex-1 flex-col items-center justify-center gap-1 rounded-[1.4rem] text-xs font-medium transition-colors",
+      "my-1.5 flex flex-1 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium transition-colors",
       active ? "bg-terracotta-soft text-terracotta-deep" : "text-foreground/80",
     );
   const iconClass = (active: boolean) =>

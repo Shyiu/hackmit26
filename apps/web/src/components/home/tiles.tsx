@@ -56,7 +56,7 @@ export function Tile({
     <Link
       href={href}
       className={cn(
-        "group relative flex min-w-0 overflow-hidden rounded-[1.75rem] p-4 transition-transform active:scale-[0.98] focus-visible:ring-3 focus-visible:ring-ring/60 focus-visible:outline-none sm:p-5",
+        "group relative flex min-w-0 overflow-hidden rounded-2xl p-4 transition-transform active:scale-[0.98] focus-visible:ring-3 focus-visible:ring-ring/60 focus-visible:outline-none sm:p-5",
         large ? "aspect-[1.45/1]" : "aspect-[1/1]",
         colors.card,
       )}
