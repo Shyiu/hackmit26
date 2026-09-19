@@ -140,8 +140,14 @@ export function SimulatorView() {
           {recorder.recording ? "Stop" : "Record"}
         </Button>
       </div>
-      {!client.recordingAllowed && (
+      {!client.recordingAllowed ? (
         <p className="text-sm text-muted-foreground">Recording is off until a caregiver allows it in settings.</p>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {client.recordingUploadEnabled
+            ? "Finished recordings upload to the caregiver's Recordings page."
+            : "Recordings stay on this device until you save them."}
+        </p>
       )}
 
       <CameraSelect
