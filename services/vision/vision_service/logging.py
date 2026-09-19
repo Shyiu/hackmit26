@@ -2,8 +2,46 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
+import logging.config
 from datetime import datetime, timezone
+
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "vision_service.logging.JsonFormatter",
+        },
+    },
+    "handlers": {
+        "json": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "stream": "ext://sys.stdout",
+        },
+    },
+    "root": {
+        "handlers": ["json"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "uvicorn": {
+            "handlers": [],
+            "level": "INFO",
+            "propagate": True,
+        },
+        "uvicorn.error": {
+            "handlers": [],
+            "level": "INFO",
+            "propagate": True,
+        },
+        "uvicorn.access": {
+            "handlers": [],
+            "level": "INFO",
+            "propagate": True,
+        },
+    },
+}
 
 
 class JsonFormatter(logging.Formatter):
@@ -25,9 +63,16 @@ class JsonFormatter(logging.Formatter):
 
 
 def configure(level: str = "INFO") -> None:
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(JsonFormatter())
-    root = logging.getLogger()
-    root.handlers.clear()
-    root.addHandler(handler)
-    root.setLevel(level.upper())
+    config = {
+        **LOGGING_CONFIG,
+        "root": {**LOGGING_CONFIG["root"], "level": level.upper()},
+        "loggers": {
+            name: {**logger_config, "level": level.upper()}
+            for name, logger_config in LOGGING_CONFIG["loggers"].items()
+        },
+    }
+    logging.config.dictConfig(config)
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        logger = logging.getLogger(name)
+        logger.handlers.clear()
+        logger.propagate = True

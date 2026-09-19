@@ -24,6 +24,10 @@ With defaults, no model weights or external services are needed: MongoDB is
 `mongomock://`, detectors and VLM are mocks, and images are stored in `data/images`.
 Copy `.env.example` to `.env` to document local choices.
 
+Application and Uvicorn logs are emitted as one JSON object per line, including
+startup and access logs. No separate Uvicorn `--log-config` option is needed;
+the application configures the root and Uvicorn loggers during import.
+
 ## MongoDB and adapters
 
 Set `MONGODB_URI=mongodb://...` and `MONGODB_DB` for a real MongoDB deployment.

@@ -29,6 +29,18 @@ class AlertPatch(BaseModel):
     status: str = Field(pattern="^(open|acknowledged|dismissed|escalated)$")
 
 
+def _parse_captured_at(value: str | None) -> datetime:
+    if not value:
+        return datetime.utcnow()
+    try:
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="captured_at must be an ISO 8601 timestamp",
+        ) from exc
+
+
 def _dependencies(settings: Settings):
     client = get_client(settings)
     db = get_db(client, settings)
@@ -127,7 +139,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             filename = path.name
             device_id = payload.get("device_id", "local-device")
             captured_at = payload.get("captured_at")
-        when = datetime.fromisoformat(captured_at) if captured_at else datetime.utcnow()
+        when = _parse_captured_at(captured_at)
         observation = process_image(
             data,
             filename=filename,
