@@ -1,6 +1,10 @@
-// Seeds one demo wearer, a caregiver login, three items, and sightings that
-// exercise the answer wording: one item seen resting, one picked up after it
-// was put down, one still waiting for its description.
+// Seeds one demo wearer, a caregiver login, rooms, the items a person with
+// dementia loses most, a caregiver message, and a reminder. The first three
+// items' sightings exercise the answer wording: one seen resting, one picked up
+// after it was put down, one still waiting for its description.
+//
+// It seeds no `people`. Face records are written by services/perception, which
+// encrypts the embeddings, and each one records a real person's consent.
 //
 //   pnpm db:seed           seed once; a second run changes nothing
 //   pnpm db:seed --reset   delete the demo wearer's data and seed again
@@ -77,8 +81,87 @@ async function seed(db: Db) {
   await observe(wallet, { lastSeenAt: new Date(now - 10 * MINUTE), state: "held", description: { status: "pending" } });
   await observe(glasses, { lastSeenAt: new Date(now - 2 * MINUTE), state: "unknown", description: { status: "pending" } });
 
+  for (const name of ["kitchen", "hallway", "bedroom", "living room"]) await tenant.rooms.create({ name });
+  await tenant.rooms.create({ name: "bathroom", private: true });
+
+  const phone = await tenant.items.create({ name: "phone", aliases: ["cell phone", "mobile", "iphone"] });
+  const pills = await tenant.items.create({
+    name: "pill organizer",
+    aliases: ["pills", "medication", "medicine", "pill box"],
+    detectorPrompts: ["pill organizer", "pill box"],
+  });
+  const remote = await tenant.items.create({ name: "remote", aliases: ["tv remote", "remote control", "clicker"] });
+  const hearingAids = await tenant.items.create({
+    name: "hearing aids",
+    aliases: ["hearing aid"],
+    detectorPrompts: ["hearing aid", "hearing aid case"],
+    plural: true,
+  });
+  const cane = await tenant.items.create({ name: "cane", aliases: ["walking stick", "walking cane"] });
+
+  await observe(phone, {
+    lastSeenAt: new Date(now - 45 * MINUTE),
+    state: "resting",
+    description: {
+      status: "ready",
+      sentence: "on the arm of the couch, under a newspaper",
+      room: "living room",
+      surface: "couch",
+      relation: "under a newspaper",
+    },
+  });
+  await observe(pills, {
+    lastSeenAt: new Date(now - 6 * 60 * MINUTE),
+    state: "resting",
+    description: {
+      status: "ready",
+      sentence: "on the kitchen table, beside the fruit bowl",
+      room: "kitchen",
+      surface: "table",
+      relation: "beside the fruit bowl",
+    },
+  });
+  await observe(remote, {
+    lastSeenAt: new Date(now - 90 * MINUTE),
+    state: "resting",
+    description: { status: "ready", sentence: "on the coffee table", room: "living room", surface: "coffee table" },
+  });
+  await observe(hearingAids, {
+    lastSeenAt: new Date(now - 11 * 60 * MINUTE),
+    state: "resting",
+    description: {
+      status: "ready",
+      sentence: "in their case on the nightstand",
+      room: "bedroom",
+      surface: "nightstand",
+      relation: "in their case",
+    },
+  });
+  await observe(cane, {
+    lastSeenAt: new Date(now - 30 * MINUTE),
+    state: "resting",
+    description: {
+      status: "ready",
+      sentence: "leaning against the wall by the front door",
+      room: "hallway",
+      relation: "leaning against the wall by the front door",
+    },
+  });
+
+  await tenant.notifications.create({
+    kind: "caregiver_message",
+    text: "Hi Mom, I'm coming by at four with groceries.",
+    createdBy: DEMO_CAREGIVER_ID,
+  });
+  await tenant.notifications.create({
+    kind: "reminder",
+    text: "Time for your evening pills. They are on the kitchen table.",
+    showAt: new Date(now + 2 * 60 * MINUTE),
+    createdBy: DEMO_CAREGIVER_ID,
+  });
+
   for (const item of await tenant.items.list()) {
-    console.log(`${item.name.padEnd(8)} ${locationStatus(item.lastSighting)}  ${item.lastSighting?.sentence ?? ""}`);
+    console.log(`${item.name.padEnd(14)} ${locationStatus(item.lastSighting)}  ${item.lastSighting?.sentence ?? ""}`);
   }
 }
 
