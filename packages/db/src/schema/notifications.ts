@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { idSchema, type CaregiverId, type NotificationId, type PatientId } from "../ids";
+import {
+  idSchema,
+  type CaregiverId,
+  type DangerEventId,
+  type NotificationId,
+  type PatientId,
+} from "../ids";
 import { notificationKind, notificationStatus } from "./common";
 
 /**
@@ -18,6 +24,7 @@ export const notificationDocSchema = z.strictObject({
   shownAt: z.date().nullable(),
   createdAt: z.date(),
   expiresAt: z.date(),
+  dangerEventId: idSchema<DangerEventId>().optional(),
 });
 
 export type NotificationDoc = z.infer<typeof notificationDocSchema>;

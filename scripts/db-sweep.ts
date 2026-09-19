@@ -1,21 +1,28 @@
-// Deletes records past their retention window and repairs item snapshots that
-// pointed at them. Idempotent; a cron can run it as often as it likes.
+// Deletes records past their retention window, repairs item snapshots that
+// pointed at them, and drops their objects from storage. Idempotent; a cron
+// can run it as often as it likes.
 //
-//   pnpm db:sweep
+//   pnpm db:sweep             delete
+//   pnpm db:sweep --dry-run   report what would go, write nothing
 
 import { sweepExpired } from "@memory-glasses/db";
+import { deleteObjects, storageConfigured } from "./lib/storage";
 import { withDatabase } from "./lib/env";
 
-// TODO: pass deleteObjects once keyframes go to object storage (README open decision 8).
-const report = await withDatabase((db) => sweepExpired(db));
+const dryRun = process.argv.includes("--dry-run");
 
-const deleted = Object.entries(report.deleted).filter(([, count]) => count > 0);
-console.log(
-  deleted.length === 0
-    ? "Nothing had expired."
-    : deleted.map(([collection, count]) => `${collection}: ${count} deleted`).join("\n"),
+if (!dryRun && !storageConfigured()) {
+  console.warn("S3_* is not set; object keys are counted but nothing is deleted from storage.");
+}
+
+const report = await withDatabase((db) =>
+  sweepExpired(db, {
+    dryRun,
+    log: (line) => console.log(line),
+    deleteObjects: storageConfigured() ? deleteObjects : undefined,
+  }),
 );
-console.log(`item snapshots cleared: ${report.clearedSnapshots}`);
-if (report.objectKeys > 0) {
-  console.log(`${report.objectKeys} object keys are orphaned; storage deletion isn't wired up yet`);
+
+if (Object.values(report.deleted).every((n) => !n) && report.clearedSnapshots === 0) {
+  console.log("Nothing had expired.");
 }

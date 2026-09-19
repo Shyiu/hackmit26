@@ -46,5 +46,6 @@ export * from "./schema/rooms";
 export * from "./schema/notifications";
 export * from "./schema/recordings";
 export * from "./schema/perception";
+export * from "./schema/safety";
 export * from "./schema/tenancy";
 export * from "./schema/meta";
