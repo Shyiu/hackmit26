@@ -6,7 +6,7 @@ The wearer asks out loud, "Where are my keys?" About a second later they hear, "
 
 The product belongs on glasses, and Ray-Ban Meta was the platform we planned around. We can't get a pair for the hackathon. So this build runs on a phone inside a 3D-printed headset. The phone's rear camera is the wearer's eyes. Its screen shows that camera feed live, with labels and notifications drawn on top, and it can record what it sees. Ray-Ban Meta stays in the plan as a second client on the same contract, for when we have the hardware.
 
-**Status: early build.** `apps/web` has the dashboard shell, stub API routes that return 501, and a Mongo client helper. The `/headset` page works on its own: stereo passthrough from the rear camera, eye calibration saved on the phone, wake lock, local video recording, a stalled-feed card, and a HUD with test captions and test labels. Push-to-talk opens and closes the mic, but no audio reaches speech to text yet, so nothing answers a question. `/sim` runs the same client on a flat page. This README is still the build plan, so edit it freely.
+**Status: early build.** The database is built: `packages/db` holds the MongoDB schemas, validators, indexes, and repositories, tested against a real MongoDB. The API routes read and write through it behind a caregiver login and device tokens, and `POST /api/ask` answers seeded questions in text. The `/headset` page works on its own: stereo passthrough from the rear camera, eye calibration saved on the phone, wake lock, local video recording, a stalled-feed card, and a HUD with test captions and test labels. Push-to-talk opens and closes the mic, but no audio reaches speech to text yet, so the pages don't ask anything. `/sim` runs the same client on a flat page. `services/perception` is a skeleton: its frame socket authenticates and answers each frame with empty detections, and its database write path is built and tested, but no detector runs. This README is still the build plan, so edit it freely.
 
 ## The problem
 
@@ -341,20 +341,44 @@ Both services derive `patientId` from an authenticated caregiver session or scop
 // patients, caregivers, devices: accounts, settings, device tokens
 ```
 
-Indexes:
+The built schemas live in `packages/db/src/schema/`, one zod schema per collection, and `pnpm db:setup` installs each one as a MongoDB validator that rejects bad writes from either service ([ADR 0002](docs/decisions/0002-mongodb-schema-from-zod.md)). They follow the sketch above, with these differences:
+
+- Every id is an ObjectId, and references are ObjectIds too.
+- `items.lookupKeys` holds the normalized name and aliases. A unique index over active items keeps each spoken name on one item, and the fast path resolves a transcript with one `$in` query on it. `items.plural` picks "it was" or "they were", and `items.active: false` archives an item.
+- `items.observationVersion` is the compare-and-set counter for snapshot writes. `locationStatus` is derived when read, from the snapshot's state and description status, rather than stored.
+- Snapshots carry `expiresAt`, so a read can drop an expired one without looking up its sighting.
+- `items.updatedAt` marks caregiver edits only; snapshot writes leave it alone. A save can send the value its form loaded as `expectedUpdatedAt` and gets a 409 instead of overwriting a newer save.
+- `patients.settings` holds the caregiver settings, and `patients.configVersion` goes up on every item, room, or settings write.
+- Three collections the sketch leaves out: `capture_sessions`, one per frame socket connection, paused or live, for the dashboard badge; `description_jobs`, the keyframe queue with leases, retries, and supersession; and `meta`, the schema fingerprint `db:setup` last applied.
+
+Indexes, as declared in `packages/db/src/registry.ts`:
 
 | Collection | Index | Serves |
 |---|---|---|
-| `items` | `{ patientId: 1, name: 1 }` | fast path lookup |
-| `sightings` | `{ patientId: 1, itemId: 1, lastSeenAt: -1 }` | timelines, history |
-| `sightings` | vector on `sentenceEmbedding`, filters `patientId`, `itemId`, `lastSeenAt` | open-ended questions |
-| `room_refs` | vector on `embedding`, filter `patientId` | room classification |
-| `interactions` | `{ patientId: 1, askedAt: -1 }` | question log |
+| `items` | unique `{ patientId: 1, lookupKeys: 1 }` where `active: true` | fast path lookup; one spoken name per active item |
+| `items` | `{ patientId: 1, name: 1 }` | item list |
 | `sightings` | unique `{ patientId: 1, eventId: 1 }` | idempotent ingestion |
+| `sightings` | `{ patientId: 1, itemId: 1, lastSeenAt: -1 }` | timelines, history |
+| `sightings` | `{ patientId: 1, lastSeenAt: -1 }` | recent sightings, room and time questions |
+| `sightings` | `{ lastSeenAt: 1 }` where `status: "open"` | closing sightings left open by a crash |
+| `sightings` | vector on `sentenceEmbedding`, filters `patientId`, `itemId`, `lastSeenAt` | open-ended questions, optional |
+| `sightings` | Atlas Search on `searchText` | the text half of `$rankFusion`, optional |
+| `room_refs` | vector on `embedding`, filter `patientId` | room classification, optional |
+| `room_refs` | `{ patientId: 1, roomId: 1 }` | a room's reference frames |
 | `interactions` | unique `{ patientId: 1, requestId: 1 }` | request deduplication |
+| `interactions` | `{ patientId: 1, askedAt: -1 }` | question log, latency percentiles |
+| `description_jobs` | `{ status: 1, runAfter: 1 }` | claiming due jobs and expired leases |
+| `description_jobs` | unique `{ sightingId: 1, keyframeRevision: 1 }` | one job per keyframe, superseding older ones |
+| `description_jobs` | `{ patientId: 1, status: 1 }` | per-wearer queue bound, pause cancelling queued work |
+| `capture_sessions` | `{ patientId: 1, startedAt: -1 }` | capture state badge |
+| `rooms` | unique `{ patientId: 1, normalizedName: 1 }` | one room per name |
 | `notifications` | `{ patientId: 1, status: 1, showAt: 1 }` | HUD poll, optional |
 | `recordings` | `{ patientId: 1, startedAt: -1 }` | recordings list, optional |
-| retained records | indexed `expiresAt`, cleanup worker | coordinated retention; TTL is only a secondary safeguard |
+| `devices` | `{ patientId: 1, createdAt: -1 }` | a wearer's devices |
+| `caregivers` | unique `{ email: 1 }` | login |
+| every collection with `expiresAt` | TTL a day after `expiresAt` | backstop only; `pnpm db:sweep` is the cleanup job, and reads filter expired records at once |
+
+The three search indexes are exactly the free tier's limit.
 
 ### Where vector search earns its place
 
@@ -445,7 +469,9 @@ Next.js:
 
 | Route | Does |
 |---|---|
-| `POST /api/ask` | Takes `{ transcript, requestId }`, returns `X-Interaction-Id` before streaming audio; deduplicates by wearer and request ID |
+| `POST /api/ask` | Takes `{ transcript, requestId }`, returns `X-Interaction-Id` before streaming audio; deduplicates by wearer and request ID. Until TTS lands it returns the interaction as JSON |
+| `POST /api/auth/login`, `POST /api/auth/logout` | The one caregiver login, from `CAREGIVER_EMAIL` and `CAREGIVER_PASSWORD`. Sets a signed session cookie |
+| `GET /api/health` | Unauthenticated. Whether the database answers and its validators are current |
 | `GET /api/stt/token` | Mints a short-lived Deepgram key so the client streams audio to Deepgram directly and skips a hop |
 | `GET /api/perception/token` | Mints a short-lived token for the frame socket. A browser can't set headers on a WebSocket, so the page sends it as the first message |
 | `GET, POST /api/items`, `PATCH /api/items/:id` | Item CRUD and photo enrollment |
@@ -515,14 +541,17 @@ hackmit26/
   services/
     perception/              FastAPI, YOLOE-26, tracker, description jobs
   packages/
-    shared/                  zod schemas and types
+    shared/                  wire contract: API bodies, the frame socket protocol, signed tokens
+    db/                      stored-document schemas, collection registry, repositories, retention
   hardware/
     headset/                 STL, slicer settings, lens measurements
   scripts/
-    create-indexes.ts        Atlas indexes, vector ones included
-    seed.ts                  demo wearer, items, fake sightings
+    db-setup.ts              syncs collections, validators, and indexes; --search for vector ones
+    seed.ts                  demo wearer, caregiver, items, fake sightings
+    db-sweep.ts              deletes records past retention
     bench-tts.ts             benchmarks the chosen TTS provider; optional comparison
-    replay.py                plays a recorded video into /ws/frames
+    replay.py                plays a folder of JPEG frames into /ws/frames
+  docker-compose.yml         local MongoDB 8.0 with Atlas Search
   docs/
     decisions/               ADRs
 ```
@@ -532,9 +561,19 @@ pnpm workspaces for the JavaScript side, uv for Python.
 ## Environment variables
 
 ```bash
-# MongoDB
+# MongoDB. Locally: `pnpm db:up`, then mongodb://localhost:27017/?directConnection=true
 MONGODB_URI=
 MONGODB_DB=memory_glasses
+OPENAI_EMBEDDING_DIMENSIONS=1536   # vector index widths for `pnpm db:setup --search`
+ROOM_EMBEDDING_DIMENSIONS=512
+
+# The one caregiver login. `pnpm db:seed` creates a caregiver with this email
+CAREGIVER_EMAIL=caregiver@example.com
+CAREGIVER_PASSWORD=
+
+# Signing secrets, 32+ characters each: openssl rand -base64 32
+AUTH_SECRET=
+DEVICE_TOKEN_SECRET=               # perception needs the same value
 
 # OpenAI. Model IDs live in env so we pick the current small, fast tier at build time
 OPENAI_API_KEY=
@@ -560,25 +599,24 @@ S3_SECRET_ACCESS_KEY=
 
 # Wiring. The phone page opens the frame socket itself, so this is the public wss:// URL
 NEXT_PUBLIC_PERCEPTION_WS_URL=
-DEVICE_TOKEN_SECRET=
-AUTH_SECRET=
 ```
 
 ## Running it
 
-The pnpm commands exist. `services/perception` and `replay.py` don't yet.
-
 ```bash
 pnpm install
-pnpm db:indexes                  # create Atlas indexes
-pnpm db:seed                     # demo wearer and items
-pnpm dev                         # Next.js on :3000
+pnpm db:up                       # local MongoDB in Docker, or point MONGODB_URI at Atlas
+pnpm db:setup                    # collections, validators, indexes; rerun after schema changes
+pnpm db:seed                     # demo wearer, caregiver login, items with sightings
+pnpm dev                         # Next.js on :3000; sign in at /login
+pnpm test                        # vitest, against MongoDB
 pnpm bench:tts                   # chosen-provider latency benchmark
 
 cd services/perception
 uv sync
 uv run uvicorn app.main:app --port 8000
-uv run python ../../scripts/replay.py fixtures/kitchen.mp4
+uv run pytest
+uv run python ../../scripts/replay.py --help
 
 # The phone needs https:// and wss://. Tunnel both dev servers, one command per terminal.
 cloudflared tunnel --url http://localhost:3000
@@ -588,6 +626,8 @@ cloudflared tunnel --url http://localhost:8000
 `next dev` blocks dev assets for hostnames it doesn't know. `apps/web/next.config.ts` allows `*.trycloudflare.com`. Add the hostname there if you use a different tunnel. Open `/headset` on the phone from the tunnel URL, tap Start, and put the phone in the shell. A recording made on the phone is also a replay fixture: copy the file off and feed it to `replay.py`.
 
 ## Testing
+
+What runs today: `pnpm test` runs the zod contract fixtures and the database tests, and `uv run pytest` in `services/perception` runs the write path, protocol, and token tests. Both suites use a real MongoDB with the generated validators, so start one with `pnpm db:up` first. The list below is the plan for the rest.
 
 - Unit tests for intent routing, answer templates, relative time, and the sighting state machine using Vitest and pytest.
 - Replay annotated walkthroughs with expected identity, location changes, and uncertainty. Cover pickup from a resting spot, similar objects, questions while an item remains visible, pending/failed descriptions, unknown rooms, dropped frames, reconnects, duplicate events, and jobs finishing out of order. Assert that old jobs never overwrite newer evidence. Record wrong-location answers and abstentions, not just detection counts.

@@ -6,14 +6,16 @@ truth for the spec, architecture, data model, current status, and build order. R
 
 ## Repo layout
 
-pnpm workspace. `apps/ios` and `services/perception` are planned but not scaffolded.
+pnpm workspace plus one uv project. `apps/ios` is planned but not scaffolded.
 
 ```text
-apps/web/         Next.js 16 App Router: /headset wearer view, /sim flat fallback, dashboard, API routes
-packages/shared/  zod schemas, the wire contract between web, perception, and the headset HUD
-scripts/          db:indexes, db:seed, bench:tts, run from the repo root with pnpm
-docs/decisions/   ADRs
-docs/research/    dated model and vision research, each ending with proposed README changes
+apps/web/             Next.js 16 App Router: /headset wearer view, /sim flat fallback, dashboard, API routes
+packages/shared/      zod 3 wire contract: API bodies, the /ws/frames protocol, signed tokens, fixtures
+packages/db/          zod 4 stored-document schemas, the collection registry, repositories, retention
+services/perception/  Python FastAPI service: frame socket, sighting writes, description job queue
+scripts/              db:setup, db:seed, db:sweep, bench:tts, run from the repo root with pnpm
+docs/decisions/       ADRs
+docs/research/        dated model and vision research, each ending with proposed README changes
 ```
 
 Wearer client code lives in `apps/web/src/hooks/` (camera, recorder, push-to-talk, wake lock, HUD
@@ -27,20 +29,34 @@ pnpm install
 pnpm dev              # apps/web on :3000
 pnpm build
 pnpm lint
-pnpm db:indexes        # needs MONGODB_URI
-pnpm db:seed           # needs MONGODB_URI, writes a demo patient + 3 items
+pnpm typecheck
+pnpm test             # vitest in packages/shared and packages/db; the db tests need MongoDB
+pnpm db:up            # local MongoDB 8.0 with Atlas Search in Docker, on :27017
+pnpm db:setup         # sync collections, validators, indexes; --search adds vector indexes
+pnpm db:seed          # demo wearer, caregiver, 3 items with sightings; --reset starts over
+pnpm db:sweep         # delete records past retention
+cd services/perception && uv run pytest   # the Python tests, also against MongoDB
 cloudflared tunnel --url http://localhost:3000   # HTTPS URL for testing on a phone
 ```
 
-Copy `apps/web/.env.example` to `apps/web/.env.local` and fill in `MONGODB_URI` at minimum to run
-anything that touches the database.
+Copy `apps/web/.env.example` to `apps/web/.env.local`. The database needs `MONGODB_URI`; signing in
+also needs `AUTH_SECRET`, `DEVICE_TOKEN_SECRET`, `CAREGIVER_EMAIL`, and `CAREGIVER_PASSWORD`. The root
+scripts read the same file.
 
 ## Conventions
 
 - API routes live under `apps/web/src/app/api/*/route.ts`, one file per resource, matching the
   table in README.md "API sketch". A route that isn't built yet validates its input and returns 501.
-- Data shapes are defined once, in `packages/shared/src/schemas/*.ts`, and imported via
-  `@memory-glasses/shared`. Add new fields there first, then use them in a route or the client.
+- Wire shapes (request bodies, socket messages) are defined once, in `packages/shared/src/schemas/*.ts`.
+  Stored documents are defined once, in `packages/db/src/schema/*.ts`, and each becomes its
+  collection's MongoDB validator. See docs/decisions/0002. After changing a stored schema, run
+  `pnpm db:setup` and `pnpm --filter @memory-glasses/db export-schema`, and commit
+  `packages/db/generated/mongo-schema.json`; a test fails until you do.
+- Route handlers go through `withTenant` in `apps/web/src/lib/server/api.ts`, which authenticates and
+  hands over repositories scoped to one wearer. `patientId` never comes from a request body. Code
+  that touches the database or secrets lives in `apps/web/src/lib/server/`.
+- `services/perception` writes sightings and item snapshots itself. Its write rules (version checks,
+  keyframe guards, job leases) live in `app/store.py`, tested against the generated validators.
 - Dashboard pages live under `apps/web/src/app/dashboard/*`, one folder per nav item.
 - A link that looks like a button is `next/link` styled with `buttonVariants()`. The Base UI
   `Button` is for actions: rendered as a link, it gets `role="button"`.
@@ -59,4 +75,8 @@ anything that touches the database.
 - Hidden and headless browser tabs render about once a second, so `useFeedWatchdog` reports a
   stalled feed and `/headset` shows its stall card. Test the headset in a visible tab, or shim
   `HTMLVideoElement.prototype.requestVideoFrameCallback`.
-- Several agent sessions often edit this repo at once. Stage files by explicit path.
+- Several agent sessions often edit this repo at once. Stage files by explicit path, and read
+  `git diff --cached --stat` before committing: anything already staged, including a `git rm`,
+  rides along in your commit.
+- The db tests use `MONGODB_TEST_URI`, default `mongodb://127.0.0.1:27017/?directConnection=true`.
+  Each test file creates and drops its own database, so they can share a server with dev data.
