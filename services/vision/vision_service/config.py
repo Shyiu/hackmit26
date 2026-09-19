@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-import warnings
 
 from cryptography.fernet import Fernet
+from pydantic import PrivateAttr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,16 +35,14 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     ALLOW_LOCAL_PATH_INGEST: bool = True
     INGEST_ALLOWED_DIR: str | None = None
+    _ephemeral_fernet: Fernet | None = PrivateAttr(default=None)
 
     def fernet(self) -> Fernet:
         if self.FACE_EMBEDDING_KEY:
             return Fernet(self.FACE_EMBEDDING_KEY.encode())
-        warnings.warn(
-            "ephemeral key — enrolled embeddings will not survive restart",
-            UserWarning,
-            stacklevel=2,
-        )
-        logging.getLogger("vision_service").warning(
-            "ephemeral key — enrolled embeddings will not survive restart"
-        )
-        return Fernet(Fernet.generate_key())
+        if self._ephemeral_fernet is None:
+            logging.getLogger("vision_service").warning(
+                "ephemeral key — enrolled embeddings will not survive restart"
+            )
+            self._ephemeral_fernet = Fernet(Fernet.generate_key())
+        return self._ephemeral_fernet

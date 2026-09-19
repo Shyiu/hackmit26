@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import logging
 import mimetypes
@@ -16,6 +17,7 @@ from .repositories import AlertsRepo, FaceProfilesRepo, ObservationsRepo, new_id
 from .rules import evaluate_rules
 from .schemas import (
     Alert,
+    CandidateAlert,
     DetectorResult,
     Evidence,
     FaceObservation,
@@ -51,21 +53,15 @@ def process_image(
     observations, profiles, alerts = repos
     received_at = datetime.utcnow()
     content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    stored = image_store.put(image_bytes, content_type=content_type, suggested_name=filename)
     observation = Observation(
         _id=new_id(),
         device_id=device_id,
         captured_at=captured_at,
         received_at=received_at,
         image=ImageInfo(
-            url=stored.url,
-            store=stored.store,
-            key=stored.key,
-            sha256=stored.sha256,
-            width=0,
-            height=0,
+            sha256=hashlib.sha256(image_bytes).hexdigest(),
             content_type=content_type,
-            bytes=stored.bytes,
+            bytes=len(image_bytes),
         ),
         processing=ProcessingInfo(state=ProcessingState.processing),
         created_at=received_at,
@@ -73,6 +69,14 @@ def process_image(
     )
     stage = "store_image"
     try:
+        stage_started = time.perf_counter()
+        stored = image_store.put(image_bytes, content_type=content_type, suggested_name=filename)
+        observation.image.url = stored.url
+        observation.image.store = stored.store
+        observation.image.key = stored.key
+        observation.processing.stage_timings_ms[stage] = (
+            time.perf_counter() - stage_started
+        ) * 1000
         stage_started = time.perf_counter()
         raw = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         image = np.asarray(raw)
@@ -128,13 +132,16 @@ def process_image(
             latency_ms=(time.perf_counter() - stage_started) * 1000,
         )
         observation.processing.stage_timings_ms[stage] = observation.faces.latency_ms
-        observation.processing.stage_timings_ms["evaluate_rules"] = 0
         observations.insert(observation)
+        stage = "evaluate_rules"
+        stage_started = time.perf_counter()
         candidates = evaluate_rules(observation.detector, observation.faces, settings)
-        observation.processing.stage_timings_ms["evaluate_rules"] = 0
+        observation.processing.stage_timings_ms[stage] = (
+            time.perf_counter() - stage_started
+        ) * 1000
         stage = "create_alerts"
-        vlm_candidates = []
-        created_alerts = []
+        pairs: list[tuple[CandidateAlert, Alert]] = []
+        vlm_pairs: list[tuple[CandidateAlert, Alert]] = []
         for candidate in candidates:
             alert = Alert(
                 _id=new_id(),
@@ -149,16 +156,16 @@ def process_image(
                 updated_at=datetime.utcnow(),
             )
             alerts.insert(alert)
-            created_alerts.append(alert)
+            pairs.append((candidate, alert))
             if candidate.vlm_verify:
-                vlm_candidates.append(candidate)
-        if vlm_candidates and settings.VLM != "off" and adapters.vlm:
+                vlm_pairs.append((candidate, alert))
+        if vlm_pairs and settings.VLM != "off" and adapters.vlm:
             stage = "vlm_verify"
-            event_types = [candidate.event_type for candidate in vlm_candidates]
+            event_types = [candidate.event_type for candidate, _ in vlm_pairs]
             try:
                 verification = adapters.vlm.verify(image_bytes, event_types)
                 observation.caption = verification.caption or None
-                for candidate, alert in zip(vlm_candidates, created_alerts, strict=False):
+                for candidate, alert in vlm_pairs:
                     confirmation = next(
                         (
                             item
@@ -171,8 +178,10 @@ def process_image(
                     alert.verification.evidence = (
                         [confirmation.evidence] if confirmation and confirmation.evidence else []
                     )
+                    if confirmation is None:
+                        continue
                     alert.verification.verified_at = datetime.utcnow()
-                    if confirmation and confirmation.confirmed and candidate.verified_event_type:
+                    if confirmation.confirmed and candidate.verified_event_type:
                         alert.event_type = candidate.verified_event_type
                         alert.verification.state = "model_confirmed"
                         alert.verification.method = "vlm"
@@ -184,13 +193,12 @@ def process_image(
                 logger.exception(
                     "vlm verification failed", extra={"observation_id": observation.id}
                 )
-                for alert in created_alerts:
-                    if alert.verification.state == "unverified":
-                        alert.verification.state = "model_error"
-                        alert.verification.method = "vlm"
-                        alert.verification.evidence = [str(exc)]
-                        alerts.update(alert)
-        observation.alert_ids = [alert.id for alert in created_alerts]
+                for _, alert in vlm_pairs:
+                    alert.verification.state = "model_error"
+                    alert.verification.method = "vlm"
+                    alert.verification.evidence = [str(exc)]
+                    alerts.update(alert)
+        observation.alert_ids = [alert.id for _, alert in pairs]
         observation.processing.state = ProcessingState.completed
         observation.updated_at = datetime.utcnow()
         observations.update(observation)

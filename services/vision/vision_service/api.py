@@ -7,7 +7,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from PIL import Image
 from pydantic import BaseModel, Field
 
 from .adapters.registry import build_adapters
@@ -113,8 +115,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             settings = deps["settings"]
             if not settings.ALLOW_LOCAL_PATH_INGEST:
                 raise HTTPException(status_code=403, detail="local path ingest is disabled")
-            if settings.INGEST_ALLOWED_DIR and settings.INGEST_ALLOWED_DIR not in str(
-                path.resolve()
+            if settings.INGEST_ALLOWED_DIR and not path.resolve().is_relative_to(
+                Path(settings.INGEST_ALLOWED_DIR).resolve()
             ):
                 raise HTTPException(status_code=403, detail="path is outside the allowed directory")
             if not path.is_file() or not (mimetypes.guess_type(path.name)[0] or "").startswith(
@@ -148,9 +150,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not file.content_type or not file.content_type.startswith("image/"):
             raise HTTPException(status_code=415, detail="an image upload is required")
         data = await file.read()
-        import numpy as np
-        from PIL import Image
-
         image = np.asarray(Image.open(io.BytesIO(data)).convert("RGB"))
         faces = deps["adapters"].face_detector.detect(image, filename=file.filename or "")
         if len(faces) != 1:

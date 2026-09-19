@@ -11,6 +11,16 @@ from ..vlm.prompt import response_schema, system_prompt
 from ..vlm.validate import validate_vlm_output
 
 
+def image_media_type(image_bytes: bytes) -> str:
+    if image_bytes.startswith(b"\x89PNG"):
+        return "image/png"
+    if image_bytes.startswith(b"\xff\xd8"):
+        return "image/jpeg"
+    if image_bytes.startswith(b"RIFF") and image_bytes[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/jpeg"
+
+
 class OpenAIVLM:
     name = "openai"
 
@@ -28,7 +38,8 @@ class OpenAIVLM:
             {
                 "type": "image_url",
                 "image_url": {
-                    "url": "data:image/jpeg;base64," + base64.b64encode(image_bytes).decode()
+                    "url": f"data:{image_media_type(image_bytes)};base64,"
+                    + base64.b64encode(image_bytes).decode()
                 },
             },
         ]

@@ -78,14 +78,14 @@ class ProcessingState(str, Enum):
 
 
 class ImageInfo(Model):
-    url: str
-    store: str
-    key: str
-    sha256: str
-    width: int
-    height: int
-    content_type: str
-    bytes: int
+    url: str = ""
+    store: str = ""
+    key: str = ""
+    sha256: str = ""
+    width: int = 0
+    height: int = 0
+    content_type: str = ""
+    bytes: int = 0
 
 
 class ProcessingInfo(Model):

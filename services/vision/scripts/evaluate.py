@@ -6,6 +6,7 @@ import statistics
 import time
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 
 from vision_service.adapters.mock import MockDetector
@@ -26,7 +27,7 @@ def evaluate(directory: str, labels_path: str | None = None, detector_name: str 
         if path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
             continue
         started = time.perf_counter()
-        image = __import__("numpy").asarray(Image.open(path).convert("RGB"))
+        image = np.asarray(Image.open(path).convert("RGB"))
         detections = detector.detect(image, filename=path.name)
         result = DetectorResult(adapter=detector.name, model=detector.model, detections=detections)
         predicted = {
