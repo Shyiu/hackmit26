@@ -1,18 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
 import { createItemSchema } from "@memory-glasses/shared";
+import { readBody, withTenant } from "@/lib/server/api";
+import { itemView } from "@/lib/server/views";
 
-// GET: list items for a patient. POST: create an item and push the prompt list
-// to the perception service. See README "Data model" and "API sketch".
-export async function GET() {
-  return NextResponse.json({ error: "not implemented" }, { status: 501 });
-}
+// Item cards: each item with its latest snapshot and what that evidence supports saying.
+export const GET = withTenant("any", async ({ tenant }) => {
+  const items = await tenant.items.list();
+  return Response.json({ items: items.map(itemView) });
+});
 
-export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const parsed = createItemSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  }
-
-  return NextResponse.json({ error: "not implemented" }, { status: 501 });
-}
+// Adds a tracked item. A name another item already answers to is a 409.
+// TODO(M1): tell the perception service to reload its prompt list.
+export const POST = withTenant("caregiver", async ({ request, tenant }) => {
+  const input = await readBody(request, createItemSchema);
+  const item = await tenant.items.create(input);
+  return Response.json(itemView(item), { status: 201 });
+});

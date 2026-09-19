@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
+import { createRoomSchema } from "@memory-glasses/shared";
+import { readBody, withTenant } from "@/lib/server/api";
+import { roomView } from "@/lib/server/views";
 
-// GET: list rooms. POST: enroll a room from a caregiver walkthrough.
-export async function GET() {
-  return NextResponse.json({ error: "not implemented" }, { status: 501 });
-}
+// Caregiver-named rooms. Walkthrough enrollment and reference frames come later.
+export const GET = withTenant("caregiver", async ({ tenant }) => {
+  const rooms = await tenant.rooms.list();
+  return Response.json({ rooms: rooms.map(roomView) });
+});
 
-export async function POST() {
-  return NextResponse.json({ error: "not implemented" }, { status: 501 });
-}
+export const POST = withTenant("caregiver", async ({ request, tenant }) => {
+  const room = await tenant.rooms.create(await readBody(request, createRoomSchema));
+  return Response.json(roomView(room), { status: 201 });
+});

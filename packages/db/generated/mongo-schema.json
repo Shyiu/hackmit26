@@ -1,0 +1,2086 @@
+{
+  "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
+  "version": 1,
+  "fingerprint": "f7e8267ffa41e9d5c06379a6209f2695292eabeed8d5f6c75e5f5482d88b5586",
+  "collections": {
+    "patients": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "displayName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "settings": {
+              "type": "object",
+              "properties": {
+                "timezone": {
+                  "type": "string"
+                },
+                "ttsProvider": {
+                  "type": "string",
+                  "enum": [
+                    "elevenlabs",
+                    "deepgram"
+                  ]
+                },
+                "voiceId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "speakingRate": {
+                  "type": "number",
+                  "minimum": 0.5,
+                  "maximum": 1.5
+                },
+                "hudLevel": {
+                  "type": "string",
+                  "enum": [
+                    "everything",
+                    "captions",
+                    "off"
+                  ]
+                },
+                "recordingAllowed": {
+                  "type": "boolean"
+                },
+                "retentionDays": {
+                  "minimum": 1,
+                  "maximum": 365,
+                  "bsonType": [
+                    "int",
+                    "long",
+                    "double"
+                  ],
+                  "multipleOf": 1
+                },
+                "staleAfterMinutes": {
+                  "minimum": 1,
+                  "maximum": 1440,
+                  "bsonType": [
+                    "int",
+                    "long",
+                    "double"
+                  ],
+                  "multipleOf": 1
+                },
+                "wakeWordEnabled": {
+                  "type": "boolean"
+                },
+                "wakeWordSensitivity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "timezone",
+                "ttsProvider",
+                "voiceId",
+                "speakingRate",
+                "hudLevel",
+                "recordingAllowed",
+                "retentionDays",
+                "staleAfterMinutes",
+                "wakeWordEnabled",
+                "wakeWordSensitivity"
+              ],
+              "additionalProperties": false
+            },
+            "configVersion": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "createdAt": {
+              "bsonType": "date"
+            },
+            "updatedAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "displayName",
+            "settings",
+            "configVersion",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": []
+    },
+    "caregivers": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "email": {
+              "type": "string",
+              "maxLength": 254,
+              "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "patientIds": {
+              "minItems": 1,
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "bsonType": "objectId"
+              }
+            },
+            "lastLoginAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "bsonType": "date"
+            },
+            "updatedAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "email",
+            "name",
+            "patientIds",
+            "lastLoginAt",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "email_unique",
+          "key": {
+            "email": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    "devices": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "headset",
+                "simulator",
+                "glasses"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "tokenVersion": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "lastSeenAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "revokedAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "bsonType": "date"
+            },
+            "updatedAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "kind",
+            "label",
+            "tokenVersion",
+            "lastSeenAt",
+            "revokedAt",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "patient_devices",
+          "key": {
+            "patientId": 1,
+            "createdAt": -1
+          },
+          "unique": false
+        }
+      ]
+    },
+    "items": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "plural": {
+              "type": "boolean"
+            },
+            "aliases": {
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              }
+            },
+            "lookupKeys": {
+              "minItems": 1,
+              "maxItems": 21,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "pattern": "^\\S+(?: \\S+){0,3}$"
+              }
+            },
+            "detectorPrompts": {
+              "minItems": 1,
+              "maxItems": 10,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              }
+            },
+            "referenceImageKeys": {
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              }
+            },
+            "nameEmbedding": {
+              "minItems": 1,
+              "maxItems": 4096,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "embeddingModel": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "active": {
+              "type": "boolean"
+            },
+            "observationVersion": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "lastSighting": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "sightingId": {
+                      "bsonType": "objectId"
+                    },
+                    "observationVersion": {
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double"
+                      ],
+                      "multipleOf": 1
+                    },
+                    "keyframeRevision": {
+                      "minimum": 0,
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double"
+                      ],
+                      "multipleOf": 1
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "resting",
+                        "held",
+                        "moving",
+                        "in_use",
+                        "unknown"
+                      ]
+                    },
+                    "descriptionStatus": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "ready",
+                        "failed"
+                      ]
+                    },
+                    "sentence": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "room": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 60
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lastSeenAt": {
+                      "bsonType": "date"
+                    },
+                    "expiresAt": {
+                      "bsonType": "date"
+                    },
+                    "thumbKey": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "headset",
+                        "simulator",
+                        "glasses"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "sightingId",
+                    "observationVersion",
+                    "keyframeRevision",
+                    "state",
+                    "descriptionStatus",
+                    "sentence",
+                    "room",
+                    "lastSeenAt",
+                    "expiresAt",
+                    "thumbKey",
+                    "source"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lastRestingSighting": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "sightingId": {
+                      "bsonType": "objectId"
+                    },
+                    "observationVersion": {
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double"
+                      ],
+                      "multipleOf": 1
+                    },
+                    "keyframeRevision": {
+                      "minimum": 0,
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double"
+                      ],
+                      "multipleOf": 1
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "resting",
+                        "held",
+                        "moving",
+                        "in_use",
+                        "unknown"
+                      ]
+                    },
+                    "descriptionStatus": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "ready",
+                        "failed"
+                      ]
+                    },
+                    "sentence": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "room": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 60
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lastSeenAt": {
+                      "bsonType": "date"
+                    },
+                    "expiresAt": {
+                      "bsonType": "date"
+                    },
+                    "thumbKey": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "headset",
+                        "simulator",
+                        "glasses"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "sightingId",
+                    "observationVersion",
+                    "keyframeRevision",
+                    "state",
+                    "descriptionStatus",
+                    "sentence",
+                    "room",
+                    "lastSeenAt",
+                    "expiresAt",
+                    "thumbKey",
+                    "source"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "usualSpots": {
+              "maxItems": 5,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "sentence": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "share": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "samples": {
+                    "minimum": 0,
+                    "bsonType": [
+                      "int",
+                      "long",
+                      "double"
+                    ],
+                    "multipleOf": 1
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "configured",
+                      "history"
+                    ]
+                  }
+                },
+                "required": [
+                  "sentence",
+                  "share",
+                  "samples",
+                  "source"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "createdAt": {
+              "bsonType": "date"
+            },
+            "updatedAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "name",
+            "plural",
+            "aliases",
+            "lookupKeys",
+            "detectorPrompts",
+            "referenceImageKeys",
+            "active",
+            "observationVersion",
+            "lastSighting",
+            "lastRestingSighting",
+            "usualSpots",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "lookup_keys_unique",
+          "key": {
+            "patientId": 1,
+            "lookupKeys": 1
+          },
+          "unique": true,
+          "partialFilterExpression": {
+            "active": true
+          }
+        },
+        {
+          "name": "patient_items_by_name",
+          "key": {
+            "patientId": 1,
+            "name": 1
+          },
+          "unique": false
+        }
+      ]
+    },
+    "sightings": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "itemId": {
+              "bsonType": "objectId"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed"
+              ]
+            },
+            "sessionId": {
+              "bsonType": "objectId"
+            },
+            "deviceId": {
+              "anyOf": [
+                {
+                  "bsonType": "objectId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "headset",
+                "simulator",
+                "glasses"
+              ]
+            },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "firstSeenAt": {
+              "bsonType": "date"
+            },
+            "lastSeenAt": {
+              "bsonType": "date"
+            },
+            "closedAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            },
+            "firstSeq": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "lastSeq": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "observationVersion": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "keyframeRevision": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "keyframeKey": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "thumbKey": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "bbox": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              ],
+              "additionalItems": false,
+              "minItems": 4,
+              "maxItems": 4
+            },
+            "frameSize": {
+              "type": "array",
+              "items": [
+                {
+                  "minimum": 0,
+                  "exclusiveMinimum": true,
+                  "bsonType": [
+                    "int",
+                    "long",
+                    "double"
+                  ],
+                  "multipleOf": 1
+                },
+                {
+                  "minimum": 0,
+                  "exclusiveMinimum": true,
+                  "bsonType": [
+                    "int",
+                    "long",
+                    "double"
+                  ],
+                  "multipleOf": 1
+                }
+              ],
+              "additionalItems": false,
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "resting",
+                "held",
+                "moving",
+                "in_use",
+                "unknown"
+              ]
+            },
+            "descriptionStatus": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "ready",
+                "failed"
+              ]
+            },
+            "room": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "bsonType": "objectId"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    },
+                    "confidence": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "confidence"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "surface": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "relation": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sentence": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "nearbyObjects": {
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              }
+            },
+            "searchText": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "sentenceEmbedding": {
+              "minItems": 1,
+              "maxItems": 4096,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "embeddingModel": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "itemId",
+            "label",
+            "status",
+            "sessionId",
+            "deviceId",
+            "source",
+            "eventId",
+            "firstSeenAt",
+            "lastSeenAt",
+            "closedAt",
+            "expiresAt",
+            "firstSeq",
+            "lastSeq",
+            "observationVersion",
+            "keyframeRevision",
+            "keyframeKey",
+            "thumbKey",
+            "confidence",
+            "bbox",
+            "frameSize",
+            "state",
+            "descriptionStatus",
+            "room",
+            "surface",
+            "relation",
+            "sentence",
+            "nearbyObjects"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "event_unique",
+          "key": {
+            "patientId": 1,
+            "eventId": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "item_timeline",
+          "key": {
+            "patientId": 1,
+            "itemId": 1,
+            "lastSeenAt": -1
+          },
+          "unique": false
+        },
+        {
+          "name": "patient_timeline",
+          "key": {
+            "patientId": 1,
+            "lastSeenAt": -1
+          },
+          "unique": false
+        },
+        {
+          "name": "open_by_last_seen",
+          "key": {
+            "lastSeenAt": 1
+          },
+          "unique": false,
+          "partialFilterExpression": {
+            "status": "open"
+          }
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "interactions": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "deviceId": {
+              "anyOf": [
+                {
+                  "bsonType": "objectId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "askedAt": {
+              "bsonType": "date"
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            },
+            "transcript": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "generating",
+                "streaming",
+                "complete",
+                "failed",
+                "cancelled"
+              ]
+            },
+            "path": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "fast",
+                    "llm"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "itemId": {
+              "anyOf": [
+                {
+                  "bsonType": "objectId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "answerTemplate": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "fresh",
+                    "stale",
+                    "held",
+                    "moved",
+                    "unknown",
+                    "unseen",
+                    "ambiguous",
+                    "not_understood"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "answerText": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timingsMs": {
+              "type": "object",
+              "properties": {
+                "stt": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "intent": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "db": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "llmFirstToken": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "ttsFirstByte": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "clientFirstPlayback": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "total": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            "playbackOutcome": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "played",
+                    "partial",
+                    "failed",
+                    "cancelled"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "playbackReportedAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    },
+                    "message": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "completedAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "deviceId",
+            "requestId",
+            "askedAt",
+            "expiresAt",
+            "transcript",
+            "status",
+            "path",
+            "itemId",
+            "answerTemplate",
+            "answerText",
+            "timingsMs",
+            "playbackOutcome",
+            "playbackReportedAt",
+            "error",
+            "completedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "request_unique",
+          "key": {
+            "patientId": 1,
+            "requestId": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "patient_questions",
+          "key": {
+            "patientId": 1,
+            "askedAt": -1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "rooms": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "normalizedName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60,
+              "pattern": "^\\S+(?: \\S+){0,3}$"
+            },
+            "private": {
+              "type": "boolean"
+            },
+            "createdAt": {
+              "bsonType": "date"
+            },
+            "updatedAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "name",
+            "normalizedName",
+            "private",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "name_unique",
+          "key": {
+            "patientId": 1,
+            "normalizedName": 1
+          },
+          "unique": true
+        }
+      ]
+    },
+    "room_refs": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "roomId": {
+              "bsonType": "objectId"
+            },
+            "embedding": {
+              "minItems": 1,
+              "maxItems": 4096,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "embeddingModel": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "imageKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "createdAt": {
+              "bsonType": "date"
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "roomId",
+            "embedding",
+            "embeddingModel",
+            "imageKey",
+            "createdAt",
+            "expiresAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "room_frames",
+          "key": {
+            "patientId": 1,
+            "roomId": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "notifications": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "caregiver_message",
+                "reminder"
+              ]
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "createdBy": {
+              "anyOf": [
+                {
+                  "bsonType": "objectId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "showAt": {
+              "bsonType": "date"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "shown",
+                "expired"
+              ]
+            },
+            "shownAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "bsonType": "date"
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "kind",
+            "text",
+            "createdBy",
+            "showAt",
+            "status",
+            "shownAt",
+            "createdAt",
+            "expiresAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "due_for_hud",
+          "key": {
+            "patientId": 1,
+            "status": 1,
+            "showAt": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "recordings": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "deviceId": {
+              "anyOf": [
+                {
+                  "bsonType": "objectId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sessionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "startedAt": {
+              "bsonType": "date"
+            },
+            "endedAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            },
+            "mimeType": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "width": {
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "height": {
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "hasAudio": {
+              "type": "boolean"
+            },
+            "chunks": {
+              "maxItems": 2000,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "seq": {
+                    "minimum": 0,
+                    "bsonType": [
+                      "int",
+                      "long",
+                      "double"
+                    ],
+                    "multipleOf": 1
+                  },
+                  "startedAt": {
+                    "bsonType": "date"
+                  },
+                  "durationMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "bytes": {
+                    "minimum": 0,
+                    "bsonType": [
+                      "int",
+                      "long",
+                      "double"
+                    ],
+                    "multipleOf": 1
+                  }
+                },
+                "required": [
+                  "seq",
+                  "startedAt",
+                  "durationMs",
+                  "key",
+                  "bytes"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "deviceId",
+            "sessionId",
+            "startedAt",
+            "endedAt",
+            "expiresAt",
+            "mimeType",
+            "width",
+            "height",
+            "hasAudio",
+            "chunks"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "patient_recordings",
+          "key": {
+            "patientId": 1,
+            "startedAt": -1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "capture_sessions": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "deviceId": {
+              "anyOf": [
+                {
+                  "bsonType": "objectId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "headset",
+                "simulator",
+                "glasses"
+              ]
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "paused",
+                "live",
+                "ended"
+              ]
+            },
+            "startedAt": {
+              "bsonType": "date"
+            },
+            "updatedAt": {
+              "bsonType": "date"
+            },
+            "endedAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lastFrameAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lastSeq": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "framesReceived": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "framesDropped": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "deviceId",
+            "source",
+            "state",
+            "startedAt",
+            "updatedAt",
+            "endedAt",
+            "lastFrameAt",
+            "lastSeq",
+            "framesReceived",
+            "framesDropped",
+            "expiresAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "patient_sessions",
+          "key": {
+            "patientId": 1,
+            "startedAt": -1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "description_jobs": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "itemId": {
+              "bsonType": "objectId"
+            },
+            "sightingId": {
+              "bsonType": "objectId"
+            },
+            "observationVersion": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "keyframeRevision": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "keyframeKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "bbox": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              ],
+              "additionalItems": false,
+              "minItems": 4,
+              "maxItems": 4
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "running",
+                "succeeded",
+                "failed",
+                "superseded",
+                "cancelled"
+              ]
+            },
+            "attempts": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "maxAttempts": {
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 10,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "runAfter": {
+              "bsonType": "date"
+            },
+            "leaseOwner": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lastError": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "bsonType": "date"
+            },
+            "updatedAt": {
+              "bsonType": "date"
+            },
+            "finishedAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "itemId",
+            "sightingId",
+            "observationVersion",
+            "keyframeRevision",
+            "keyframeKey",
+            "bbox",
+            "status",
+            "attempts",
+            "maxAttempts",
+            "runAfter",
+            "leaseOwner",
+            "lastError",
+            "createdAt",
+            "updatedAt",
+            "finishedAt",
+            "expiresAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "claimable",
+          "key": {
+            "status": 1,
+            "runAfter": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "sighting_keyframe_unique",
+          "key": {
+            "sightingId": 1,
+            "keyframeRevision": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "patient_queue",
+          "key": {
+            "patientId": 1,
+            "status": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "meta": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "enum": [
+                "schema"
+              ]
+            },
+            "version": {
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "fingerprint": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64
+            },
+            "syncedAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "version",
+            "fingerprint",
+            "syncedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": []
+    }
+  }
+}

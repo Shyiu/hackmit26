@@ -1,0 +1,33 @@
+import "server-only";
+
+// Server env vars, read when a route needs them rather than at import time, so
+// a missing Deepgram key breaks speech and nothing else. apps/web/.env.example
+// lists them all with where to get each one.
+export type ServerEnvName =
+  | "MONGODB_URI"
+  | "MONGODB_DB"
+  | "AUTH_SECRET"
+  | "DEVICE_TOKEN_SECRET"
+  | "CAREGIVER_EMAIL"
+  | "CAREGIVER_PASSWORD"
+  | "DEEPGRAM_API_KEY"
+  | "ELEVENLABS_API_KEY"
+  | "OPENAI_API_KEY"
+  | "NEXT_PUBLIC_PERCEPTION_WS_URL";
+
+export class MissingEnvError extends Error {
+  override name = "MissingEnvError";
+  constructor(readonly variable: ServerEnvName) {
+    super(`${variable} is not set. Add it to apps/web/.env.local; apps/web/.env.example says where to get it.`);
+  }
+}
+
+export function requireEnv(name: ServerEnvName): string {
+  const value = process.env[name];
+  if (!value) throw new MissingEnvError(name);
+  return value;
+}
+
+export function optionalEnv(name: ServerEnvName): string | undefined {
+  return process.env[name] || undefined;
+}

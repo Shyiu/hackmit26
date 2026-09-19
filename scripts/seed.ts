@@ -1,130 +1,93 @@
-import { MongoClient, ObjectId } from "mongodb";
+// Seeds one demo wearer, a caregiver login, three items, and sightings that
+// exercise the answer wording: one item seen resting, one picked up after it
+// was put down, one still waiting for its description.
+//
+//   pnpm db:seed           seed once; a second run changes nothing
+//   pnpm db:seed --reset   delete the demo wearer's data and seed again
 
-// Seeds one demo wearer, a few items, and a sighting per item, matching the
-// shapes in README.md "Data model". Enough for the dashboard and /api/ask
-// fast path to have something to read once those are wired up.
-async function main() {
-  const uri = process.env.MONGODB_URI;
-  if (!uri) {
-    throw new Error("MONGODB_URI is not set");
-  }
+import {
+  collection,
+  collections,
+  createCaregiver,
+  createPatient,
+  locationStatus,
+  parseId,
+  tenantRepos,
+  type CaregiverId,
+  type Db,
+  type PatientId,
+} from "@memory-glasses/db";
+import { seedObservation } from "@memory-glasses/db/observations";
+import { withDatabase } from "./lib/env";
 
-  const client = new MongoClient(uri);
-  await client.connect();
-  const db = client.db(process.env.MONGODB_DB ?? "memory_glasses");
-
-  const patientId = "demo-patient";
-  const retentionMs = 30 * 24 * 60 * 60 * 1000; // 30 day default retention
-
-  await db.collection<{ _id: string; name: string }>("patients").updateOne(
-    { _id: patientId },
-    { $set: { name: "Demo wearer" } },
-    { upsert: true }
-  );
-
-  await db
-    .collection<{ _id: string; patientId: string; name: string }>("caregivers")
-    .updateOne(
-      { _id: "demo-caregiver" },
-      { $set: { patientId, name: "Demo caregiver" } },
-      { upsert: true }
-    );
-
-  const now = new Date();
-  const sessionId = new ObjectId().toString();
-  const items = [
-    {
-      name: "keys",
-      aliases: ["car keys", "house keys", "key ring"],
-      detectorPrompts: ["keys", "key ring"],
-      sentence: "on the kitchen counter, next to the coffee maker",
-      room: "kitchen",
-    },
-    {
-      name: "wallet",
-      aliases: ["billfold"],
-      detectorPrompts: ["wallet"],
-      sentence: "on the hallway table",
-      room: "hallway",
-    },
-    {
-      name: "glasses",
-      aliases: ["eyeglasses", "reading glasses"],
-      detectorPrompts: ["glasses", "eyeglasses"],
-      sentence: "on the nightstand",
-      room: "bedroom",
-    },
-  ];
-
-  for (const item of items) {
-    const itemId = new ObjectId();
-    const sightingId = new ObjectId();
-    const lastSeenAt = new Date(now.getTime() - 20 * 60 * 1000);
-    const observationVersion = 1;
-    const keyframeRevision = 1;
-
-    const sighting = {
-      _id: sightingId,
-      patientId,
-      itemId,
-      label: item.name,
-      status: "closed" as const,
-      firstSeenAt: new Date(lastSeenAt.getTime() - 5 * 1000),
-      lastSeenAt,
-      expiresAt: new Date(lastSeenAt.getTime() + retentionMs),
-      sessionId,
-      eventId: new ObjectId().toString(),
-      observationVersion,
-      keyframeRevision,
-      descriptionStatus: "ready" as const,
-      confidence: 0.92,
-      bbox: [0.4, 0.5, 0.08, 0.06],
-      frameSize: [1280, 720],
-      room: { id: item.room, name: item.room, confidence: 0.9 },
-      state: "resting" as const,
-      sentence: item.sentence,
-      nearbyObjects: [],
-      source: "simulator" as const,
-    };
-
-    await db.collection("sightings").insertOne(sighting);
-
-    const sightingSummary = {
-      sightingId: sightingId.toString(),
-      observationVersion,
-      keyframeRevision,
-      sentence: item.sentence,
-      room: item.room,
-      state: "resting" as const,
-      lastSeenAt,
-      descriptionStatus: "ready" as const,
-    };
-
-    await db.collection("items").updateOne(
-      { _id: itemId },
-      {
-        $set: {
-          patientId,
-          name: item.name,
-          aliases: item.aliases,
-          detectorPrompts: item.detectorPrompts,
-          referenceImages: [],
-          lastSighting: sightingSummary,
-          lastRestingSighting: sightingSummary,
-          locationStatus: "observed",
-          usualSpots: [{ sentence: item.sentence, share: 1 }],
-        },
-      },
-      { upsert: true }
-    );
-
-    console.log(`seeded ${item.name}`);
-  }
-
-  await client.close();
+function fixedId<TId extends PatientId | CaregiverId>(hex: string): TId {
+  const id = parseId<TId>(hex);
+  if (!id) throw new Error(`Bad fixed id ${hex}`);
+  return id;
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+// Fixed ids so reseeding finds the same wearer, and so a dev token can name it.
+const DEMO_PATIENT_ID = fixedId<PatientId>("5eed00000000000000000001");
+const DEMO_CAREGIVER_ID = fixedId<CaregiverId>("5eed000000000000000000ca");
+const MINUTE = 60_000;
+
+async function reset(db: Db) {
+  for (const spec of Object.values(collections)) {
+    if ("patientId" in spec.schema.shape) {
+      await db.collection(spec.name).deleteMany({ patientId: DEMO_PATIENT_ID });
+    }
+  }
+  await collection(db, "patients").deleteOne({ _id: DEMO_PATIENT_ID });
+  await collection(db, "caregivers").deleteOne({ _id: DEMO_CAREGIVER_ID });
+}
+
+async function seed(db: Db) {
+  const now = Date.now();
+  await createPatient(db, { id: DEMO_PATIENT_ID, displayName: "Demo wearer" });
+  await createCaregiver(db, {
+    id: DEMO_CAREGIVER_ID,
+    email: process.env.CAREGIVER_EMAIL || "caregiver@example.com",
+    name: "Demo caregiver",
+    patientIds: [DEMO_PATIENT_ID],
+  });
+
+  const tenant = tenantRepos(db, DEMO_PATIENT_ID);
+  const keys = await tenant.items.create({ name: "keys", aliases: ["car keys", "house keys", "key ring"] });
+  const wallet = await tenant.items.create({ name: "wallet", aliases: ["billfold"] });
+  const glasses = await tenant.items.create({ name: "glasses", aliases: ["eyeglasses", "reading glasses"] });
+  const observe = (item: typeof keys, rest: Omit<Parameters<typeof seedObservation>[1], "patientId" | "itemId" | "label">) =>
+    seedObservation(db, { patientId: DEMO_PATIENT_ID, itemId: item._id, label: item.name, ...rest });
+
+  await observe(keys, {
+    lastSeenAt: new Date(now - 20 * MINUTE),
+    state: "resting",
+    description: {
+      status: "ready",
+      sentence: "on the kitchen counter, next to the coffee maker",
+      room: "kitchen",
+      surface: "counter",
+      relation: "next to the coffee maker",
+    },
+  });
+  await observe(wallet, {
+    lastSeenAt: new Date(now - 3 * 60 * MINUTE),
+    state: "resting",
+    description: { status: "ready", sentence: "on the hallway table", room: "hallway", surface: "table" },
+  });
+  await observe(wallet, { lastSeenAt: new Date(now - 10 * MINUTE), state: "held", description: { status: "pending" } });
+  await observe(glasses, { lastSeenAt: new Date(now - 2 * MINUTE), state: "unknown", description: { status: "pending" } });
+
+  for (const item of await tenant.items.list()) {
+    console.log(`${item.name.padEnd(8)} ${locationStatus(item.lastSighting)}  ${item.lastSighting?.sentence ?? ""}`);
+  }
+}
+
+await withDatabase(async (db) => {
+  if (process.argv.includes("--reset")) await reset(db);
+  if (await collection(db, "patients").findOne({ _id: DEMO_PATIENT_ID })) {
+    console.log("The demo wearer is already seeded. Pass --reset to start over.");
+    return;
+  }
+  await seed(db);
+  console.log(`\nDemo wearer ${DEMO_PATIENT_ID.toHexString()}, caregiver login ${process.env.CAREGIVER_EMAIL || "caregiver@example.com"}`);
 });

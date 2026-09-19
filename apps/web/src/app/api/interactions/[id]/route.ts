@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { InteractionId } from "@memory-glasses/db";
+import { HttpError, readId, withTenant } from "@/lib/server/api";
+import { interactionView } from "@/lib/server/views";
 
-// Poll authorized answer text, status, and final server timings for one interaction.
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  return NextResponse.json({ error: "not implemented", id }, { status: 501 });
-}
+// The client polls this for the answer text, status, and final server timings.
+export const GET = withTenant<{ id: string }>("any", async ({ params, tenant }) => {
+  const interaction = await tenant.interactions.get(readId<InteractionId>(params.id));
+  if (!interaction) throw new HttpError(404, "Not found");
+  return Response.json(interactionView(interaction));
+});

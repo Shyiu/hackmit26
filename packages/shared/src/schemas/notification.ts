@@ -18,12 +18,12 @@ export const notificationSchema = z.object({
   shownAt: z.coerce.date().optional(),
 });
 
-// patientId comes from the caregiver session, never the request body.
-export const createNotificationSchema = notificationSchema.pick({
-  kind: true,
-  text: true,
-  showAt: true,
-});
+// patientId comes from the caregiver session, never the request body. showAt
+// takes an ISO timestamp only: z.coerce.date() would read null as 1970.
+export const createNotificationSchema = notificationSchema
+  .pick({ kind: true, text: true })
+  .extend({ showAt: z.string().datetime({ offset: true }).pipe(z.coerce.date()).optional() })
+  .strict();
 
 export type NotificationKind = z.infer<typeof notificationKindSchema>;
 export type NotificationStatus = z.infer<typeof notificationStatusSchema>;

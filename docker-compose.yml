@@ -1,0 +1,17 @@
+# Local MongoDB for development and tests: `pnpm db:up`, then
+# MONGODB_URI=mongodb://localhost:27017/?directConnection=true
+#
+# The atlas-local image runs MongoDB 8.0, the same version as the Atlas free
+# tier, plus Atlas Search, so `pnpm db:setup --search` works locally too.
+services:
+  mongo:
+    image: mongodb/mongodb-atlas-local:8.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+
+volumes:
+  mongo-data:
+  mongo-config:

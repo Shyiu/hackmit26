@@ -41,12 +41,31 @@ export const itemSchema = z.object({
   usualSpots: z.array(usualSpotSchema).default([]),
 });
 
-export const createItemSchema = itemSchema.pick({
-  patientId: true,
-  name: true,
-  aliases: true,
-  detectorPrompts: true,
-});
+const spokenNameSchema = z.string().trim().min(1).max(60);
+
+// patientId comes from the session or device token, never the request body.
+export const createItemSchema = z
+  .object({
+    name: spokenNameSchema,
+    aliases: z.array(spokenNameSchema).max(20).default([]),
+    detectorPrompts: z.array(spokenNameSchema).max(10).default([]),
+    /** "they were" instead of "it was". Guessed from the name when left out. */
+    plural: z.boolean().optional(),
+  })
+  .strict();
+
+export const updateItemSchema = z
+  .object({
+    name: spokenNameSchema.optional(),
+    aliases: z.array(spokenNameSchema).max(20).optional(),
+    detectorPrompts: z.array(spokenNameSchema).max(10).optional(),
+    plural: z.boolean().optional(),
+    /** false archives the item: its history stays and its names free up. */
+    active: z.boolean().optional(),
+    /** The item's `updatedAt` when the form loaded. A save made since then wins, and this one gets a 409. */
+    expectedUpdatedAt: z.string().datetime({ offset: true }).pipe(z.coerce.date()).optional(),
+  })
+  .strict();
 
 export type ObservationState = z.infer<typeof observationStateSchema>;
 export type DescriptionStatus = z.infer<typeof descriptionStatusSchema>;
@@ -54,3 +73,4 @@ export type SightingSummary = z.infer<typeof sightingSummarySchema>;
 export type UsualSpot = z.infer<typeof usualSpotSchema>;
 export type Item = z.infer<typeof itemSchema>;
 export type CreateItem = z.infer<typeof createItemSchema>;
+export type UpdateItem = z.infer<typeof updateItemSchema>;

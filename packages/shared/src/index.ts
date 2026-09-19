@@ -5,3 +5,7 @@ export * from "./schemas/interaction";
 export * from "./schemas/detection";
 export * from "./schemas/notification";
 export * from "./schemas/recording";
+export * from "./schemas/perception";
+export * from "./schemas/auth";
+export * from "./signed-token";
+export * from "./device-token";
