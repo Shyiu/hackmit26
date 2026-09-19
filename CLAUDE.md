@@ -83,7 +83,8 @@ scripts read the same file.
 
 - The web app deploys to Vercel from `main` (README.md "Deploying"). The project's Root Directory is
   `apps/web` and `ENABLE_EXPERIMENTAL_COREPACK=1` pins pnpm 11; both live in Vercel's settings, not
-  in the repo. Routes must keep reading env lazily through `lib/server/env.ts`, because the build
+  in the repo. A production build runs `db:setup` and `db:seed` first (`scripts/vercel-build.sh`,
+  ADR 0005), so keep both idempotent. Routes must keep reading env lazily through `lib/server/env.ts`, because the build
   runs without most keys. `services/perception` is not on Vercel.
 - A phone opens the camera and mic only on HTTPS, and an HTTPS page opens only `wss://` sockets.
   Test on a phone through a tunnel or a Vercel URL. `allowedDevOrigins` in `apps/web/next.config.ts`

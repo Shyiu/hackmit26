@@ -743,7 +743,9 @@ See `apps/ios/README.md` for signing and limits.
 
 The web app deploys to Vercel as the project `memory-glasses`, at <https://memory-glasses.vercel.app>. The GitHub repo is connected: a push to `main` deploys production, and every other branch and pull request gets a preview URL. `services/perception` does not run on Vercel. It holds a WebSocket open and loads model weights, so it needs a long-running host with a `wss://` URL.
 
-Project settings that matter, all set on Vercel and not in a `vercel.json`:
+`apps/web/vercel.json` sets the build command to `scripts/vercel-build.sh`. A production build runs `pnpm db:setup` and `pnpm db:seed` against `MONGODB_URI` before `next build`, so each deploy brings the database to its own schema and the demo wearer is always there ([ADR 0005](docs/decisions/0005-database-setup-in-the-vercel-production-build.md)). Preview builds skip the database steps.
+
+Project settings that live on Vercel and not in the repo:
 
 - Root Directory is `apps/web`. Vercel still installs from the workspace root, so `packages/shared` and `packages/db` resolve.
 - `ENABLE_EXPERIMENTAL_COREPACK=1` makes the build use the `pnpm@11.5.0` named in `packageManager`. Without it Vercel picks a pnpm from the lockfile version.
@@ -761,7 +763,7 @@ vercel deploy --prod
 
 `vercel link` appends `.env*` to `.gitignore` and writes a root `.env.local`. Revert the first, since it cancels the `!.env.example` rule, and delete the second. `vercel git connect` fails in a git worktree; run it from a normal clone.
 
-To bring up a new database, point the local scripts at it once: put the Atlas URI in `apps/web/.env.local`, then `pnpm db:setup` and `pnpm db:seed`. Atlas has to allow Vercel's addresses, which for a hackathon means allowing `0.0.0.0/0` under Network Access. The seeded caregiver signs in with the `CAREGIVER_EMAIL` and `CAREGIVER_PASSWORD` stored on Vercel, so set those to values you know. Wherever perception runs, give it the same `DEVICE_TOKEN_SECRET` and `MONGODB_URI`, and set `NEXT_PUBLIC_PERCEPTION_WS_URL` on Vercel to its `wss://…/ws/frames` URL, then redeploy.
+A production deploy sets up and seeds the database by itself. To do it by hand, `MONGODB_URI='mongodb+srv://…' pnpm db:setup`, then the same with `db:seed`. Atlas has to allow Vercel's functions and build machines, which for a hackathon means allowing `0.0.0.0/0` under Network Access. The seeded caregiver signs in with the `CAREGIVER_EMAIL` and `CAREGIVER_PASSWORD` stored on Vercel, so set those to values you know. Wherever perception runs, give it the same `DEVICE_TOKEN_SECRET` and `MONGODB_URI`, and set `NEXT_PUBLIC_PERCEPTION_WS_URL` on Vercel to its `wss://…/ws/frames` URL, then redeploy.
 
 ## Testing
 
