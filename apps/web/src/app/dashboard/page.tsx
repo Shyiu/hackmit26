@@ -62,114 +62,118 @@ export default async function DashboardHomePage() {
         <CaptureBadge compact className="shrink-0" />
       </header>
 
-      <section className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <Tile href="/dashboard/items" title="Find items" icon={Search} tone="terracotta" />
-          <Tile href="/dashboard/live" title="Live view" icon={Video} tone="lavender" />
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <Tile href="/dashboard/questions" title="Questions" icon={MessageCircleQuestion} tone="sky" size="small" />
-          <Tile href="/dashboard/messages" title="Messages" icon={MessageSquareHeart} tone="butter" size="small" />
-          <Tile href="/dashboard/rooms" title="Rooms" icon={DoorOpen} tone="mint" size="small" />
-        </div>
-        <ShortcutStrip shortcuts={SHORTCUTS} />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <SectionTitle>What they heard last</SectionTitle>
-        {lastQuestion ? (
-          <TicketCard
-            icon={KeyRound}
-            title={lastQuestion.answerText ?? "No answer yet"}
-            subtitle={`“${lastQuestion.transcript}” · ${relativeTime(lastQuestion.askedAt, now)}`}
-            action={
-              <Link href="/dashboard/questions" className={pillLinkClass}>
-                Log
-              </Link>
-            }
-          />
-        ) : (
-          <p className="rounded-3xl border-2 border-dashed p-5 text-center text-sm text-muted-foreground">
-            No questions yet. They show up here as soon as the wearer asks one.
-          </p>
-        )}
-      </section>
-
-      {needsALook.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <SectionTitle>Needs a look</SectionTitle>
-          <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 md:mx-0 md:px-0">
-            {needsALook.map((item) => {
-              const status = locationStatus(item.lastSighting);
-              return (
-                <li key={item._id.toHexString()} className="w-[78%] shrink-0 snap-start sm:w-72">
-                  <Link
-                    href={`/dashboard/items/${item._id.toHexString()}`}
-                    className="flex h-full gap-4 rounded-3xl border-2 border-border p-4 hover:border-terracotta/40"
-                  >
-                    <Hand className="mt-1 size-7 shrink-0 text-terracotta" />
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="truncate text-lg font-semibold capitalize">{item.name}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {STATUS_LABELS[status]}
-                        {item.lastSighting && `, ${relativeTime(item.lastSighting.lastSeenAt, now)}`}
-                      </span>
-                      <span className="mt-2 self-end text-sm font-semibold text-terracotta-deep">View</span>
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+      <div className="grid gap-7 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-start lg:gap-6">
+        <section className="flex flex-col gap-3 lg:sticky lg:top-6">
+          <div className="grid grid-cols-2 gap-3">
+            <Tile href="/dashboard/items" title="Find items" icon={Search} tone="terracotta" />
+            <Tile href="/dashboard/live" title="Live view" icon={Video} tone="lavender" />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Tile href="/dashboard/questions" title="Questions" icon={MessageCircleQuestion} tone="sky" size="small" />
+            <Tile href="/dashboard/messages" title="Messages" icon={MessageSquareHeart} tone="butter" size="small" />
+            <Tile href="/dashboard/rooms" title="Rooms" icon={DoorOpen} tone="mint" size="small" />
+          </div>
+          <ShortcutStrip shortcuts={SHORTCUTS} />
         </section>
-      )}
 
-      <section className="flex flex-col gap-3">
-        <SectionTitle
-          action={
-            <Link href="/dashboard/items" className="text-sm font-semibold text-terracotta-deep">
-              See all
-            </Link>
-          }
-        >
-          Recently seen
-        </SectionTitle>
-        {recent.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing seen yet.</p>
-        ) : (
-          <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
-            {recent.map((item) => {
-              const status = locationStatus(item.lastSighting);
-              return (
-                <li key={item._id.toHexString()}>
-                  <Link
-                    href={`/dashboard/items/${item._id.toHexString()}`}
-                    className="flex items-center gap-4 rounded-3xl bg-muted p-3 pr-4 hover:bg-secondary"
-                  >
-                    <span
-                      className={cn(
-                        "flex size-14 shrink-0 items-center justify-center rounded-2xl text-xl font-bold capitalize",
-                        status === "observed" ? "bg-terracotta text-white" : "bg-terracotta-soft text-terracotta-deep",
-                      )}
-                    >
-                      {item.name.slice(0, 1)}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate font-semibold capitalize">{item.name}</span>
-                      <span className="block truncate text-sm text-muted-foreground">
-                        {whereLine(item.lastSighting)}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {item.lastSighting && relativeTime(item.lastSighting.lastSeenAt, now)}
-                      </span>
-                    </span>
+        <div className="flex min-w-0 flex-col gap-7 lg:gap-6">
+          <section className="flex flex-col gap-3">
+            <SectionTitle>What they heard last</SectionTitle>
+            {lastQuestion ? (
+              <TicketCard
+                icon={KeyRound}
+                title={lastQuestion.answerText ?? "No answer yet"}
+                subtitle={`“${lastQuestion.transcript}” · ${relativeTime(lastQuestion.askedAt, now)}`}
+                action={
+                  <Link href="/dashboard/questions" className={pillLinkClass}>
+                    Log
                   </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+                }
+              />
+            ) : (
+              <p className="rounded-3xl border-2 border-dashed p-5 text-center text-sm text-muted-foreground">
+                No questions yet. They show up here as soon as the wearer asks one.
+              </p>
+            )}
+          </section>
+
+          {needsALook.length > 0 && (
+            <section className="flex flex-col gap-3">
+              <SectionTitle>Needs a look</SectionTitle>
+              <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 md:mx-0 md:px-0 lg:grid lg:grid-cols-2 lg:overflow-visible">
+                {needsALook.map((item) => {
+                  const status = locationStatus(item.lastSighting);
+                  return (
+                    <li key={item._id.toHexString()} className="w-[78%] shrink-0 snap-start sm:w-72 lg:w-auto">
+                      <Link
+                        href={`/dashboard/items/${item._id.toHexString()}`}
+                        className="flex h-full gap-4 rounded-3xl border-2 border-border p-4 hover:border-terracotta/40"
+                      >
+                        <Hand className="mt-1 size-7 shrink-0 text-terracotta" />
+                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span className="truncate text-lg font-semibold capitalize">{item.name}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {STATUS_LABELS[status]}
+                            {item.lastSighting && `, ${relativeTime(item.lastSighting.lastSeenAt, now)}`}
+                          </span>
+                          <span className="mt-2 self-end text-sm font-semibold text-terracotta-deep">View</span>
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          <section className="flex flex-col gap-3">
+            <SectionTitle
+              action={
+                <Link href="/dashboard/items" className="text-sm font-semibold text-terracotta-deep">
+                  See all
+                </Link>
+              }
+            >
+              Recently seen
+            </SectionTitle>
+            {recent.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nothing seen yet.</p>
+            ) : (
+              <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
+                {recent.map((item) => {
+                  const status = locationStatus(item.lastSighting);
+                  return (
+                    <li key={item._id.toHexString()}>
+                      <Link
+                        href={`/dashboard/items/${item._id.toHexString()}`}
+                        className="flex items-center gap-4 rounded-3xl bg-muted p-3 pr-4 hover:bg-secondary"
+                      >
+                        <span
+                          className={cn(
+                            "flex size-14 shrink-0 items-center justify-center rounded-2xl text-xl font-bold capitalize",
+                            status === "observed" ? "bg-terracotta text-white" : "bg-terracotta-soft text-terracotta-deep",
+                          )}
+                        >
+                          {item.name.slice(0, 1)}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate font-semibold capitalize">{item.name}</span>
+                          <span className="block truncate text-sm text-muted-foreground">
+                            {whereLine(item.lastSighting)}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {item.lastSighting && relativeTime(item.lastSighting.lastSeenAt, now)}
+                          </span>
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
