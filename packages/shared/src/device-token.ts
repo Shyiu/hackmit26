@@ -15,7 +15,7 @@ export const deviceTokenClaimsSchema = z
     pid: objectIdHex,
     /** The registered device, or null for a caregiver's signed-in page. */
     sub: objectIdHex.nullable(),
-    scope: z.enum(["frames", "debug", "api"]),
+    scope: z.enum(["frames", "api"]),
     /** The device's tokenVersion at mint time. Revoking bumps it. */
     tv: z.number().int().nonnegative(),
     iat: z.number().int(),

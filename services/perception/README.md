@@ -4,7 +4,7 @@ Takes JPEG frames from the headset page over a WebSocket, runs a detector on the
 
 ## Status
 
-Skeleton. The frame socket, device tokens, capture sessions, and the MongoDB write path in `app/store.py` work and are tested. The detector finds nothing (`NullDetector`). YOLOE-26, the tracker that turns detections into sightings, and the vision model that describes keyframes are M1. `WS /ws/debug` and `POST /config/classes` are stubs.
+Skeleton. The frame socket, device tokens, capture sessions, and the MongoDB write path in `app/store.py` work and are tested. The detector finds nothing (`NullDetector`). YOLOE-26, the tracker that turns detections into sightings, and the vision model that describes keyframes are M1. `POST /config/classes` is a stub. There is no debug socket: the caregiver dashboard gets no camera stream.
 
 ## Run
 
@@ -52,7 +52,7 @@ app/protocol.py   /ws/frames messages and the binary frame envelope, mirroring p
 app/tokens.py     device token verification, mirroring packages/shared/src/device-token.ts
 app/store.py      the write path: sessions, sightings, snapshots, the description job queue
 app/detector.py   the Detector protocol and NullDetector
-app/main.py       the FastAPI app: /ws/frames, /ws/debug, /health, /config/classes
+app/main.py       the FastAPI app: /ws/frames, /health, /config/classes
 ```
 
 ## The frame socket

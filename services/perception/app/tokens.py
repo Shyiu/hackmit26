@@ -26,7 +26,7 @@ from .protocol import Int, ObjectIdHex, Version
 MIN_SECRET_LENGTH = 32
 _BASE64URL = re.compile(r"[A-Za-z0-9_-]*")
 
-Scope = Literal["frames", "debug", "api"]
+Scope = Literal["frames", "api"]
 InvalidReason = Literal["malformed", "bad_signature", "expired"]
 
 
@@ -110,7 +110,7 @@ def _main() -> None:
     parser.add_argument("--patient", required=True, help="the wearer's _id, 24 hex characters")
     parser.add_argument("--device", default=None, help="a registered device's _id; omit for a signed-in page")
     parser.add_argument("--token-version", type=int, default=0, help="the device's tokenVersion")
-    parser.add_argument("--scope", choices=["frames", "debug", "api"], default="frames")
+    parser.add_argument("--scope", choices=["frames", "api"], default="frames")
     parser.add_argument("--minutes", type=int, default=15)
     args = parser.parse_args()
 

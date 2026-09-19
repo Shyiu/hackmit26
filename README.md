@@ -4,7 +4,7 @@ A wearable camera that remembers where things are, for people living with dement
 
 The wearer asks out loud, "Where are my keys?" About a second later they hear, "I last saw your keys on the kitchen counter, next to the coffee maker, about twenty minutes ago."
 
-The product belongs on glasses, and Ray-Ban Meta was the platform we planned around. We can't get a pair for the hackathon, and a 3D-printed VR headset was tried on paper and dropped. So this build runs on a phone worn on the chest. Its rear camera faces forward and streams what's in front of the wearer, the phone records that view, and answers come back as speech in the wearer's ear. The live view with item labels shows on the caregiver dashboard. Ray-Ban Meta stays in the plan as a second client on the same contract, for when we have the hardware.
+The product belongs on glasses, and Ray-Ban Meta was the platform we planned around. We can't get a pair for the hackathon, and a 3D-printed VR headset was tried on paper and dropped. So this build runs on a phone worn on the chest. Its rear camera faces forward and streams what's in front of the wearer, the phone records that view, and answers come back as speech in the wearer's ear. Item labels draw on the wearer's own screen; the caregiver dashboard gets no camera stream. Ray-Ban Meta stays in the plan as a second client on the same contract, for when we have the hardware.
 
 **Status: early build.** The database is built: `packages/db` holds the MongoDB schemas, validators, indexes, and repositories, tested against a real MongoDB. The API routes read and write through it behind a caregiver login and device tokens, and `POST /api/ask` answers seeded questions in text. The `/headset` page was built for the dropped VR headset. Its camera, wake lock, local recording, stalled-feed watchdog, and push-to-talk carry over to the chest page; its stereo view and eye calibration don't, and the page still has to become `/wear`. Push-to-talk opens and closes the mic, but no audio reaches speech to text yet, so the pages don't ask anything. `/sim` runs the same client on a flat page. `services/perception` is a skeleton: its frame socket authenticates and answers each frame with empty detections, and its database write path is built and tested, but no detector runs. This README is still the build plan, so edit it freely.
 
@@ -18,18 +18,18 @@ A camera the person already wears can watch where objects end up. The wearer doe
 
 1. Answer "where is my X?" out loud in under one second at the median, measured from the moment the wearer stops talking.
 2. Track everyday items with no tags and no setup by the wearer.
-3. Record what the chest camera sees, and show that live view with item labels on the caregiver dashboard.
+3. Record what the chest camera sees, and draw item labels over that view on the wearer's own screen.
 4. Give caregivers a dashboard that shows where things are, what the wearer asked, and how often.
 5. Run the full demo without the chest mount, using a laptop webcam or a phone held in the hand, so a broken mount can't sink the project.
 
-The hackathon MVP is three validated objects, one enrolled instance per category, phone browser capture from the chest, local recording, push-to-talk, spoken answers in earbuds, basic keyframe descriptions, exact item lookup, one TTS provider, and a minimal dashboard with the live view. Get the loop working on a flat page by hour eight, then put the phone on the chest. Item labels on the dashboard live view follow in M5. Room enrollment, visual enrollment, semantic search, the LLM question path, caregiver messages, and uploaded recordings are optional follow-ons; their sections below describe the roadmap, not requirements for the core demo.
+The hackathon MVP is three validated objects, one enrolled instance per category, phone browser capture from the chest, local recording, push-to-talk, spoken answers in earbuds, basic keyframe descriptions, exact item lookup, one TTS provider, and a minimal read-only dashboard. Get the loop working on a flat page by hour eight, then put the phone on the chest. Item labels on the wearer's screen follow in M5. Room enrollment, visual enrollment, semantic search, the LLM question path, caregiver messages, and uploaded recordings are optional follow-ons; their sections below describe the roadmap, not requirements for the core demo.
 
 Not in v1:
 
 - Medical claims or diagnosis of any kind.
 - Face recognition. It's on the stretch list and needs a consent story first.
 - Turn-by-turn guidance to the item.
-- World-anchored AR. Labels sit in screen space over the dashboard's live video. Pinning a marker to a spot in the room needs camera pose from ARKit or ARCore, which means a native app.
+- World-anchored AR. Labels sit in screen space over the wearer's own video. Pinning a marker to a spot in the room needs camera pose from ARKit or ARCore, which means a native app.
 - Ray-Ban Meta support. We have no hardware. The contract leaves room for it.
 - A native phone app. The chest client is a web page until the browser stops being enough.
 - Languages other than English.
@@ -124,7 +124,7 @@ flowchart LR
   W -- "answer text" --> T[ElevenLabs or Deepgram TTS]
   T -- "audio stream" --> W
   W -- "audio stream, caption" --> P
-  C[Caregiver browser<br/>live view with labels] --> W
+  C[Caregiver browser<br/>items, questions, latency] --> W
   G[Ray-Ban Meta + DAT app<br/>later] -. "same two endpoints" .-> W
 ```
 
@@ -133,7 +133,7 @@ Two deployable pieces for the hackathon, and a third later:
 | Piece | Stack | Job |
 |---|---|---|
 | `apps/web` | Next.js App Router, TypeScript, Tailwind, shadcn/ui, MongoDB Node driver | The `/wear` chest page, the flat `/sim` fallback, the caregiver dashboard, the REST API, the `/api/ask` voice endpoint |
-| `services/perception` | Python, FastAPI, Ultralytics YOLOE-26, ByteTrack, pymongo; open_clip later | Takes frames, detects and tracks items, sends detections to the dashboard live view, writes sightings, requests scene descriptions |
+| `services/perception` | Python, FastAPI, Ultralytics YOLOE-26, ByteTrack, pymongo; open_clip later | Takes frames, detects and tracks items, sends detections back to the capture page, writes sightings, requests scene descriptions |
 | `apps/ios`, later | Swift, ARKit, Meta DAT, AVAudioEngine | A native shell for the chest phone once the browser runs out: capture with the screen locked, a local wake word, hardware-button push-to-talk. Also the Ray-Ban Meta client |
 
 One design rule makes the latency goal reachable. **Do the expensive work when an item is seen, not when it's asked about.** Vision descriptions and optional room classification/embeddings happen at write time in the background. Once enrichment finishes, the answer is one indexed read away. Earlier questions get a conservative pending-description answer.
@@ -167,7 +167,7 @@ The optional slow path targets first spoken audio in under 2 s; measure rather t
 
 Also measure capture-to-queryable-observation and capture-to-queryable-description latency. Initial demo targets are P95 under 2 s and 5 s respectively. Return uncertainty while enrichment is pending. Track correct-location answers, wrong-location answers, and abstentions separately: a fast incorrect answer fails the demo. Record capture sequence numbers, server receipt times, and client playback times. Use monotonic clocks for durations and account for clock skew between devices; verify audible onset using a loopback recording on the demo phone's speaker or earbuds.
 
-Labels on the dashboard live view lag the camera by several hundred milliseconds at 2 to 5 fps. A label drawn where the keys were half a second ago is worse than no label, so each detection carries its frame's sequence number and the live view drops anything older than 500 ms.
+Labels lag the camera by several hundred milliseconds at 2 to 5 fps. A label drawn where the keys were half a second ago is worse than no label, so each detection carries its frame's sequence number and the capture page drops anything older than 500 ms.
 
 How we hold the budget:
 
@@ -226,7 +226,7 @@ If small-item detection fails the recorded walkthrough, first try a larger input
 - Drop blurry frames before inference using Laplacian variance. Body-worn video blurs every time the wearer walks.
 - Run at image size 960 or higher. Keys at arm's length are a few dozen pixels wide at 720p, which was the glasses' ceiling. The phone isn't capped there. Capture at 1080p, send JPEGs 1280 px wide, and test whether full 1080p frames buy recall on the smallest item.
 - The page grabs frames from its `<video>`. Sampling costs one `drawImage` per frame and no second camera stream.
-- The perception service answers each frame on the same socket with that frame's sequence number and its detections for tracked items. The dashboard live view draws labels from those and drops stale ones.
+- The perception service answers each frame on the same socket with that frame's sequence number and its detections for tracked items. The capture page draws labels from those over its own video and drops stale ones.
 - Benchmark sustained throughput, recall, memory, and thermal behavior on the actual laptop before moving to medium. Upscaling cannot recover detail absent from the source frame.
 - Keep at most one pending frame per device, replacing it with the newest frame under load. Log drops and frame age instead of accumulating stale video.
 - Use a versioned frame envelope with session ID, sequence number, capture time, dimensions, and byte length. Authenticate the socket, limit sizes/rates, and reject duplicates or expired frames. Reconnect with backoff and a new session; do not replay old camera buffers.
@@ -270,7 +270,7 @@ The MVP vision model may name a room type or return `unknown`. Optional room enr
 
 ## Data model
 
-Both services derive `patientId` from an authenticated caregiver session or scoped device credential, never an untrusted request body. Every tenant-owned collection and cache is scoped to it. Apply ownership checks to reads, writes, storage URLs, debug streams, configuration, STT token minting, queued jobs, and optional model tools. Rate-limit token minting and inference.
+Both services derive `patientId` from an authenticated caregiver session or scoped device credential, never an untrusted request body. Every tenant-owned collection and cache is scoped to it. Apply ownership checks to reads, writes, storage URLs, configuration, STT token minting, queued jobs, and optional model tools. Rate-limit token minting and inference.
 
 ```js
 // items: one per tracked thing. The hot path reads only this.
@@ -425,13 +425,13 @@ The phone's screen faces the wearer from their chest. They can glance down at it
 |---|---|---|
 | Answer caption, the spoken sentence word for word | phone and dashboard | M2 |
 | Listening mark, capture and recording state | phone and dashboard | M2 |
-| Live view with item labels, detections under 500 ms old | dashboard | M5 |
-| Sighting notification, "keys seen on the counter" | dashboard only; speaking it would nag the wearer | M5 |
+| Item labels over the video, detections under 500 ms old | phone | M5 |
+| Sighting notification, "keys seen on the counter" | shown, not spoken; speaking it would nag the wearer | M5 |
 | Caregiver message or reminder | spoken, then shown as a caption | optional, M6 |
 
 - Voice first. The vision research note cites a [2026 JMIR Aging survey](https://doi.org/10.2196/81840) where older adults with cognitive impairment preferred audio to visual information.
 - The phone screen stays dark apart from large, high-contrast text: one caption at a time, held long enough to read twice, then faded.
-- Label tracked items only on the live view. Boxes on every chair and mug make it harder to read.
+- Label tracked items only. Boxes on every chair and mug make it harder to read.
 - Caregiver messages and reminders follow the speech rules above and never interrupt an answer.
 - System trouble gets calm words, "I need a moment", and the caregiver sees the real error on the dashboard.
 
@@ -443,7 +443,7 @@ MVP by M3: read-only item cards, latest question/answer, latency, and capture/pa
 - **Add an item.** Name, aliases and a few photos. Saving pushes the new prompt list to the perception service.
 - **Rooms.** Enroll a room by walking through it. Mark rooms private for the later on-device privacy gate; do not present server-side labels as a pre-upload privacy guarantee.
 - **Questions.** A log of what the wearer asked and what they heard. A chart of questions per day per item. A jump in repeated questions can flag a hard day. The dashboard states it as a count and nothing more. It isn't a diagnostic.
-- **Live view.** What the chest camera sees, with item labels, sighting notifications, and the last answer. This is the AR view, and on a laptop it's how the judges watch the demo.
+- **No live view.** The caregiver side carries no camera stream and nothing subscribes to frames or detections. The AR view is the wearer's own screen, so judges watch the demo by mirroring the phone or running `/sim` on a laptop.
 - **Messages.** Optional. Send a short message or set a reminder. The voice reads it to the wearer.
 - **Recordings.** Optional. Lists recordings once they leave the phone. Until then a recording is a file on the phone.
 - **Latency.** P50 and P95 per stage, read from `interactions`.
@@ -481,7 +481,6 @@ Perception service:
 | Route | Does |
 |---|---|
 | `WS /ws/frames` | Binary JPEG frames in, with the versioned session/sequence/timestamp envelope. JSON out per frame: `{ seq, detections: [{ itemId, label, bbox, confidence }] }` with boxes normalized to the frame |
-| `WS /ws/debug` | Detections and annotated frames for the dashboard live view |
 | `POST /config/classes` | Reloads the prompt list after a caregiver edits items |
 | `GET /health` | Model loaded, current fps, queue depth |
 
@@ -499,8 +498,8 @@ An always-on camera in someone's home is a serious thing, and the wearer may not
 
 - The MVP runs in an explicitly approved demo area with a visible capture/pause control. Capture starts paused; reconnects require explicit resumption. Pause before leaving that area. Automatic private-room exclusion is not an MVP capability.
 - State the actual flow: raw frames reach the selected perception host in memory. Only selected, downscaled, face-blurred keyframes may reach object storage or the external vision provider. Blurring on that host does not mean raw frames never left the capture device. Exclude raw frames from logs and error reporting.
-- A future automatic privacy gate must run on the capture device before any upload, including debug frames and thumbnails. Private or unknown rooms block transmission and storage until cleared locally. Server-side room recognition cannot enforce this. Bathrooms and bedrooms default to private when that gate is implemented.
-- Debug live view is authenticated, opt-in, transient, and disabled while paused. Pause stops uploads and cancels/drops queued frames and description work; it cannot retract data already sent externally. Document provider retention settings before any real-home use.
+- A future automatic privacy gate must run on the capture device before any upload, including thumbnails. Private or unknown rooms block transmission and storage until cleared locally. Server-side room recognition cannot enforce this. Bathrooms and bedrooms default to private when that gate is implemented.
+- Pause stops uploads and cancels/drops queued frames and description work; it cannot retract data already sent externally. Document provider retention settings before any real-home use.
 - Retention defaults to 30 days. A retryable cleanup job removes expired sightings, keyframes, thumbnails, embeddings, interactions, and related jobs, clears item snapshots pointing to removed sightings, and recomputes derived usual spots. Apply a stated retention policy to enrollment images too. Exclude expired data from reads immediately rather than relying on delayed TTL deletion. Storage lifecycle rules are a backstop; document backup/provider retention separately.
 - Audio leaves the device only during push-to-talk or after a future local wake word fires. Show listening state and provide an immediate stop control.
 - A phone has no capture light facing bystanders, and Ray-Ban Metas do. The harness carries a visible "camera on" notice, and the phone screen and dashboard show capture and recording state. We don't try to hide the camera.
@@ -624,7 +623,7 @@ What runs today: `pnpm test` runs the zod contract fixtures and the database tes
 - A golden set of about 30 questions, including aliases, unknown items, and ambiguous references. Recorded speech cases include slow speech and mid-sentence pauses.
 - Report P50/P95 and sample count on a fixed replay/speech set, separating cold/warm and push-to-talk/hands-free runs. Measure speech-end to spoken answer and capture to queryable observation/description. Seeded reads isolate API performance but do not prove end-to-end success. Keep network-dependent benchmarks separate from deterministic unit-test gates.
 - Audio integration checks cover finalized segments versus complete turns, playback on the demo phone's browser with the camera running, interruption, provider failures, and no chime counted as answer audio.
-- Chest checks run on the demo phone in the harness. The camera frames the table and the wearer's hands while standing and sitting. Walking doesn't blur every frame. Labels older than 500 ms never draw on the live view. A stalled feed plays the tone and shows on the dashboard. Wake lock holds for twenty minutes. Recording starts, shows its mark, stops on pause, and produces a playable file. A tap on the chest starts a question. Answers are audible in the earbuds with the mic in use. Log the phone's temperature and battery at the start and end of a twenty minute run.
+- Chest checks run on the demo phone in the harness. The camera frames the table and the wearer's hands while standing and sitting. Walking doesn't blur every frame. Labels older than 500 ms never draw. A stalled feed plays the tone and shows on the dashboard. Wake lock holds for twenty minutes. Recording starts, shows its mark, stops on pause, and produces a playable file. A tap on the chest starts a question. Answers are audible in the earbuds with the mic in use. Log the phone's temperature and battery at the start and end of a twenty minute run.
 - Tenant isolation checks on API routes, sockets, background jobs, caches, and storage access.
 - Privacy/retention checks cover pause, queued-job cancellation, expiry filtering, deletion retries, and removal of denormalized snapshots and images.
 - Contract fixtures validate identical payloads in Python and TypeScript. Pin dependencies/model assets and run a clean startup before rehearsal.
@@ -640,7 +639,7 @@ Hours assume a 24-hour hackathon and three or four people. Edit to fit the team.
 | M2 Voice and minimal dashboard | 1 to 6, parallel | Push-to-talk `/sim`, one STT/TTS provider, exact lookup, PCM playback, interaction polling, captions, cards and timings. Alongside it, turn `/headset` into `/wear`: drop the stereo view, add tap-anywhere push-to-talk and the dim caption screen | Seeded questions produce audible answers in earbuds and client playback timings on the phone |
 | M3 Join | 6 to 8 | Real sightings/descriptions answer real questions; test movement and immediate queries | Three objects work end to end on path A with the demo phone as the camera, with honest uncertainty and measured accuracy/latency |
 | M4 Reliability | 8 to 12 | Dropped frames, retries, late jobs, ambiguous items, privacy/retention checks, pause and failure UX | Replay checks pass; stale evidence never replaces newer observations |
-| M5 Chest camera | 8 to 16 | Mount angle, lens choice from chest height, tap-to-talk while worn, the dashboard live view with labels and sighting notifications, the twenty minute heat and battery run | The M3 loop works with the phone on a teammate's chest while they walk around, or path A remains the demo |
+| M5 Chest camera | 8 to 16 | Mount angle, lens choice from chest height, tap-to-talk while worn, labels and sighting notifications on the wearer's screen, the twenty minute heat and battery run | The M3 loop works with the phone on a teammate's chest while they walk around, or path A remains the demo |
 | M6 Optional extension | 12 to 18, only after core checks pass | Choose one: semantic questions, visual enrollment, spoken caregiver messages and reminders, or a richer dashboard. Wake word, room enrollment, and recording upload compete for this time | The chosen feature passes an evaluation without destabilizing M3 |
 | M7 Polish | 18 to 24 | Freeze features, measure accuracy/latency, demo script, backup recording, docs | Two clean rehearsals including the path A fallback |
 
@@ -648,11 +647,11 @@ M3 is the cut line. If it slips, drop M6. Do not try to build every roadmap feat
 
 ### Demo script
 
-1. A teammate wears the phone on their chest in the approved demo area. The dashboard live view faces the judges on a laptop. Resume capture, and the wearer puts a validated object on a counter. If the mount didn't pass M5, hold the phone in the hand on path A.
+1. A teammate wears the phone on their chest in the approved demo area. The phone screen is mirrored to a laptop facing the judges, or the same flow runs on `/sim`. Resume capture, and the wearer puts a validated object on a counter. If the mount didn't pass M5, hold the phone in the hand on path A.
 2. Ask where it is, including once while it remains visible. The wearer hears "I last saw…" with a time in the earbuds, and the judges see the same words and the thumbnail on the dashboard.
 3. Pick it up and ask again. Confirm the system does not confidently send the wearer back to the counter. Put it on a new surface and ask after enrichment.
 4. Ask about an unseen item to demonstrate uncertainty. Show an enrolled alias; demonstrate semantic matching only if that optional feature passed evaluation.
-5. Show the labels and sighting notifications on the live view if M5 shipped them. Stop the recording and play the file back. Then show the question log, speech/sighting latency, and pause control. Rehearse the same sequence on path A.
+5. Show the labels and sighting notifications on the wearer's screen if M5 shipped them. Stop the recording and play the file back. Then show the question log, speech/sighting latency, and pause control. Rehearse the same sequence on path A.
 
 ## Risks
 

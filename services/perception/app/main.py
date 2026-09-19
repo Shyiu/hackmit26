@@ -123,16 +123,6 @@ async def reload_classes() -> JSONResponse:
     return JSONResponse({"error": "not implemented"}, status_code=501)
 
 
-@router.websocket("/ws/debug")
-async def debug_socket(ws: WebSocket) -> None:
-    await ws.accept()
-    if await _hello(ws, "debug") is None:
-        return
-    # Not built yet. The dashboard live view will get detections and annotated
-    # frames here: opt-in, transient, and silent while capture is paused.
-    await ws.close(code=1000)
-
-
 @router.websocket("/ws/frames")
 async def frames_socket(ws: WebSocket) -> None:
     await ws.accept()

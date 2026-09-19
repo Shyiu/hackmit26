@@ -136,7 +136,7 @@ def test_config_classes_is_not_built_yet(client: TestClient) -> None:
     [
         (_hello("not.a-token"), "signature"),
         (_hello(FIXTURE["token"].replace(".", "..")), "malformed"),
-        (_hello(_token(scope="debug")), "needs a frames token"),
+        (_hello(_token(scope="api")), "needs a frames token"),
         (_hello(_token(sub=str(REVOKED_DEVICE))), "revoked"),
         # Minted before the device's tokenVersion was bumped, which is how revoking reaches live tokens.
         (_hello(_token(tv=1)), "revoked"),
@@ -201,13 +201,6 @@ def test_frames_socket_runs_a_capture_session(
     assert session["endedAt"] is not None
 
 
-def test_debug_socket_checks_the_scope_and_closes(client: TestClient) -> None:
-    with client.websocket_connect("/ws/debug") as ws:
-        ws.send_text(_hello(FIXTURE["token"]))
-        assert "needs a debug token" in _refusal(ws)
-
-    with client.websocket_connect("/ws/debug") as ws:
-        ws.send_text(_hello(_token(scope="debug")))
-        with pytest.raises(WebSocketDisconnect) as closed:
-            ws.receive_text()
-        assert closed.value.code == 1000
+def test_there_is_no_debug_socket(client: TestClient) -> None:
+    with pytest.raises(WebSocketDisconnect), client.websocket_connect("/ws/debug"):
+        pass
