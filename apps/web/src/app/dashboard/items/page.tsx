@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { relativeTime } from "@/lib/server/answer";
+import { relativeTime } from "@/lib/relative-time";
 import { principalFromSession, SESSION_COOKIE } from "@/lib/server/auth";
 import { getDb } from "@/lib/server/db";
 
