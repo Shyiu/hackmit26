@@ -692,6 +692,20 @@ NEXT_PUBLIC_PERCEPTION_WS_URL=
 
 ## Running it
 
+One command sets up a fresh checkout and starts both servers:
+
+```bash
+pnpm start                       # install, env files, MongoDB, setup, seed, then :3000 and :8000
+pnpm start --setup-only          # stop before starting the servers
+pnpm start --tunnel              # also open cloudflared tunnels and print the phone URL
+pnpm start --reset               # reseed the demo wearer
+PORT=3100 PERCEPTION_PORT=8100 pnpm start   # when another checkout holds the default ports
+```
+
+`scripts/start.sh` creates `apps/web/.env.local` and `services/perception/.env` from their examples if they are missing, generates `AUTH_SECRET`, `DEVICE_TOKEN_SECRET`, and a demo `CAREGIVER_PASSWORD`, and copies the token secret and database settings into the perception file. It never overwrites a value that is already set. It prints the demo login when it finishes. API keys (OpenAI, Deepgram, ElevenLabs, S3) stay empty until you fill them in. If something already listens on :27017 it uses that MongoDB instead of starting a container. With `--tunnel` it starts `next dev` with `NEXT_PUBLIC_PERCEPTION_WS_URL` set to the perception tunnel's `wss://` URL.
+
+The same steps by hand:
+
 ```bash
 pnpm install
 pnpm db:up                       # local MongoDB in Docker, or point MONGODB_URI at Atlas

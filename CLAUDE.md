@@ -33,6 +33,7 @@ both render it with a different view, so a client feature added there reaches bo
 ## Commands
 
 ```bash
+pnpm start            # scripts/start.sh: install, env files, db, seed, then web and perception
 pnpm install
 pnpm dev              # apps/web on :3000
 pnpm build
