@@ -1,14 +1,18 @@
 import { askRequestSchema } from "@memory-glasses/shared";
+import { waitUntil } from "@vercel/functions";
 import { composeAnswer } from "@/lib/server/answer";
 import { readBody, withTenant } from "@/lib/server/api";
+import { pcmHeaders, ttsProvider } from "@/lib/server/tts";
+import { timedStream } from "@/lib/server/tts/timed-stream";
 import { interactionView } from "@/lib/server/views";
 
 const round = (ms: number) => Math.round(ms * 10) / 10;
 
 // The fast path from README "What happens when the wearer asks a question":
 // one indexed query resolves the item and its latest snapshot, a template words
-// the answer, no LLM runs. Until TTS lands in M2 the answer comes back as JSON;
-// the audio stream will replace the body and keep the X-Interaction-Id header.
+// the answer, no LLM runs. With a TTS provider configured the body is the audio
+// stream (PCM, see pcmHeaders) and the text is polled from /api/interactions/:id.
+// Without one, the interaction comes back as JSON and the phone speaks it.
 export const POST = withTenant("any", async ({ request, principal, tenant, settings }) => {
   const started = performance.now();
   const body = await readBody(request, askRequestSchema);
@@ -31,15 +35,60 @@ export const POST = withTenant("any", async ({ request, principal, tenant, setti
     const resolution = await tenant.items.resolve(body.transcript);
     const lookupMs = performance.now() - lookupStarted;
     const answer = composeAnswer(resolution, settings, new Date());
+    const outcome = { path: "fast" as const, itemId: answer.itemId, answerTemplate: answer.template, answerText: answer.text };
+    headers.set("Server-Timing", `db;dur=${round(lookupMs)}`);
+
+    const provider = ttsProvider();
+    if (provider) {
+      const ttsStarted = performance.now();
+      const upstream = await provider.synthesize(answer.text, { signal: request.signal }).catch((error: unknown) => {
+        // The voice is down, not the answer. Fall through to JSON so the phone speaks it.
+        console.warn(`tts: ${provider.name} unavailable, answering as JSON:`, error instanceof Error ? error.message : error);
+        return null;
+      });
+      if (upstream) {
+        const streaming = await tenant.interactions.transition(interaction._id, "streaming", {
+          ...outcome,
+          timingsMs: { db: round(lookupMs) },
+        });
+        if (streaming) {
+          // Stage timings land with the final transition, once the stream has ended one way or another.
+          let ttsFirstByte: number | undefined;
+          const audio = timedStream(
+            upstream,
+            {
+              onFirstByte: (ms) => {
+                ttsFirstByte = round(ms);
+              },
+              onEnd: (result, error) => {
+                const ttsTimings = ttsFirstByte === undefined ? {} : { ttsFirstByte };
+                const final =
+                  result === "complete"
+                    ? tenant.interactions.transition(interaction._id, "complete", {
+                        timingsMs: { ...ttsTimings, total: round(performance.now() - started) },
+                      })
+                    : tenant.interactions.transition(interaction._id, result, {
+                        timingsMs: ttsTimings,
+                        ...(result === "failed" && {
+                          error: { code: "tts_failed", message: String(error instanceof Error ? error.message : error).slice(0, 500) },
+                        }),
+                      });
+                waitUntil(final.catch(() => null));
+              },
+            },
+            ttsStarted,
+          );
+          for (const [name, value] of Object.entries(pcmHeaders(provider.format))) headers.set(name, value);
+          return new Response(audio, { headers });
+        }
+        await upstream.cancel().catch(() => null);
+      }
+    }
 
     const completed = await tenant.interactions.transition(interaction._id, "complete", {
-      path: "fast",
-      itemId: answer.itemId,
-      answerTemplate: answer.template,
-      answerText: answer.text,
+      ...outcome,
       timingsMs: { db: round(lookupMs), total: round(performance.now() - started) },
     });
-    headers.set("Server-Timing", `db;dur=${round(lookupMs)}`);
     const current = completed ?? (await tenant.interactions.get(interaction._id)) ?? interaction;
     return Response.json(interactionView(current), { headers });
   } catch (error) {

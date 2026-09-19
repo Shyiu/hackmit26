@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import type { TurnMode } from "@/lib/client/deepgram";
-import { primeSpeech, speak, type Speech, type SpeechOutcome } from "@/lib/client/speaker";
+import {
+  pcmFormatFromHeaders,
+  playPcmStream,
+  primeSpeech,
+  speak,
+  type Speech,
+  type SpeechOutcome,
+} from "@/lib/client/speaker";
 import { playListeningChime, playStallTone } from "@/lib/tones";
 import { CAMERA_SETTING, parseCameraChoice, useCamera, type CameraChoice } from "./use-camera";
 import { useHudMessage } from "./use-hud-message";
@@ -27,26 +34,47 @@ function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-async function askServer(transcript: string): Promise<InteractionView> {
+// Polls an interaction until it settles. Server TTS answers carry only audio,
+// so the caption text comes from here while the voice is already playing.
+async function fetchInteraction(id: string): Promise<InteractionView> {
+  const poll = await fetch(`/api/interactions/${id}`, { cache: "no-store" });
+  if (!poll.ok) throw new Error(`Polling the answer failed with ${poll.status}`);
+  return (await poll.json()) as InteractionView;
+}
+
+async function pollInteraction(interaction: InteractionView, settled: (status: string) => boolean) {
+  const deadline = performance.now() + POLL_LIMIT_MS;
+  while (!settled(interaction.status) && performance.now() < deadline) {
+    await sleep(POLL_MS);
+    interaction = await fetchInteraction(interaction._id);
+  }
+  return interaction;
+}
+
+const isFinal = (status: string) => status !== "generating" && status !== "streaming";
+
+type ServerAnswer =
+  | { kind: "text"; interaction: InteractionView }
+  | { kind: "audio"; interactionId: string; body: ReadableStream<Uint8Array>; format: { sampleRate: number; channels: number } };
+
+async function askServer(transcript: string): Promise<ServerAnswer> {
   const response = await fetch("/api/ask", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ transcript, requestId: crypto.randomUUID() }),
   });
   if (!response.ok) throw new Error(`Ask failed with ${response.status}`);
-  let interaction = (await response.json()) as InteractionView;
-  // 202: an earlier attempt with this request is still running. Poll it.
-  const deadline = performance.now() + POLL_LIMIT_MS;
-  while ((interaction.status === "generating" || interaction.status === "streaming") && performance.now() < deadline) {
-    await sleep(POLL_MS);
-    const poll = await fetch(`/api/interactions/${interaction._id}`, { cache: "no-store" });
-    if (!poll.ok) throw new Error(`Polling the answer failed with ${poll.status}`);
-    interaction = (await poll.json()) as InteractionView;
+  const format = pcmFormatFromHeaders(response.headers);
+  const interactionId = response.headers.get("x-interaction-id");
+  if (format && response.body && interactionId) {
+    return { kind: "audio", interactionId, body: response.body, format };
   }
+  // 202: an earlier attempt with this request is still running. Poll it.
+  const interaction = await pollInteraction((await response.json()) as InteractionView, isFinal);
   if (interaction.status !== "complete" || !interaction.answerText) {
     throw new Error(`The answer ended as ${interaction.status}`);
   }
-  return interaction;
+  return { kind: "text", interaction };
 }
 
 function reportPlayback(interactionId: string, outcome: SpeechOutcome, firstPlaybackMs: number | null) {
@@ -154,14 +182,37 @@ export function useWearerClient({ turnMode, fullscreen = false }: { turnMode: Tu
     [hud, rate, stopSpeaking],
   );
 
+  // Server TTS: play the PCM as it streams in, and caption it from the polled
+  // interaction. Cancelling here also closes the response, which cancels upstream.
+  const playStream = useCallback(
+    async (answer: Extract<ServerAnswer, { kind: "audio" }>) => {
+      stopSpeaking();
+      const speech = playPcmStream(answer.body, resumeAudio(), answer.format);
+      speechRef.current = speech;
+      // The text is already stored by the time the audio headers arrive; one fetch usually does it.
+      const caption = fetchInteraction(answer.interactionId)
+        .then((interaction) => pollInteraction(interaction, (status) => status !== "generating"))
+        .then((interaction) => {
+          if (speechRef.current === speech && interaction.answerText) hud.show("caption", interaction.answerText);
+        })
+        .catch(() => null);
+      const startedAt = await speech.started;
+      const outcome = await speech.done;
+      await caption;
+      if (speechRef.current === speech) speechRef.current = null;
+      return { startedAt, outcome };
+    },
+    [hud, resumeAudio, stopSpeaking],
+  );
+
   const answerQuestion = useCallback(
     async (transcript: string, turnEndedAt: number) => {
       const seq = ++answerSeqRef.current;
       setLastQuestion(transcript);
       setAnswer("thinking");
-      let interaction: InteractionView;
+      let answer: ServerAnswer;
       try {
-        interaction = await askServer(transcript);
+        answer = await askServer(transcript);
       } catch (error) {
         if (seq !== answerSeqRef.current) return;
         setLastError(error instanceof Error ? error.message : String(error));
@@ -171,14 +222,22 @@ export function useWearerClient({ turnMode, fullscreen = false }: { turnMode: Tu
         return;
       }
       // A newer question already started; this answer is stale.
-      if (seq !== answerSeqRef.current) return;
+      if (seq !== answerSeqRef.current) {
+        if (answer.kind === "audio") void answer.body.cancel().catch(() => null);
+        return;
+      }
       setLastError(null);
       setAnswer("speaking");
-      const { startedAt, outcome } = await say(interaction.answerText ?? TROUBLE);
-      reportPlayback(interaction._id, outcome, startedAt === null ? null : startedAt - turnEndedAt);
+      if (answer.kind === "text") {
+        const { startedAt, outcome } = await say(answer.interaction.answerText ?? TROUBLE);
+        reportPlayback(answer.interaction._id, outcome, startedAt === null ? null : startedAt - turnEndedAt);
+      } else {
+        const { startedAt, outcome } = await playStream(answer);
+        reportPlayback(answer.interactionId, outcome, startedAt === null ? null : startedAt - turnEndedAt);
+      }
       if (seq === answerSeqRef.current) setAnswer("idle");
     },
-    [say],
+    [playStream, say],
   );
 
   const onTurnEnd = useCallback(
