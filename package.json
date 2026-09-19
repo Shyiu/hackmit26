@@ -1,0 +1,23 @@
+{
+  "name": "memory-glasses",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "lint": "pnpm --filter web lint",
+    "db:indexes": "tsx scripts/create-indexes.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "bench:tts": "tsx scripts/bench-tts.ts"
+  },
+  "dependencies": {
+    "@memory-glasses/shared": "workspace:*",
+    "mongodb": "^6"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@11.5.0"
+}
