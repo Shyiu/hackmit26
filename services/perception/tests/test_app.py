@@ -6,6 +6,7 @@ import json
 import threading
 import time
 from collections.abc import Callable, Iterator
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ import pytest
 from bson import ObjectId
 from conftest import TEST_URI, Database, Seed
 from fastapi.testclient import TestClient
+from PIL import Image
 from pymongo import MongoClient
 from pymongo.collection import Collection
 from starlette.testclient import WebSocketTestSession
@@ -30,6 +32,10 @@ from app.protocol import (
     encode_frame,
     parse_server_message,
 )
+from app.safety.adapters.mock import MockDetector, MockFaceDetector, MockFaceEmbedder, MockVLM
+from app.safety.adapters.registry import Adapters
+from app.safety.models import BBox
+from app.safety.models import Detection as SafetyDetection
 from app.tokens import DeviceTokenClaims, sign_device_token
 
 FIXTURE: dict[str, Any] = json.loads(
@@ -132,6 +138,28 @@ def _frame(session_id: str, seq: int) -> bytes:
     return encode_frame(header, JPEG)
 
 
+def _frame_with_jpeg(session_id: str, seq: int, jpeg: bytes) -> bytes:
+    return encode_frame(
+        FrameHeader(
+            v=1,
+            sessionId=session_id,
+            seq=seq,
+            capturedAtMs=1000.0 * seq,
+            sentAtMs=1000.0 * seq + 40,
+            width=16,
+            height=16,
+            bytes=len(jpeg),
+        ),
+        jpeg,
+    )
+
+
+def _valid_jpeg() -> bytes:
+    output = BytesIO()
+    Image.new("RGB", (16, 16), "white").save(output, format="JPEG")
+    return output.getvalue()
+
+
 def _refusal(ws: WebSocketTestSession) -> str:
     message = parse_server_message(ws.receive_text())
     assert isinstance(message, ErrorMessage) and message.code == "unauthorized"
@@ -152,14 +180,36 @@ def _wait_for[T](find: Callable[[], T | None], timeout: float = 5.0) -> T:
 def test_health_reports_the_database_and_the_queue(client: TestClient) -> None:
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"ok": True, "detector": "null", "db": "ok", "queueDepth": 0}
+    assert response.json() == {
+        "ok": True,
+        "detector": "null",
+        "db": "ok",
+        "queueDepth": 0,
+        "safety": {
+            "detector": "mock",
+            "faceDetector": "mock",
+            "faceEmbedder": "mock",
+            "vlm": "mock",
+        },
+    }
 
 
 def test_health_says_when_the_database_is_unreachable(wearer_db: Database) -> None:
     with _client(wearer_db.name, uri="mongodb://127.0.0.1:1/?directConnection=true") as client:
         response = client.get("/health")
     assert response.status_code == 503
-    assert response.json() == {"ok": False, "detector": "null", "db": "unreachable", "queueDepth": None}
+    assert response.json() == {
+        "ok": False,
+        "detector": "null",
+        "db": "unreachable",
+        "queueDepth": None,
+        "safety": {
+            "detector": "mock",
+            "faceDetector": "mock",
+            "faceEmbedder": "mock",
+            "vlm": "mock",
+        },
+    }
 
 
 def test_config_classes_is_not_built_yet(client: TestClient) -> None:
@@ -252,6 +302,53 @@ def test_frames_socket_runs_a_capture_session(
     assert (session["patientId"], session["deviceId"], session["source"]) == (PATIENT, DEVICE, "headset")
     assert (session["framesReceived"], session["framesDropped"], session["lastSeq"]) == (1, 1, 2)
     assert session["endedAt"] is not None
+
+
+def test_live_frame_runs_safety_after_detections(wearer_db: Database, tmp_path: Path) -> None:
+    settings = Settings(
+        mongodb_uri=TEST_URI,
+        mongodb_db=wearer_db.name,
+        device_token_secret=SECRET,
+        safety_sample_every_n_frames=1,
+        frame_image_dir=str(tmp_path),
+    )
+    safety_adapters = Adapters(
+        detector=MockDetector(
+            [SafetyDetection(label="knife", confidence=0.9, bbox=BBox(x=0, y=0, w=1, h=1))]
+        ),
+        face_detector=MockFaceDetector(faces=0),
+        face_embedder=MockFaceEmbedder(),
+        vlm=MockVLM(),
+    )
+    mongo = MongoClient(TEST_URI, tz_aware=True)
+    with TestClient(
+        create_app(
+            settings,
+            safety_adapters=safety_adapters,
+            token_clock=lambda: FIXTURE["validAt"],
+        )
+    ) as app_client:
+        with app_client.websocket_connect("/ws/frames") as ws:
+            ws.send_text(_hello(FIXTURE["token"]))
+            opened = parse_server_message(ws.receive_text())
+            assert isinstance(opened, SessionMessage)
+            ws.send_text(_capture("live"))
+            assert parse_server_message(ws.receive_text()) == SessionMessage(
+                type="session", v=1, sessionId=opened.sessionId, state="live"
+            )
+            ws.send_bytes(_frame_with_jpeg(opened.sessionId, 2, _valid_jpeg()))
+            parse_server_message(ws.receive_text())
+            found = _wait_for(
+                lambda: mongo[wearer_db.name]["frame_observations"].find_one({"patientId": PATIENT})
+            )
+            assert found is not None
+            event = _wait_for(
+                lambda: mongo[wearer_db.name]["danger_events"].find_one(
+                    {"patientId": PATIENT, "status": "open"}
+                )
+            )
+            assert event is not None
+    mongo.close()
 
 
 def test_debug_socket_checks_the_scope_and_closes(client: TestClient) -> None:

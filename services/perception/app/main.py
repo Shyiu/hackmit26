@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from bson import ObjectId
-from fastapi import APIRouter, FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from pymongo import AsyncMongoClient
@@ -37,6 +37,11 @@ from .protocol import (
     parse_frame,
     session_message,
 )
+from .safety.adapters.registry import Adapters, build_adapters
+from .safety.images import LocalFrameStore
+from .safety.routes import router as safety_router
+from .safety.service import SafetyService
+from .safety.store import SafetyStore
 from .store import CaptureSource, ItemPrompts, ObservationStore, UnknownPatientError
 from .tokens import DeviceTokenClaims, InvalidTokenError, Scope, verify_device_token
 from .tracker import SightingTracker, SightingWriter, TrackerConfig
@@ -61,6 +66,7 @@ class Services:
     store: ObservationStore
     detector: Detector
     token_clock: Callable[[], float]
+    safety: SafetyService | None = None
 
 
 def _services(connection: HTTPConnection) -> Services:
@@ -72,6 +78,7 @@ def create_app(
     settings: Settings | None = None,
     *,
     detector: Detector | None = None,
+    safety_adapters: Adapters | None = None,
     token_clock: Callable[[], float] = time.time,
 ) -> FastAPI:
     """Settings default to the environment. Tests pass their own, and a clock for token expiry."""
@@ -85,15 +92,43 @@ def create_app(
             appname="memory-glasses-perception",
             serverSelectionTimeoutMS=5_000,
         )
-        store = ObservationStore(client[resolved.mongodb_db])
-        app.state.services = Services(resolved, store, detector or build_detector(resolved), token_clock)
+        db = client[resolved.mongodb_db]
+        store = ObservationStore(db)
+        safety = None
+        if resolved.safety_enabled:
+            safety = SafetyService(
+                resolved,
+                SafetyStore(db, store, resolved),
+                safety_adapters or build_adapters(resolved),
+                LocalFrameStore(resolved.frame_image_dir),
+            )
+            log.info(
+                "safety adapters configured",
+                extra={
+                    "safety_detector": safety.adapters.detector.name,
+                    "safety_face_detector": safety.adapters.face_detector.name,
+                    "safety_face_embedder": safety.adapters.face_embedder.name,
+                    "safety_vlm": safety.adapters.vlm.name if safety.adapters.vlm else None,
+                },
+            )
+        app.state.services = Services(
+            resolved, store, detector or build_detector(resolved), token_clock, safety
+        )
         try:
             yield
         finally:
             await client.close()
 
     app = FastAPI(title="memory glasses perception", lifespan=lifespan)
+
+    @app.exception_handler(HTTPException)
+    async def http_error(_request: Request, exc: HTTPException) -> JSONResponse:
+        if isinstance(exc.detail, dict) and "code" in exc.detail:
+            return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+
     app.include_router(router)
+    app.include_router(safety_router)
     return app
 
 
@@ -112,7 +147,24 @@ async def health(request: Request) -> JSONResponse:
     except (PyMongoError, TimeoutError):
         db = "unreachable"
     ok = db == "ok"
-    body = {"ok": ok, "detector": services.detector.name, "db": db, "queueDepth": queue_depth}
+    safety = services.safety
+    safety_names = (
+        {
+            "detector": safety.adapters.detector.name,
+            "faceDetector": safety.adapters.face_detector.name,
+            "faceEmbedder": safety.adapters.face_embedder.name,
+            "vlm": safety.adapters.vlm.name if safety.adapters.vlm else None,
+        }
+        if safety
+        else None
+    )
+    body = {
+        "ok": ok,
+        "detector": services.detector.name,
+        "db": db,
+        "queueDepth": queue_depth,
+        "safety": safety_names,
+    }
     # 503 lets a tunnel or load balancer health check see that the database is gone.
     return JSONResponse(body, status_code=200 if ok else 503)
 
@@ -162,7 +214,7 @@ async def frames_socket(ws: WebSocket) -> None:
         await ws.send_text(error_message("server_error", "Storage is unavailable").model_dump_json())
         await ws.close(code=1011)
         return
-    connection = FrameConnection(ws, services, patient_id, session_id)
+    connection = FrameConnection(ws, services, patient_id, device_id, session_id)
     connection.writer = SightingWriter(
         services.store, patient_id=patient_id, session_id=session_id, device_id=device_id, source=source
     )
@@ -221,12 +273,21 @@ class FrameConnection:
     it, so a slow detector drops frames instead of answering with stale ones.
     """
 
-    def __init__(self, ws: WebSocket, services: Services, patient_id: ObjectId, session_id: ObjectId) -> None:
+    def __init__(
+        self,
+        ws: WebSocket,
+        services: Services,
+        patient_id: ObjectId,
+        device_id: ObjectId | None,
+        session_id: ObjectId,
+    ) -> None:
         self.ws = ws
         self.store = services.store
         self.detector = services.detector
         self.settings = services.settings
+        self.services_safety = services.safety
         self.patient_id = patient_id
+        self.device_id = device_id
         self.session_id = session_id
         self.live = False
         self.last_seq = -1
@@ -350,6 +411,20 @@ class FrameConnection:
                         detections, pending.observed_at, header.seq, (header.width, header.height)
                     )
                     await self.writer.apply(events)
+                if (
+                    self.services_safety is not None
+                    and header.seq % self.services_safety.settings.safety_sample_every_n_frames == 0
+                ):
+                    try:
+                        await self.services_safety.process(
+                            self.patient_id,
+                            self.device_id,
+                            self.session_id,
+                            pending.frame.jpeg,
+                            pending.observed_at,
+                        )
+                    except Exception:
+                        log.exception("Safety processing failed for frame %s", header.seq)
             except WebSocketDisconnect:
                 return
             except Exception:
