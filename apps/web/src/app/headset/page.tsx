@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth/session";
 import { HeadsetView } from "./headset-view";
 
 export const metadata: Metadata = {
@@ -19,6 +21,12 @@ export const viewport: Viewport = {
 
 // The wearer's view: the phone's rear camera once per eye, with the HUD on top.
 // See README "The headset: a phone in a printed shell".
-export default function HeadsetPage() {
+// The caregiver signs in on the phone once; the page trades that session for
+// short-lived device tokens.
+export default async function HeadsetPage() {
+  if (!(await getSession())) {
+    redirect("/login?next=/headset");
+  }
+
   return <HeadsetView />;
 }

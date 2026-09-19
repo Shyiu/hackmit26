@@ -427,7 +427,7 @@ MVP by M3: read-only item cards, latest question/answer, latency, and capture/pa
 - **Add an item.** Name, aliases and a few photos. Saving pushes the new prompt list to the perception service.
 - **Rooms.** Enroll a room by walking through it. Mark rooms private for the later on-device privacy gate; do not present server-side labels as a pre-upload privacy guarantee.
 - **Questions.** A log of what the wearer asked and what they heard. A chart of questions per day per item. A jump in repeated questions can flag a hard day. The dashboard states it as a count and nothing more. It isn't a diagnostic.
-- **Live view.** The current frame with boxes drawn and the caption the wearer is reading. Nobody else can see inside the headset, so this page on a laptop is how the judges watch the demo.
+- **No live view.** The caregiver side carries no camera stream. Judges and caregivers watch the wearer's own screen, mirrored from the phone or run on `/sim`.
 - **Messages.** Optional. Send a short message or set a reminder. The HUD shows it and the voice reads it.
 - **Recordings.** Optional. Lists recordings once they leave the phone. Until then a recording is a file on the phone.
 - **Latency.** P50 and P95 per stage, read from `interactions`.
@@ -463,7 +463,6 @@ Perception service:
 | Route | Does |
 |---|---|
 | `WS /ws/frames` | Binary JPEG frames in, with the versioned session/sequence/timestamp envelope. JSON out per frame: `{ seq, detections: [{ itemId, label, bbox, confidence }] }` with boxes normalized to the frame, for the HUD |
-| `WS /ws/debug` | Detections and annotated frames for the dashboard live view |
 | `POST /config/classes` | Reloads the prompt list after a caregiver edits items |
 | `GET /health` | Model loaded, current fps, queue depth |
 
@@ -482,7 +481,7 @@ An always-on camera in someone's home is a serious thing, and the wearer may not
 - The MVP runs in an explicitly approved demo area with a visible capture/pause control. Capture starts paused; reconnects require explicit resumption. Pause before leaving that area. Automatic private-room exclusion is not an MVP capability.
 - State the actual flow: raw frames reach the selected perception host in memory. Only selected, downscaled, face-blurred keyframes may reach object storage or the external vision provider. Blurring on that host does not mean raw frames never left the capture device. Exclude raw frames from logs and error reporting.
 - A future automatic privacy gate must run on the capture device before any upload, including debug frames and thumbnails. Private or unknown rooms block transmission and storage until cleared locally. Server-side room recognition cannot enforce this. Bathrooms and bedrooms default to private when that gate is implemented.
-- Debug live view is authenticated, opt-in, transient, and disabled while paused. Pause stops uploads and cancels/drops queued frames and description work; it cannot retract data already sent externally. Document provider retention settings before any real-home use.
+- Pause stops uploads and cancels/drops queued frames and description work; it cannot retract data already sent externally. Document provider retention settings before any real-home use.
 - Retention defaults to 30 days. A retryable cleanup job removes expired sightings, keyframes, thumbnails, embeddings, interactions, and related jobs, clears item snapshots pointing to removed sightings, and recomputes derived usual spots. Apply a stated retention policy to enrollment images too. Exclude expired data from reads immediately rather than relying on delayed TTL deletion. Storage lifecycle rules are a backstop; document backup/provider retention separately.
 - Audio leaves the device only during push-to-talk or after a future local wake word fires. Show listening state and provide an immediate stop control.
 - A phone has no capture light facing bystanders, and Ray-Ban Metas do. The shell carries a visible "camera on" notice, and the HUD shows capture and recording state to the wearer. We don't try to hide the camera.
@@ -618,7 +617,7 @@ M3 is the cut line. If it slips, drop M6. Do not try to build every roadmap feat
 
 ### Demo script
 
-1. A teammate wears the headset in the approved demo area with a spotter beside them. The dashboard live view faces the judges on a laptop. Resume capture and put a validated object on a counter. If the headset didn't pass M5, hold the phone in the hand on path A.
+1. A teammate wears the headset in the approved demo area with a spotter beside them. The wearer's phone screen is mirrored to a laptop facing the judges, or the same flow runs on `/sim`. Resume capture and put a validated object on a counter. If the headset didn't pass M5, hold the phone in the hand on path A.
 2. Ask where it is, including once while it remains visible. Hear "I last saw…" with a time, see the same words as a caption, and show the description/thumbnail.
 3. Pick it up and ask again. Confirm the system does not confidently send the wearer back to the counter. Put it on a new surface and ask after enrichment.
 4. Ask about an unseen item to demonstrate uncertainty. Show an enrolled alias; demonstrate semantic matching only if that optional feature passed evaluation.
