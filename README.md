@@ -4,7 +4,7 @@ Smart glasses that remember where things are, for people living with dementia.
 
 The wearer asks out loud, "Where are my keys?" About a second later the glasses answer, "I last saw your keys on the kitchen counter, next to the coffee maker, about twenty minutes ago."
 
-**Status: planning.** No code exists yet. This README is the build plan. Edit it freely. Building starts once the plan is signed off.
+**Status: bare backbone.** `apps/web` is scaffolded (Next.js App Router, Tailwind, shadcn/ui, stub API routes, a Mongo client helper). Nothing does real work yet. This README is still the build plan — edit it freely.
 
 ## The problem
 
