@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -18,8 +19,10 @@ from starlette.testclient import WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
 from app.config import Settings
+from app.detector import Detector, Prompts
 from app.main import create_app
 from app.protocol import (
+    Detection,
     DetectionsMessage,
     ErrorMessage,
     FrameHeader,
@@ -51,10 +54,38 @@ async def wearer_db(db: Database) -> Database:
     return db
 
 
-def _client(db_name: str, uri: str = TEST_URI) -> TestClient:
+def _client(db_name: str, uri: str = TEST_URI, detector: Detector | None = None) -> TestClient:
     settings = Settings(mongodb_uri=uri, mongodb_db=db_name, device_token_secret=SECRET)
     # The fixture token was minted for a fixed moment, so the app reads that as now.
-    return TestClient(create_app(settings, token_clock=lambda: FIXTURE["validAt"]))
+    return TestClient(create_app(settings, detector=detector, token_clock=lambda: FIXTURE["validAt"]))
+
+
+class StubDetector:
+    """Sees the wearer's first tracked item in every frame, and can be made slow."""
+
+    name = "stub"
+
+    def __init__(self) -> None:
+        self.seen: list[tuple[int, Prompts]] = []
+        self.release = threading.Event()
+        self.release.set()
+
+    def detect(self, jpeg: bytes, header: FrameHeader, prompts: Prompts) -> list[Detection] | None:
+        self.release.wait(5.0)
+        self.seen.append((header.seq, prompts))
+        if not prompts:
+            return []
+        item = prompts[0]
+        return [Detection(itemId=item.item_id, label=item.label, bbox=(0.4, 0.3, 0.2, 0.2), confidence=0.9)]
+
+
+def _live_session(ws: WebSocketTestSession) -> str:
+    ws.send_text(_hello(FIXTURE["token"]))
+    opened = parse_server_message(ws.receive_text())
+    assert isinstance(opened, SessionMessage)
+    ws.send_text(_capture("live"))
+    assert isinstance(parse_server_message(ws.receive_text()), SessionMessage)
+    return opened.sessionId
 
 
 @pytest.fixture
@@ -211,3 +242,82 @@ def test_debug_socket_checks_the_scope_and_closes(client: TestClient) -> None:
         with pytest.raises(WebSocketDisconnect) as closed:
             ws.receive_text()
         assert closed.value.code == 1000
+
+
+@pytest.fixture(scope="module")
+async def keys_item(wearer_db: Database) -> ObjectId:
+    seed = Seed(wearer_db)
+    await seed.item(PATIENT, "wallet", active=False)
+    return await seed.item(PATIENT, "keys")
+
+
+@pytest.fixture
+def wearer(wearer_db: Database) -> Iterator[Database]:
+    # Sightings from one test would confirm again in the next; each starts clean.
+    mongo: MongoClient[dict[str, Any]] = MongoClient(TEST_URI, tz_aware=True)
+    with mongo:
+        yield wearer_db
+        mongo[wearer_db.name]["sightings"].delete_many({})
+        mongo[wearer_db.name]["items"].update_many(
+            {}, {"$set": {"lastSighting": None, "lastRestingSighting": None, "observationVersion": 0}}
+        )
+
+
+def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_frames(
+    wearer: Database, keys_item: ObjectId, sessions: Collection[dict[str, Any]]
+) -> None:
+    detector = StubDetector()
+    with _client(wearer.name, detector=detector) as client, client.websocket_connect("/ws/frames") as ws:
+        session_id = _live_session(ws)
+        for seq in (1, 2, 3):
+            ws.send_bytes(_frame(session_id, seq))
+            reply = parse_server_message(ws.receive_text())
+            assert isinstance(reply, DetectionsMessage) and reply.seq == seq
+            assert [(d.itemId, d.label, d.bbox) for d in reply.detections] == [
+                (str(keys_item), "keys", (0.4, 0.3, 0.2, 0.2))
+            ]
+        db = sessions.database
+        sighting = _wait_for(lambda: db["sightings"].find_one({"patientId": PATIENT, "status": "open"}))
+        assert (sighting["itemId"], sighting["firstSeq"], sighting["lastSeq"]) == (keys_item, 1, 3)
+        assert (sighting["sessionId"], sighting["source"]) == (ObjectId(session_id), "headset")
+        assert sighting["eventId"] == f"{session_id}:1"
+        item = db["items"].find_one({"_id": keys_item})
+        assert item is not None and item["lastSighting"]["sightingId"] == sighting["_id"]
+        ws.close()
+        _wait_for(lambda: db["sightings"].find_one({"_id": sighting["_id"], "status": "closed"}))
+
+    # Only the active item's prompts reached the detector.
+    assert [[p.text for p in prompts] for _, prompts in detector.seen] == [["keys"]] * 3
+
+
+def test_one_or_two_frames_write_nothing(wearer: Database, keys_item: ObjectId) -> None:
+    detector = StubDetector()
+    with _client(wearer.name, detector=detector) as client, client.websocket_connect("/ws/frames") as ws:
+        session_id = _live_session(ws)
+        for seq in (1, 2):
+            ws.send_bytes(_frame(session_id, seq))
+            assert isinstance(parse_server_message(ws.receive_text()), DetectionsMessage)
+        ws.close()
+    mongo: MongoClient[dict[str, Any]] = MongoClient(TEST_URI, tz_aware=True)
+    with mongo:
+        assert mongo[wearer.name]["sightings"].count_documents({"patientId": PATIENT}) == 0
+
+
+def test_slow_inference_drops_frames_instead_of_queueing_them(
+    wearer: Database, keys_item: ObjectId, sessions: Collection[dict[str, Any]]
+) -> None:
+    detector = StubDetector()
+    detector.release.clear()
+    with _client(wearer.name, detector=detector) as client, client.websocket_connect("/ws/frames") as ws:
+        session_id = _live_session(ws)
+        # The worker is stuck on frame 1. Frames 2 to 5 arrive meanwhile; only the newest may wait.
+        for seq in (1, 2, 3, 4, 5):
+            ws.send_bytes(_frame(session_id, seq))
+        _wait_for(lambda: sessions.find_one({"_id": ObjectId(session_id), "framesDropped": 3}))
+        detector.release.set()
+        replies = [parse_server_message(ws.receive_text()) for _ in range(2)]
+        assert [r.seq for r in replies if isinstance(r, DetectionsMessage)] == [1, 5]
+        ws.close()
+        session = _wait_for(lambda: sessions.find_one({"_id": ObjectId(session_id), "state": "ended"}))
+    assert [seq for seq, _ in detector.seen] == [1, 5]
+    assert (session["framesReceived"], session["framesDropped"], session["lastSeq"]) == (2, 3, 5)

@@ -4,7 +4,7 @@ Takes JPEG frames from the headset page over a WebSocket, runs a detector on the
 
 ## Status
 
-Skeleton. The frame socket, device tokens, capture sessions, and the MongoDB write path in `app/store.py` work and are tested. The detector finds nothing (`NullDetector`). YOLOE-26, the tracker that turns detections into sightings, and the vision model that describes keyframes are M1. `WS /ws/debug` and `POST /config/classes` are stubs.
+The frame socket, device tokens, capture sessions, the YOLOE-26 detector, the tracker that turns detections into sightings, and the MongoDB write path in `app/store.py` work and are tested. Without the model assets the service boots with `NullDetector`, which finds nothing. The vision model that describes keyframes is M1. `WS /ws/debug` and `POST /config/classes` are stubs.
 
 ## Run
 
@@ -22,6 +22,28 @@ ffmpeg -i kitchen.mp4 -vf fps=3,scale=1280:-2 frames/%05d.jpg
 TOKEN=$(uv run python -m app.tokens --patient <wearer id>)
 uv run python ../../scripts/replay.py frames/ --token "$TOKEN" --fps 3
 ```
+
+## The YOLOE-26 detector
+
+`uv sync` alone installs no model stack, and `DETECTOR=auto` (the default) runs `NullDetector` unless both Ultralytics and the checkpoint are present. Before a demo, install the extra and fetch the two assets while you still have network. The checkpoint is about 30 MB; the MobileCLIP2 text encoder that `set_classes` runs is about 250 MB, and Ultralytics also pulls its CLIP fork from GitHub the first time:
+
+```bash
+cd services/perception
+uv sync --extra yoloe                        # ultralytics 8.4.145 and torch; on a CPU box first
+                                             # `uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu`
+uv run python -c '
+from ultralytics import YOLOE
+model = YOLOE("yoloe-26s-seg.pt")           # downloads the checkpoint into the working directory
+model.set_classes(["keys", "wallet"])        # downloads the CLIP fork and mobileclip2_b.ts
+'
+uv run uvicorn app.main:app --port 8000      # /health says "detector": "yoloe"
+```
+
+Both files land in the working directory, next to `YOLOE_MODEL`. Keep them there or point `YOLOE_MODEL` at the checkpoint; `DETECTOR=yoloe` fails to start rather than falling back, so a demo box can't silently run the null detector. Use the `-seg.pt` checkpoints, not `-seg-pf.pt`: the prompt-free ones can't take the wearer's item names.
+
+The class names are each active item's `detectorPrompts` (falling back to its name), read when the socket opens and re-read every `PROMPT_REFRESH_SECONDS`. Setting classes runs the text encoder once per distinct prompt list, about 1.5 s on CPU. Frames whose Laplacian variance is under `BLUR_THRESHOLD` are unusable: they get an empty `detections` reply and don't count toward confirming a sighting.
+
+Measured on this repo's dev box, 8 vCPU Intel Xeon Platinum 8559C, no GPU, `yoloe-26s-seg.pt`, 15 prompts, 1280x720 JPEG in, torch 2.14 CPU, 20 frames after warm-up: median 66 ms at `YOLOE_IMAGE_SIZE=640` (15 fps), 94 ms at 960 (10.7 fps). Either is faster than the 3 fps the phone sends, so `FRAME_STRIDE=1` and the newest-frame-wins queue drops nothing under normal load.
 
 ## Test
 
@@ -43,6 +65,17 @@ The store and app tests run against a real MongoDB. Each test module gets a fres
 | `DEVICE_TOKEN_SECRET` | required | Verifies frame socket tokens. The web app's value, 32 characters or more |
 | `OPENAI_API_KEY` | none | The description worker. Unused until M1 |
 | `WORKER_ID` | hostname and pid | Lease owner on claimed description jobs |
+| `DETECTOR` | `auto` | `auto`, `null` or `yoloe`. `auto` runs YOLOE only when its assets are already on disk |
+| `YOLOE_MODEL` | `yoloe-26s-seg.pt` | Checkpoint path |
+| `YOLOE_IMAGE_SIZE` | `640` | Inference size. 960 is slower and finds smaller things |
+| `YOLOE_DEVICE` | Ultralytics' choice | `cpu`, `cuda:0`, `mps` |
+| `DETECTOR_CONFIDENCE` | `0.25` | Boxes below this never leave the detector |
+| `BLUR_THRESHOLD` | `40` | Laplacian variance under which a frame is unusable. `0` turns it off |
+| `FRAME_STRIDE` | `1` | Run the detector on every Nth live frame |
+| `PROMPT_REFRESH_SECONDS` | `30` | How often a live socket re-reads the wearer's items |
+| `CONFIRM_FRAMES`, `CONFIRM_WINDOW_SECONDS` | `3`, `2` | Usable frames within a window before a sighting opens |
+| `REFRESH_INTERVAL_MS`, `TRACK_LOST_SECONDS` | `500`, `3` | Snapshot refresh rate; how long unseen before a track closes |
+| `TRACK_MATCH_IOU` | `0.3` | Minimum overlap to keep a track on a detection |
 | `MONGODB_TEST_URI` | `mongodb://127.0.0.1:27017/?directConnection=true` | Tests only |
 
 ## Layout
@@ -51,7 +84,8 @@ The store and app tests run against a real MongoDB. Each test module gets a fres
 app/protocol.py   /ws/frames messages and the binary frame envelope, mirroring packages/shared
 app/tokens.py     device token verification, mirroring packages/shared/src/device-token.ts
 app/store.py      the write path: sessions, sightings, snapshots, the description job queue
-app/detector.py   the Detector protocol and NullDetector
+app/detector.py   the Detector protocol, NullDetector, and YoloeDetector (Ultralytics YOLOE-26)
+app/tracker.py    ByteTrack-style association per capture session, the confirmation rule, sighting writes
 app/main.py       the FastAPI app: /ws/frames, /ws/debug, /health, /config/classes
 ```
 
@@ -60,8 +94,17 @@ app/main.py       the FastAPI app: /ws/frames, /ws/debug, /health, /config/class
 1. The page opens `/ws/frames` and sends `hello` with a token of scope `frames`. A bad token gets an `unauthorized` error and close code 4401. A token naming a device is also refused once that device is revoked or its `tokenVersion` moves past the token's.
 2. The service opens a capture session and answers `session`, paused.
 3. `capture` switches between live and paused. Pausing cancels the wearer's queued description jobs, and frames that arrive while paused are dropped unread.
-4. While live, each binary message is a frame: a 4-byte big-endian header length, the header as JSON, then the JPEG. The service keeps one pending frame per connection, newest wins, and answers `detections` with that frame's `seq`. A `seq` that doesn't increase is rejected.
-5. On disconnect the session ends, which also cancels queued description jobs.
+4. While live, each binary message is a frame: a 4-byte big-endian header length, the header as JSON, then the JPEG. The service keeps one pending frame per connection, newest wins, and answers `detections` with that frame's `seq`. A frame that gets replaced before the worker takes it, or that falls between `FRAME_STRIDE` steps, counts as dropped and gets no reply. A `seq` that doesn't increase is rejected.
+5. The detector runs in a worker thread, one frame per connection at a time, and its detections go back only on this socket. Nothing else sees the frames.
+6. On disconnect the session ends, which closes the session's open sightings and cancels queued description jobs.
+
+## From detections to sightings
+
+`app/tracker.py` keeps one `SightingTracker` per connection, so track ids are local to the capture session. Each usable frame's detections are matched to tracks of the same item by IoU, ByteTrack style: confident boxes (≥ 0.5) first, then what's left of the tracks against faint boxes (0.1 to 0.5), which keeps a track alive through a badly lit frame but never starts one. An unmatched confident box starts a track.
+
+- A track is confirmed, and a sighting opened through `ObservationStore.open_sighting`, once it has `CONFIRM_FRAMES` hits within `CONFIRM_WINDOW_SECONDS`. One noisy frame moves nothing. The sighting's `eventId` is `<sessionId>:<trackId>`, so a replayed open is a no-op.
+- While it stays in view the sighting is refreshed at most every `REFRESH_INTERVAL_MS`, with the frame's normalized capture time and `seq`, which the store uses to ignore out-of-order frames.
+- `TRACK_LOST_SECONDS` without a usable observation closes the track and its sighting. Ending the session closes them all.
 
 ## How the write path keeps order
 

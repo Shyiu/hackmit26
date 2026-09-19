@@ -141,6 +141,13 @@ class DescriptionResult(BaseModel):
 
 
 @dataclass(frozen=True, slots=True)
+class ItemPrompts:
+    item_id: ObjectId
+    name: str
+    prompts: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class OpenedSighting:
     sighting_id: ObjectId
     # False when the eventId was a replay and the sighting already existed.
@@ -243,6 +250,16 @@ class ObservationStore:
 
     async def ping(self) -> None:
         await self._db.command("ping")
+
+    async def active_items(self, patient_id: ObjectId) -> list[ItemPrompts]:
+        """The wearer's active items with their detector prompts, the detector's class list."""
+        cursor = self._items.find(
+            {"patientId": patient_id, "active": True}, {"name": 1, "detectorPrompts": 1}
+        )
+        return [
+            ItemPrompts(doc["_id"], doc["name"], tuple(doc.get("detectorPrompts") or [doc["name"]]))
+            async for doc in cursor
+        ]
 
     async def queue_depth(self) -> int:
         """Queued description jobs across every wearer, for /health."""
