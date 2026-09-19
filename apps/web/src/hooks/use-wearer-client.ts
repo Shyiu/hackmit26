@@ -123,7 +123,9 @@ export function useWearerClient({ turnMode, fullscreen = false }: { turnMode: Tu
   const recordingAllowed = settings?.recordingAllowed ?? false;
 
   const wakeLock = useWakeLock(started);
-  const stalled = useFeedWatchdog(video, started);
+  // A camera that never opened shows its own error; the stall card is for a
+  // feed that was running and froze.
+  const stalled = useFeedWatchdog(video, started) && camera.stream !== null;
 
   // On iPhone an AudioContext only makes sound if it's resumed inside a tap.
   const resumeAudio = useCallback(() => {
