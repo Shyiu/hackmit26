@@ -35,11 +35,19 @@ async function main() {
   );
   console.log("interactions: unique { patientId: 1, requestId: 1 }");
 
+  // Optional collections, after M3: caregiver messages for the HUD, uploaded recordings.
+  await db.collection("notifications").createIndex({ patientId: 1, status: 1, showAt: 1 });
+  console.log("notifications: { patientId: 1, status: 1, showAt: 1 }");
+
+  await db.collection("recordings").createIndex({ patientId: 1, startedAt: -1 });
+  console.log("recordings: { patientId: 1, startedAt: -1 }");
+
   // expiresAt is a coordinated-retention safeguard, not the primary cleanup path.
   // A worker does the actual delete/recompute; this TTL index just catches what it misses.
-  await db.collection("sightings").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-  await db.collection("interactions").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-  console.log("sightings, interactions: TTL safeguard on expiresAt");
+  for (const name of ["sightings", "interactions", "notifications", "recordings"]) {
+    await db.collection(name).createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+  }
+  console.log("sightings, interactions, notifications, recordings: TTL safeguard on expiresAt");
 
   try {
     await db.collection("sightings").createSearchIndex({
