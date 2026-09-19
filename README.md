@@ -514,6 +514,7 @@ hackmit26/
     ios/                     later: native headset shell with ARKit, and the Ray-Ban DAT client
   services/
     perception/              FastAPI, YOLOE-26, tracker, description jobs
+    vision/                  FastAPI single-frame safety pipeline: detector, faces, VLM verification, alerts -> Mongo
   packages/
     shared/                  zod schemas and types
   hardware/
