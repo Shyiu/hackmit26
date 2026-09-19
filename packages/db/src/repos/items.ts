@@ -155,7 +155,11 @@ export function itemsRepo(ctx: RepoContext) {
     async resolve(transcript: string): Promise<ItemResolution> {
       const candidates = lookupCandidates(transcript);
       if (candidates.length === 0) return { kind: "none" };
-      const matches = await items.find({ active: true, lookupKeys: { $in: candidates } }).toArray();
+      // Hinted: with a handful of items the planner would rather walk every item
+      // by name, which stops being cheap as the list grows.
+      const matches = await items
+        .find({ active: true, lookupKeys: { $in: candidates } }, { hint: "lookup_keys_unique" })
+        .toArray();
       if (matches.length === 0) return { kind: "none" };
 
       const now = ctx.now();
