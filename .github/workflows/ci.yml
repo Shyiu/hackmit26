@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: lint, typecheck, JS tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # The db and route tests each create and drop their own database here.
+      MONGODB_TEST_URI: mongodb://127.0.0.1:27017/?directConnection=true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # corepack rejects the pinned pnpm, so it runs through npx like the README says.
+      - run: npx --yes pnpm@11.5.0 install --frozen-lockfile
+      # The same MongoDB 8.0 image as `pnpm db:up`, waited on through its own healthcheck.
+      - run: docker compose up -d --wait mongo
+      - run: npx --yes pnpm@11.5.0 lint
+      - run: npx --yes pnpm@11.5.0 typecheck
+      - run: npx --yes pnpm@11.5.0 test
+
+  perception:
+    name: perception pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: services/perception
+    env:
+      MONGODB_TEST_URI: mongodb://127.0.0.1:27017/?directConnection=true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/perception/uv.lock
+      - run: docker compose up -d --wait mongo
+        working-directory: .
+      - run: uv sync --frozen
+      - run: uv run pytest -q
