@@ -24,7 +24,7 @@ export const interactionStatusSchema = z.enum([
 ]);
 
 export const playbackReportSchema = z.object({
-  clientFirstPlaybackMs: z.number().optional(),
+  clientFirstPlaybackMs: z.number().nonnegative().max(60_000).optional(),
   outcome: z.enum(["played", "partial", "failed", "cancelled"]),
 });
 

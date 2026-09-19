@@ -62,6 +62,8 @@ export const updateItemSchema = z
     plural: z.boolean().optional(),
     /** false archives the item: its history stays and its names free up. */
     active: z.boolean().optional(),
+    /** The item's `updatedAt` when the form loaded. A save made since then wins, and this one gets a 409. */
+    expectedUpdatedAt: z.string().datetime({ offset: true }).pipe(z.coerce.date()).optional(),
   })
   .strict();
 

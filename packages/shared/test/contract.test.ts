@@ -54,6 +54,9 @@ describe("device tokens", () => {
     });
     expect(await verifyDeviceToken(token, `${secret}-other`, validAt)).toMatchObject({ reason: "bad_signature" });
     expect(await verifyDeviceToken(`${payload}`, secret, validAt)).toMatchObject({ reason: "malformed" });
+    // Five characters is a length base64 can't decode, which used to throw.
+    expect(await verifyDeviceToken(`${payload}.abcde`, secret, validAt)).toMatchObject({ reason: "malformed" });
+    expect(await verifyDeviceToken(`abcde.${signature}`, secret, validAt)).toMatchObject({ reason: "malformed" });
   });
 
   it("refuses a short secret", async () => {

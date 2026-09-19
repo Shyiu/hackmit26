@@ -21,8 +21,13 @@ function toBase64Url(bytes: Uint8Array): string {
 
 function fromBase64Url(text: string): Uint8Array<ArrayBuffer> | null {
   if (!/^[A-Za-z0-9_-]*$/.test(text)) return null;
-  const binary = atob(text.replace(/-/g, "+").replace(/_/g, "/"));
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  try {
+    const binary = atob(text.replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  } catch {
+    // A truncated token can leave a length base64 can't decode.
+    return null;
+  }
 }
 
 // No return annotation: Node's types declare CryptoKey as a value, the DOM's as a type.
