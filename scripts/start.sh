@@ -6,7 +6,7 @@
 #   pnpm start --setup-only     set up and exit
 #   pnpm start --no-perception  skip the Python service
 #   pnpm start --reset          reseed the demo wearer from scratch
-#   pnpm start --tunnel         also open cloudflared tunnels, for testing on a phone
+#   pnpm start --tunnel         also open public https tunnels, for testing on a phone
 #
 # PORT and PERCEPTION_PORT move the servers off :3000 and :8000 when another checkout has them.
 
@@ -73,8 +73,8 @@ if $perception && ! have uv; then
   warn "uv is not installed, so the perception service is skipped. Install: https://docs.astral.sh/uv/"
   perception=false
 fi
-if $tunnel && ! have cloudflared; then
-  die "cloudflared is not installed. Run: brew install cloudflared"
+if $tunnel && ! have cloudflared && ! have ssh; then
+  die "--tunnel needs cloudflared or ssh. Run: brew install cloudflared"
 fi
 
 step "Installing JavaScript dependencies"
@@ -158,23 +158,51 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Opens a quick tunnel to a local port and leaves its https URL in $tunnel_result.
+# Opens a public https tunnel to a local port and leaves its URL in $tunnel_result.
 # It sets a variable instead of printing, because $(...) would lose the pid in a subshell.
+# cloudflared hands out a URL before it has connected, and some networks block its port 7844,
+# so wait for the connection and fall back to an SSH tunnel through localhost.run.
+tunnel_provider=cloudflared
+have cloudflared || tunnel_provider=ssh
 open_tunnel() {
-  local port=$1 log url
+  local port=$1 log pid url pattern ready tries
   tunnel_result=
   log=$(mktemp)
-  cloudflared tunnel --url "http://localhost:$port" > "$log" 2>&1 &
-  pids+=($!)
-  for _ in $(seq 1 60); do
-    url=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$log" | head -n 1 || true)
-    if [ -n "$url" ]; then
-      tunnel_result=$url
-      return 0
+  if [ "$tunnel_provider" = cloudflared ]; then
+    cloudflared tunnel --url "http://localhost:$port" > "$log" 2>&1 &
+    pattern='https://[a-z0-9-]*\.trycloudflare\.com'
+    ready='Registered tunnel connection'
+    tries=40
+  else
+    ssh -T -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes \
+      -R "80:localhost:$port" nokey@localhost.run > "$log" 2>&1 &
+    pattern='https://[a-z0-9]*\.lhr\.life'
+    ready=$pattern
+    # localhost.run can take half a minute to hand out its URL.
+    tries=120
+  fi
+  pid=$!
+  for _ in $(seq 1 "$tries"); do
+    if grep -q "$ready" "$log"; then
+      url=$(grep -o "$pattern" "$log" | head -n 1 || true)
+      if [ -n "$url" ]; then
+        pids+=("$pid")
+        tunnel_result=$url
+        echo "localhost:$port -> $url"
+        return 0
+      fi
     fi
+    kill -0 "$pid" 2> /dev/null || break
     sleep 0.5
   done
-  die "cloudflared gave no URL for port $port. Its log is at $log"
+  kill "$pid" 2> /dev/null || true
+  if [ "$tunnel_provider" = cloudflared ]; then
+    warn "cloudflared could not connect, this network likely blocks port 7844. Using localhost.run over SSH."
+    tunnel_provider=ssh
+    open_tunnel "$port"
+    return
+  fi
+  die "No tunnel for port $port. The log is at $log"
 }
 
 web_url=

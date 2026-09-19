@@ -697,12 +697,12 @@ One command sets up a fresh checkout and starts both servers:
 ```bash
 pnpm start                       # install, env files, MongoDB, setup, seed, then :3000 and :8000
 pnpm start --setup-only          # stop before starting the servers
-pnpm start --tunnel              # also open cloudflared tunnels and print the phone URL
+pnpm start --tunnel              # also open public https tunnels and print the phone URL
 pnpm start --reset               # reseed the demo wearer
 PORT=3100 PERCEPTION_PORT=8100 pnpm start   # when another checkout holds the default ports
 ```
 
-`scripts/start.sh` creates `apps/web/.env.local` and `services/perception/.env` from their examples if they are missing, generates `AUTH_SECRET`, `DEVICE_TOKEN_SECRET`, and a demo `CAREGIVER_PASSWORD`, and copies the token secret and database settings into the perception file. It never overwrites a value that is already set. It prints the demo login when it finishes. API keys (OpenAI, Deepgram, ElevenLabs, S3) stay empty until you fill them in. If something already listens on :27017 it uses that MongoDB instead of starting a container. With `--tunnel` it starts `next dev` with `NEXT_PUBLIC_PERCEPTION_WS_URL` set to the perception tunnel's `wss://` URL.
+`scripts/start.sh` creates `apps/web/.env.local` and `services/perception/.env` from their examples if they are missing, generates `AUTH_SECRET`, `DEVICE_TOKEN_SECRET`, and a demo `CAREGIVER_PASSWORD`, and copies the token secret and database settings into the perception file. It never overwrites a value that is already set. It prints the demo login when it finishes. API keys (OpenAI, Deepgram, ElevenLabs, S3) stay empty until you fill them in. If something already listens on :27017 it uses that MongoDB instead of starting a container. With `--tunnel` it starts `next dev` with `NEXT_PUBLIC_PERCEPTION_WS_URL` set to the perception tunnel's `wss://` URL. It waits for cloudflared to connect, and where the network blocks cloudflared's port 7844 it falls back to an SSH tunnel through localhost.run. That fallback needs no account but drops some requests with a 503, so prefer a network where cloudflared works.
 
 The same steps by hand:
 
