@@ -38,6 +38,8 @@ SECRET: str = FIXTURE["secret"]
 PATIENT = ObjectId(FIXTURE["claims"]["pid"])
 DEVICE = ObjectId(FIXTURE["claims"]["sub"])
 REVOKED_DEVICE = ObjectId("5eed00000000000000000d02")
+OTHER_PATIENT = ObjectId("5eed00000000000000000002")
+WRONG_SECRET = "another-secret-of-the-right-length-0123456789"
 JPEG = b"\xff\xd8\xff\xe0" + bytes(60)
 
 
@@ -48,6 +50,8 @@ async def wearer_db(db: Database) -> Database:
     await seed.patient(PATIENT)
     await seed.device(PATIENT, DEVICE)
     await seed.device(PATIENT, REVOKED_DEVICE, revoked=True)
+    # A second household, so a token can name a real wearer that isn't the device's.
+    await seed.patient(OTHER_PATIENT)
     return db
 
 
@@ -71,8 +75,8 @@ def sessions(wearer_db: Database) -> Iterator[Collection[dict[str, Any]]]:
         yield mongo[wearer_db.name]["capture_sessions"]
 
 
-def _token(**changes: Any) -> str:
-    return sign_device_token(DeviceTokenClaims.model_validate(FIXTURE["claims"] | changes), SECRET)
+def _token(secret: str = SECRET, **changes: Any) -> str:
+    return sign_device_token(DeviceTokenClaims.model_validate(FIXTURE["claims"] | changes), secret)
 
 
 def _hello(token: str) -> str:
@@ -136,22 +140,40 @@ def test_config_classes_is_not_built_yet(client: TestClient) -> None:
     [
         (_hello("not.a-token"), "signature"),
         (_hello(FIXTURE["token"].replace(".", "..")), "malformed"),
+        (_hello(FIXTURE["token"].split(".")[0]), "malformed"),
+        # An empty token isn't a hello at all; the socket still closes with 4401.
+        (_hello(""), "hello first"),
+        # Signed correctly, but by someone without the shared secret.
+        (_hello(_token(secret=WRONG_SECRET)), "signature"),
+        # Valid until one second before the clock the app reads.
+        (_hello(_token(exp=FIXTURE["validAt"] - 1)), "expired"),
+        (_hello(_token(exp=FIXTURE["validAt"])), "expired"),
         (_hello(_token(scope="debug")), "needs a frames token"),
+        (_hello(_token(scope="api")), "needs a frames token"),
         (_hello(_token(sub=str(REVOKED_DEVICE))), "revoked"),
         # Minted before the device's tokenVersion was bumped, which is how revoking reaches live tokens.
         (_hello(_token(tv=1)), "revoked"),
         (_hello(_token(sub="5eed00000000000000000dff")), "unknown"),
         (_hello(_token(pid="5eed000000000000000000ff", sub=None)), "Unknown wearer"),
+        # Another wearer's pid with this device's sub: the device isn't in that household.
+        (_hello(_token(pid=str(OTHER_PATIENT))), "unknown or was revoked"),
         (_capture("live"), "hello first"),
     ],
     ids=[
         "bad-signature",
         "malformed",
+        "malformed-one-part",
+        "malformed-empty",
+        "wrong-secret",
+        "expired",
+        "expired-at-exp",
         "wrong-scope",
+        "api-scope",
         "revoked-device",
         "stale-token-version",
         "unknown-device",
         "unknown-wearer",
+        "other-wearers-token",
         "no-hello",
     ],
 )
