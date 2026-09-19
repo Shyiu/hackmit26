@@ -6,6 +6,8 @@ const NAV_LINKS = [
   { href: "/dashboard/rooms", label: "Rooms" },
   { href: "/dashboard/questions", label: "Questions" },
   { href: "/dashboard/live", label: "Live view" },
+  { href: "/dashboard/messages", label: "Messages" },
+  { href: "/dashboard/recordings", label: "Recordings" },
   { href: "/dashboard/latency", label: "Latency" },
   { href: "/dashboard/settings", label: "Settings" },
 ];
