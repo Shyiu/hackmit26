@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "fb4ec1a318b86404ba7db4f0e9cec0b26d51ab7c7f45aa3b220f743a646c2fa9",
+  "fingerprint": "4c139ef3eb986c024aaee0319de5e2025fc9d47d39a6f0cee32995b800cbbcc3",
   "collections": {
     "patients": {
       "validator": {
@@ -150,6 +150,11 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 60
+            },
+            "passwordHash": {
+              "type": "string",
+              "minLength": 40,
+              "maxLength": 300
             },
             "patientIds": {
               "minItems": 1,

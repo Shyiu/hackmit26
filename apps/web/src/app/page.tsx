@@ -1,56 +1,33 @@
-import { ChevronRight, Glasses, LayoutDashboard, Laptop } from "lucide-react";
+import { Glasses, Laptop, LayoutDashboard, UserPlus } from "lucide-react";
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
-
-const DESTINATIONS: { href: string; title: string; body: string; icon: LucideIcon }[] = [
-  {
-    href: "/wear",
-    title: "Wear",
-    body: "For the phone on the chest. Streams the camera, answers questions out loud.",
-    icon: Glasses,
-  },
-  {
-    href: "/dashboard",
-    title: "Caregiver dashboard",
-    body: "Where things are, what was asked, and the live view.",
-    icon: LayoutDashboard,
-  },
-  {
-    href: "/sim",
-    title: "Simulator",
-    body: "The same client on a laptop webcam or a phone in the hand.",
-    icon: Laptop,
-  },
-];
+import { Wordmark } from "@/components/brand";
+import { Tile } from "@/components/home/tiles";
 
 export default function Home() {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-8 px-5 pt-safe pb-safe">
-      <div className="pt-10">
-        <h1 className="text-3xl font-semibold tracking-tight">Memory glasses</h1>
-        <p className="mt-3 text-muted-foreground">
-          A wearable camera that remembers where things are, for people living with dementia.
-          Ask &ldquo;where are my keys?&rdquo; out loud and hear the answer.
-        </p>
-      </div>
-      <nav className="flex flex-col gap-3 pb-10">
-        {DESTINATIONS.map(({ href, title, body, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className="flex items-center gap-4 rounded-2xl border p-4 transition-colors hover:bg-accent active:bg-accent"
-          >
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Icon className="size-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-medium">{title}</span>
-              <span className="block text-sm text-muted-foreground">{body}</span>
-            </span>
-            <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
-          </Link>
-        ))}
+    <div className="mx-auto flex min-h-dvh w-full max-w-xl flex-col gap-8 px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-12">
+      <header className="flex flex-col gap-4">
+        <Wordmark className="text-lg" />
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-balance">Where did I put my keys?</h1>
+          <p className="mt-2 text-muted-foreground">
+            A camera worn on the chest remembers where things were last seen, and answers out loud
+            for people living with dementia.
+          </p>
+        </div>
+      </header>
+      <nav className="grid grid-cols-2 gap-3">
+        <Tile href="/wear" title="Wear" icon={Glasses} tone="terracotta" />
+        <Tile href="/dashboard" title="Dashboard" icon={LayoutDashboard} tone="lavender" />
+        <Tile href="/sim" title="Simulator" icon={Laptop} tone="sky" />
+        <Tile href="/signup" title="Sign up" icon={UserPlus} tone="butter" />
       </nav>
+      <p className="text-center text-sm text-muted-foreground">
+        Already have an account?{" "}
+        <Link href="/login" className="font-semibold text-terracotta-deep">
+          Sign in
+        </Link>
+      </p>
     </div>
   );
 }
