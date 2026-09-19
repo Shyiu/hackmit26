@@ -74,8 +74,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(_app: FastAPI):
         if not hasattr(_app.state, "deps"):
             _app.state.deps = _dependencies(app_settings)
+        adapters = _app.state.deps["adapters"]
         logger.info(
-            "vision service started", extra={"adapters": app.state.deps["adapters"].__dict__}
+            "vision service started",
+            extra={
+                "adapters": {
+                    "detector": adapters.detector.name,
+                    "face_detector": adapters.face_detector.name,
+                    "face_embedder": adapters.face_embedder.name,
+                    "vlm": adapters.vlm.name if adapters.vlm else "off",
+                }
+            },
         )
         yield
 
