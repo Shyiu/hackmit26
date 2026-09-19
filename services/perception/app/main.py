@@ -24,7 +24,7 @@ from pymongo.errors import PyMongoError
 from starlette.requests import HTTPConnection
 
 from .config import Settings
-from .detector import Detector, NullDetector
+from .detector import Detector, Prompt, Prompts, build_detector
 from .protocol import (
     CaptureCommand,
     Frame,
@@ -37,8 +37,9 @@ from .protocol import (
     parse_frame,
     session_message,
 )
-from .store import CaptureSource, ObservationStore, UnknownPatientError
+from .store import CaptureSource, ItemPrompts, ObservationStore, UnknownPatientError
 from .tokens import DeviceTokenClaims, InvalidTokenError, Scope, verify_device_token
+from .tracker import SightingTracker, SightingWriter, TrackerConfig
 
 log = logging.getLogger("perception")
 
@@ -85,7 +86,7 @@ def create_app(
             serverSelectionTimeoutMS=5_000,
         )
         store = ObservationStore(client[resolved.mongodb_db])
-        app.state.services = Services(resolved, store, detector or NullDetector(), token_clock)
+        app.state.services = Services(resolved, store, detector or build_detector(resolved), token_clock)
         try:
             yield
         finally:
@@ -152,6 +153,7 @@ async def frames_socket(ws: WebSocket) -> None:
             await _refuse(ws, "Device is unknown or was revoked")
             return
         session_id = await services.store.open_capture_session(patient_id, device_id, source)
+        prompts = await services.store.active_items(patient_id)
     except UnknownPatientError:
         await _refuse(ws, "Unknown wearer")
         return
@@ -160,7 +162,12 @@ async def frames_socket(ws: WebSocket) -> None:
         await ws.send_text(error_message("server_error", "Storage is unavailable").model_dump_json())
         await ws.close(code=1011)
         return
-    await FrameConnection(ws, services, patient_id, session_id).run()
+    connection = FrameConnection(ws, services, patient_id, session_id)
+    connection.writer = SightingWriter(
+        services.store, patient_id=patient_id, session_id=session_id, device_id=device_id, source=source
+    )
+    connection.set_prompts(prompts)
+    await connection.run()
 
 
 async def _hello(ws: WebSocket, scope: Scope) -> DeviceTokenClaims | None:
@@ -218,13 +225,26 @@ class FrameConnection:
         self.ws = ws
         self.store = services.store
         self.detector = services.detector
+        self.settings = services.settings
         self.patient_id = patient_id
         self.session_id = session_id
         self.live = False
         self.last_seq = -1
+        self.live_frames = 0
         self.pending: _Pending | None = None
         self.wake = asyncio.Event()
         self.send_lock = asyncio.Lock()
+        self.prompts: Prompts = ()
+        self.prompts_loaded_at = time.monotonic()
+        self.tracker = SightingTracker(TrackerConfig.from_settings(services.settings))
+        # None until the socket has a device and source to write sightings for.
+        self.writer: SightingWriter | None = None
+
+    def set_prompts(self, items: list[ItemPrompts]) -> None:
+        self.prompts = tuple(
+            Prompt(str(item.item_id), item.name, text) for item in items for text in item.prompts
+        )
+        self.prompts_loaded_at = time.monotonic()
 
     async def run(self) -> None:
         worker = asyncio.create_task(self._work())
@@ -249,6 +269,8 @@ class FrameConnection:
             worker.cancel()
             await asyncio.gather(worker, return_exceptions=True)
             try:
+                if self.writer is not None:
+                    await self.writer.apply(self.tracker.close_all())
                 # Ending cancels the wearer's queued description work, the same as a pause.
                 await self.store.set_capture_state(self.patient_id, self.session_id, "ended")
             except PyMongoError:
@@ -292,6 +314,13 @@ class FrameConnection:
             await self._send(error_message("bad_frame", f"seq {header.seq} is not after {self.last_seq}"))
             return
         self.last_seq = header.seq
+        self.live_frames += 1
+        if (self.live_frames - 1) % self.settings.frame_stride:
+            # Between strides. Skipped on purpose, but still a frame the session saw.
+            await self.store.record_frame(
+                self.patient_id, self.session_id, header.seq, received_at, dropped=True
+            )
+            return
         replaced = self.pending
         self.pending = _Pending(frame, received_at, capture_time(received_at, header))
         self.wake.set()
@@ -307,17 +336,29 @@ class FrameConnection:
                 continue
             header = pending.frame.header
             try:
-                detections = await asyncio.to_thread(self.detector.detect, pending.frame.jpeg, header)
-                # M1: the tracker takes these with pending.observed_at and header.seq,
-                # and opens or refreshes sightings through the store.
-                await self._send(detections_message(header.seq, detections))
+                await self._refresh_prompts()
+                detections = await asyncio.to_thread(
+                    self.detector.detect, pending.frame.jpeg, header, self.prompts
+                )
+                await self._send(detections_message(header.seq, detections or []))
                 await self.store.record_frame(
                     self.patient_id, self.session_id, header.seq, pending.received_at, dropped=False
                 )
+                if detections is not None and self.writer is not None:
+                    # A blurry frame is no evidence either way, so it doesn't reach the tracker.
+                    events = self.tracker.observe(
+                        detections, pending.observed_at, header.seq, (header.width, header.height)
+                    )
+                    await self.writer.apply(events)
             except WebSocketDisconnect:
                 return
             except Exception:
                 log.exception("Frame %s of capture session %s failed", header.seq, self.session_id)
+
+    async def _refresh_prompts(self) -> None:
+        # A caregiver edit to the item list reaches the detector within this long.
+        if time.monotonic() - self.prompts_loaded_at >= self.settings.prompt_refresh_seconds:
+            self.set_prompts(await self.store.active_items(self.patient_id))
 
     async def _drop_pending(self) -> None:
         dropped, self.pending = self.pending, None

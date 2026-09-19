@@ -13,6 +13,13 @@ dependencies = [
   "pydantic-settings>=2.15",
 ]
 
+[project.optional-dependencies]
+# The YOLOE-26 detector. Pinned: the YOLOE text-prompt API and asset names move between releases.
+# Without this extra the service boots with NullDetector, and the tests stub the model.
+yoloe = [
+  "ultralytics==8.4.145",
+]
+
 [dependency-groups]
 dev = [
   "pytest>=9.1",
