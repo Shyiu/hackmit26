@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
 
-// Per-device settings such as eye spacing, zoom, and the chosen camera, kept in
+// Per-device settings such as the chosen camera, kept in
 // localStorage. The server render sees null, and the client picks up the stored
 // value right after hydration.
 const CHANGE_EVENT = "stored-setting-change";
