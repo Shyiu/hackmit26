@@ -44,7 +44,8 @@ function fromBase64Url(text: string): Uint8Array<ArrayBuffer> | null {
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
-async function hmacKey(secret: string, usage: "sign" | "verify"): Promise<CryptoKey> {
+// No return annotation: Node's types declare CryptoKey as a value, the DOM's as a type.
+async function hmacKey(secret: string, usage: "sign" | "verify") {
   if (secret.length < 32) throw new Error("DEVICE_TOKEN_SECRET must be at least 32 characters");
   return crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [usage]);
 }
