@@ -11,7 +11,22 @@ dependencies = [
   "pymongo>=4.18",
   "pydantic>=2.13",
   "pydantic-settings>=2.15",
+  "cryptography>=44",
+  "numpy>=2",
+  "Pillow>=11",
+  "python-multipart>=0.0.20",
+  "httpx>=0.28",
 ]
+
+[project.optional-dependencies]
+# The YOLOE-26 detector. Pinned: the YOLOE text-prompt API and asset names move between releases.
+# Without this extra the service boots with NullDetector, and the tests stub the model.
+yoloe = [
+  "ultralytics==8.4.145",
+]
+# The safety pass's optional real adapters. See README "Safety pipeline".
+dfine = ["torch>=2", "transformers>=4.52"]
+faces = ["insightface>=0.7", "onnxruntime>=1.18"]
 
 [dependency-groups]
 dev = [
@@ -19,6 +34,7 @@ dev = [
   "pytest-asyncio>=1.4",
   # Starlette's TestClient runs on httpx2 and warns if it finds only httpx.
   "httpx2>=2.13",
+  "ruff>=0.14",
 ]
 
 [tool.uv]

@@ -7,6 +7,7 @@ import { notificationDocSchema } from "./schema/notifications";
 import { captureSessionDocSchema, descriptionJobDocSchema } from "./schema/perception";
 import { recordingDocSchema } from "./schema/recordings";
 import { roomDocSchema, roomRefDocSchema } from "./schema/rooms";
+import { dangerEventDocSchema, frameObservationDocSchema, personDocSchema } from "./schema/safety";
 import { sightingDocSchema } from "./schema/sightings";
 import { caregiverDocSchema, deviceDocSchema, patientDocSchema } from "./schema/tenancy";
 
@@ -316,12 +317,51 @@ export const collections = {
   notifications: defineCollection({
     name: "notifications",
     schema: notificationDocSchema,
-    writers: ["web"],
+    writers: ["web", "perception"],
     indexes: [
       {
         name: "due_for_hud",
         key: { patientId: 1, status: 1, showAt: 1 },
         purpose: "the HUD poll for the next queued message or due reminder",
+      },
+    ],
+  }),
+
+  people: defineCollection({
+    name: "people",
+    schema: personDocSchema,
+    writers: ["perception"],
+    indexes: [
+      {
+        name: "patient_people_by_name",
+        key: { patientId: 1, name: 1 },
+        purpose: "face enrollment list",
+      },
+    ],
+  }),
+
+  frameObservations: defineCollection({
+    name: "frame_observations",
+    schema: frameObservationDocSchema,
+    writers: ["perception"],
+    indexes: [
+      {
+        name: "patient_frames",
+        key: { patientId: 1, capturedAt: -1 },
+        purpose: "recent frames for the dashboard",
+      },
+    ],
+  }),
+
+  dangerEvents: defineCollection({
+    name: "danger_events",
+    schema: dangerEventDocSchema,
+    writers: ["perception"],
+    indexes: [
+      {
+        name: "open_by_last_seen",
+        key: { patientId: 1, status: 1, lastSeenAt: -1 },
+        purpose: "open hazards, dashboard alert badge",
       },
     ],
   }),

@@ -1,8 +1,131 @@
-// Spoken answers through the browser's speech synthesis, until server TTS
-// lands (README "Text to speech"). The rate comes from the wearer's settings,
-// where slower than default is the point.
+// Spoken answers. Server TTS streams PCM (README "Text to speech") and
+// playPcmStream schedules it chunk by chunk; when no provider is configured
+// the server sends text and speak() uses the browser's speech synthesis. The
+// rate comes from the wearer's settings, where slower than default is the point.
 
 export type SpeechOutcome = "played" | "cancelled" | "failed";
+
+export type PcmStreamFormat = { sampleRate: number; channels: number };
+
+/** Reads the audio contract headers the ask route sets; null for a JSON answer. */
+export function pcmFormatFromHeaders(headers: Headers): PcmStreamFormat | null {
+  if (!headers.get("content-type")?.startsWith("audio/pcm")) return null;
+  const sampleRate = Number(headers.get("x-audio-sample-rate") ?? 24_000);
+  const channels = Number(headers.get("x-audio-channels") ?? 1);
+  if (!Number.isFinite(sampleRate) || sampleRate <= 0 || channels < 1) return null;
+  return { sampleRate, channels };
+}
+
+/** Signed 16-bit little-endian samples to floats; interleaved channels split out. */
+function decodePcm16(bytes: Uint8Array, channels: number): Float32Array<ArrayBuffer>[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const frames = Math.floor(bytes.byteLength / 2 / channels);
+  const out = Array.from({ length: channels }, () => new Float32Array(new ArrayBuffer(frames * 4)));
+  for (let frame = 0; frame < frames; frame++) {
+    for (let channel = 0; channel < channels; channel++) {
+      out[channel][frame] = view.getInt16((frame * channels + channel) * 2, true) / 32768;
+    }
+  }
+  return out;
+}
+
+// Enough audio to ride out a network hiccup, without a noticeable wait.
+const PREROLL_SECONDS = 0.08;
+const LEAD_SECONDS = 0.03;
+
+/**
+ * Plays streamed PCM as it arrives, scheduling each chunk right after the one
+ * before so playback is gapless. Ends "failed" when the stream breaks before
+ * any sound; "cancelled" when the caller stops it; "played" once the last
+ * sample has sounded.
+ */
+export function playPcmStream(body: ReadableStream<Uint8Array>, context: AudioContext, format: PcmStreamFormat): Speech {
+  const reader = body.getReader();
+  const sources = new Set<AudioBufferSourceNode>();
+  let cancelled = false;
+  let nextTime = 0;
+  let pending = new Uint8Array(0);
+  let resolveStarted: (at: number | null) => void = () => {};
+  const started = new Promise<number | null>((resolve) => (resolveStarted = resolve));
+  const frameBytes = 2 * format.channels;
+
+  function schedule(bytes: Uint8Array) {
+    const usable = bytes.byteLength - (bytes.byteLength % frameBytes);
+    if (usable === 0) return;
+    const channels = decodePcm16(bytes.subarray(0, usable), format.channels);
+    const buffer = context.createBuffer(format.channels, channels[0].length, format.sampleRate);
+    channels.forEach((samples, index) => buffer.copyToChannel(samples, index));
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(context.destination);
+    if (nextTime === 0) {
+      nextTime = context.currentTime + LEAD_SECONDS;
+      resolveStarted(performance.now() + LEAD_SECONDS * 1000);
+    } else if (nextTime < context.currentTime) {
+      // An underrun: the network fell behind; pick up from now rather than rushing.
+      nextTime = context.currentTime + LEAD_SECONDS;
+    }
+    source.start(nextTime);
+    nextTime += buffer.duration;
+    sources.add(source);
+    source.onended = () => sources.delete(source);
+  }
+
+  const done = (async (): Promise<SpeechOutcome> => {
+    let anyAudio = false;
+    try {
+      const prerollBytes = Math.ceil(PREROLL_SECONDS * format.sampleRate) * frameBytes;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (cancelled) return "cancelled";
+        if (done) break;
+        if (value.byteLength === 0) continue;
+        anyAudio = true;
+        const merged = new Uint8Array(pending.byteLength + value.byteLength);
+        merged.set(pending);
+        merged.set(value, pending.byteLength);
+        // Buffer a little before the first sound, then flush every chunk as it comes.
+        if (nextTime === 0 && merged.byteLength < prerollBytes) {
+          pending = merged;
+          continue;
+        }
+        const usable = merged.byteLength - (merged.byteLength % frameBytes);
+        schedule(merged.subarray(0, usable));
+        pending = merged.slice(usable);
+      }
+      if (pending.byteLength >= frameBytes) schedule(pending);
+      if (!anyAudio || nextTime === 0) {
+        resolveStarted(null);
+        return "failed";
+      }
+      // Wait for the tail of the last buffer to sound.
+      const remaining = Math.max(0, nextTime - context.currentTime);
+      await new Promise((resolve) => window.setTimeout(resolve, remaining * 1000 + 50));
+      return cancelled ? "cancelled" : "played";
+    } catch {
+      resolveStarted(null);
+      return cancelled ? "cancelled" : "failed";
+    }
+  })();
+
+  return {
+    started,
+    done,
+    cancel() {
+      cancelled = true;
+      resolveStarted(null);
+      void reader.cancel().catch(() => null);
+      for (const source of sources) {
+        try {
+          source.stop();
+        } catch {
+          // Already ended.
+        }
+      }
+      sources.clear();
+    },
+  };
+}
 
 export function speechAvailable() {
   return typeof window !== "undefined" && "speechSynthesis" in window;
