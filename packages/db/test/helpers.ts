@@ -7,8 +7,8 @@ import { syncDatabase } from "../src/setup";
 
 const uri = process.env.MONGODB_TEST_URI ?? "mongodb://127.0.0.1:27017/?directConnection=true";
 
-/** A fresh, fully synced database on a real MongoDB, dropped by `close`. */
-export async function openTestDb(): Promise<{
+/** A fresh database on a real MongoDB, synced unless asked not to, dropped by `close`. */
+export async function openTestDb({ sync = true }: { sync?: boolean } = {}): Promise<{
   db: Db;
   /** The same database through more clients, each with its own pool, for race tests. */
   moreConnections: (count: number) => Promise<Db[]>;
@@ -24,7 +24,7 @@ export async function openTestDb(): Promise<{
     );
   }
   const db = client.db(`mg_test_${randomUUID().slice(0, 8)}`);
-  await syncDatabase(db);
+  if (sync) await syncDatabase(db);
   const extraClients: MongoClient[] = [];
   return {
     db,

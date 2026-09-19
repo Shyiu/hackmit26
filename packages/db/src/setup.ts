@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Db, Document } from "mongodb";
+import type { Collection, Db, Document } from "mongodb";
 import { toMongoJsonSchema } from "./json-schema";
 import {
   collection,
@@ -42,6 +42,7 @@ export type SyncChange = {
     | "updated validator"
     | "created index"
     | "rebuilt index"
+    | "updated index"
     | "dropped index"
     | "undeclared index"
     | "created search index"
@@ -113,30 +114,46 @@ export async function schemaStatus(db: Db): Promise<SchemaStatus> {
 async function syncIndexes(db: Db, planned: CollectionPlan, prune: boolean): Promise<SyncChange[]> {
   const changes: SyncChange[] = [];
   const target = db.collection(planned.name);
-  const existing = await target.listIndexes().toArray();
-  const byName = new Map(existing.map((index) => [String(index.name), index]));
+  let existing = await target.listIndexes().toArray();
 
   for (const index of planned.indexes) {
-    const current = byName.get(index.name);
+    const current = existing.find((candidate) => candidate.name === index.name);
     if (current && sameIndex(current, index)) continue;
-    if (current) await target.dropIndex(index.name);
-    try {
-      await target.createIndex(index.key, {
-        name: index.name,
-        unique: index.unique,
-        ...(index.partialFilterExpression && { partialFilterExpression: index.partialFilterExpression }),
-        ...(index.expireAfterSeconds !== undefined && { expireAfterSeconds: index.expireAfterSeconds }),
+
+    if (current && onlyTtlDiffers(current, index)) {
+      await db.command({
+        collMod: planned.name,
+        index: { name: index.name, expireAfterSeconds: index.expireAfterSeconds },
       });
+      changes.push({ collection: planned.name, action: "updated index", name: index.name, detail: "TTL changed in place" });
+      continue;
+    }
+
+    // Anything in the way: this name with an older definition, or this key
+    // pattern under another name, like the default names `db:indexes` used.
+    // MongoDB won't hold two indexes on one key pattern, so these go first.
+    const inTheWay = existing.filter(
+      (candidate) => candidate.name !== "_id_" && (candidate.name === index.name || sameKey(candidate, index)),
+    );
+    // Check before dropping anything, so existing duplicates can't cost the old index.
+    if (index.unique) await assertUnique(target, planned.name, index);
+    for (const old of inTheWay) await target.dropIndex(String(old.name));
+    try {
+      await target.createIndex(index.key, creationOptions(index));
     } catch (error) {
+      // A writer can slip a duplicate in while no index guards it. Put the old
+      // indexes back, so a failed rebuild never leaves the collection with neither.
+      for (const old of inTheWay) await target.createIndex(old.key, restoreOptions(old)).catch(() => undefined);
       const reason = error instanceof Error ? error.message : String(error);
-      throw new Error(`Creating ${planned.name}.${index.name} failed: ${reason}`);
+      throw new Error(`Creating ${planned.name}.${index.name} failed; the previous indexes are back. ${reason}`);
     }
     changes.push({
       collection: planned.name,
-      action: current ? "rebuilt index" : "created index",
+      action: inTheWay.length > 0 ? "rebuilt index" : "created index",
       name: index.name,
-      detail: index.purpose,
+      detail: inTheWay.length > 0 ? `replaced ${inTheWay.map((old) => old.name).join(", ")}` : index.purpose,
     });
+    existing = await target.listIndexes().toArray();
   }
 
   const declared = new Set(planned.indexes.map((index) => index.name));
@@ -149,12 +166,71 @@ async function syncIndexes(db: Db, planned: CollectionPlan, prune: boolean): Pro
   return changes;
 }
 
+function sameKey(current: Document, wanted: ResolvedIndex): boolean {
+  return canonicalJson(Object.entries(current.key ?? {})) === canonicalJson(Object.entries(wanted.key));
+}
+
 function sameIndex(current: Document, wanted: ResolvedIndex): boolean {
   return (
-    canonicalJson(Object.entries(current.key ?? {})) === canonicalJson(Object.entries(wanted.key)) &&
+    sameKey(current, wanted) &&
     Boolean(current.unique) === wanted.unique &&
     canonicalJson(current.partialFilterExpression) === canonicalJson(wanted.partialFilterExpression) &&
     current.expireAfterSeconds === wanted.expireAfterSeconds
+  );
+}
+
+function onlyTtlDiffers(current: Document, wanted: ResolvedIndex): boolean {
+  return (
+    typeof current.expireAfterSeconds === "number" &&
+    wanted.expireAfterSeconds !== undefined &&
+    sameIndex({ ...current, expireAfterSeconds: wanted.expireAfterSeconds }, wanted)
+  );
+}
+
+function creationOptions(index: ResolvedIndex) {
+  return {
+    name: index.name,
+    unique: index.unique,
+    ...(index.partialFilterExpression && { partialFilterExpression: index.partialFilterExpression }),
+    ...(index.expireAfterSeconds !== undefined && { expireAfterSeconds: index.expireAfterSeconds }),
+  };
+}
+
+function restoreOptions(old: Document) {
+  return {
+    name: String(old.name),
+    unique: Boolean(old.unique),
+    ...(old.sparse && { sparse: true }),
+    ...(old.partialFilterExpression && { partialFilterExpression: old.partialFilterExpression }),
+    ...(typeof old.expireAfterSeconds === "number" && { expireAfterSeconds: old.expireAfterSeconds }),
+  };
+}
+
+/**
+ * Fails with the offending values if the data already breaks a unique index.
+ * Array fields count per element, the way a multikey unique index does, and
+ * repeats inside one document don't count.
+ */
+async function assertUnique(target: Collection, collectionName: string, index: ResolvedIndex): Promise<void> {
+  const paths = Object.keys(index.key);
+  const pipeline: Document[] = [
+    ...(index.partialFilterExpression ? [{ $match: index.partialFilterExpression }] : []),
+    ...paths.map((path) => ({ $unwind: { path: `$${path}`, preserveNullAndEmptyArrays: true } })),
+    {
+      $group: {
+        _id: Object.fromEntries(paths.map((path, i) => [`k${i}`, `$${path}`])),
+        ids: { $addToSet: "$_id" },
+      },
+    },
+    { $match: { "ids.1": { $exists: true } } },
+    { $limit: 3 },
+  ];
+  const clashes = await target.aggregate(pipeline).toArray();
+  if (clashes.length === 0) return;
+  const examples = clashes.map((clash) => JSON.stringify(Object.values(clash._id ?? {}))).join(", ");
+  throw new Error(
+    `Can't make ${collectionName}.${index.name} unique: documents already share ${paths.join(" + ")} ` +
+      `(${examples}). Fix those documents and rerun; the existing indexes are untouched.`,
   );
 }
 
