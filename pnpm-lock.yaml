@@ -8,16 +8,16 @@ importers:
 
   .:
     dependencies:
+      '@memory-glasses/db':
+        specifier: workspace:*
+        version: link:packages/db
       '@memory-glasses/shared':
         specifier: workspace:*
         version: link:packages/shared
-      mongodb:
-        specifier: ^6
-        version: 6.21.0(socks@2.8.10)
     devDependencies:
       '@types/node':
-        specifier: ^20
-        version: 20.19.43
+        specifier: ^24
+        version: 24.13.5
       tsx:
         specifier: ^4
         version: 4.23.13

@@ -2,20 +2,26 @@
   "name": "memory-glasses",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
     "lint": "pnpm --filter web lint",
-    "db:indexes": "tsx scripts/create-indexes.ts",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck && tsc --noEmit",
+    "db:up": "docker compose up -d --wait mongo",
+    "db:down": "docker compose down",
+    "db:setup": "tsx scripts/db-setup.ts",
     "db:seed": "tsx scripts/seed.ts",
+    "db:sweep": "tsx scripts/db-sweep.ts",
     "bench:tts": "tsx scripts/bench-tts.ts"
   },
   "dependencies": {
-    "@memory-glasses/shared": "workspace:*",
-    "mongodb": "^6"
+    "@memory-glasses/db": "workspace:*",
+    "@memory-glasses/shared": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^24",
     "tsx": "^4",
     "typescript": "^5"
   },
