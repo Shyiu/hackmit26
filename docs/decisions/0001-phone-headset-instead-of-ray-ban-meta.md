@@ -2,7 +2,7 @@
 
 Date: 2026-09-19
 
-Status: accepted
+Status: superseded by [0003](0003-chest-mounted-phone-instead-of-headset.md)
 
 ## Context
 

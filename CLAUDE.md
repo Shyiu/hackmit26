@@ -1,7 +1,8 @@
 # memory-glasses
 
 A wearable camera that helps people with dementia find misplaced items. The hackathon build runs on
-a phone inside a 3D-printed headset; Ray-Ban Meta is a later client. README.md is the source of
+a phone worn on the chest (ADR 0003); Ray-Ban Meta is a later client. `/headset` is left over from a
+dropped VR headset and is being turned into `/wear`. README.md is the source of
 truth for the spec, architecture, data model, current status, and build order. Read it first.
 
 ## Repo layout
