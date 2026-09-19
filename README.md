@@ -6,7 +6,7 @@ The wearer asks out loud, "Where are my keys?" About a second later they hear, "
 
 The product belongs on glasses, and Ray-Ban Meta was the platform we planned around. We can't get a pair for the hackathon, and a 3D-printed VR headset was tried on paper and dropped. So this build runs on a phone worn on the chest. Its rear camera faces forward and streams what's in front of the wearer, the phone records that view, and answers come back as speech in the wearer's ear. The live view with item labels shows on the caregiver dashboard. Ray-Ban Meta stays in the plan as a second client on the same contract, for when we have the hardware.
 
-**Status: early build.** The database is built: `packages/db` holds the MongoDB schemas, validators, indexes, and repositories, tested against a real MongoDB. The API routes read and write through it behind a caregiver login and device tokens, and `POST /api/ask` answers seeded questions in text. The `/headset` page was built for the dropped VR headset. Its camera, wake lock, local recording, stalled-feed watchdog, and push-to-talk carry over to the chest page; its stereo view and eye calibration don't, and the page still has to become `/wear`. Push-to-talk opens and closes the mic, but no audio reaches speech to text yet, so the pages don't ask anything. `/sim` runs the same client on a flat page. `services/perception` is a skeleton: its frame socket authenticates and answers each frame with empty detections, and its database write path is built and tested, but no detector runs. This README is still the build plan, so edit it freely.
+**Status: early build.** The database is built: `packages/db` holds the MongoDB schemas, validators, indexes, and repositories, tested against a real MongoDB. The API routes read and write through it behind a caregiver login and device tokens. `/wear` is the chest page: a dim screen where a tap anywhere asks a question. Speech to text runs on Deepgram when `DEEPGRAM_API_KEY` is set and falls back to the browser's recognizer when it isn't. `POST /api/ask` answers from the item snapshots, the answer is spoken with the browser's speech synthesis at the wearer's rate and shown as a caption, and playback timing goes back to the server. Server TTS (ElevenLabs PCM streaming) isn't built. The page streams 1280 px JPEG frames to the perception socket at 3 fps when capture is resumed, and speaks queued caregiver messages. `/sim` runs the same client on a flat page with hold-to-ask and a typed question. The caregiver dashboard is built for phones and desktops: items, item detail and editing, questions, live status, messages, rooms, latency, settings. `apps/ios` is a Capacitor shell that loads the deployed web app ([ADR 0004](docs/decisions/0004-ios-shell-with-capacitor.md)). `services/perception` is a skeleton: its frame socket authenticates and answers each frame with empty detections, and its database write path is built and tested, but no detector runs, and `/ws/debug` isn't built, so the dashboard live view has no video yet. This README is still the build plan, so edit it freely.
 
 ## The problem
 
@@ -134,7 +134,7 @@ Two deployable pieces for the hackathon, and a third later:
 |---|---|---|
 | `apps/web` | Next.js App Router, TypeScript, Tailwind, shadcn/ui, MongoDB Node driver | The `/wear` chest page, the flat `/sim` fallback, the caregiver dashboard, the REST API, the `/api/ask` voice endpoint |
 | `services/perception` | Python, FastAPI, Ultralytics YOLOE-26, ByteTrack, pymongo; open_clip later | Takes frames, detects and tracks items, sends detections to the dashboard live view, writes sightings, requests scene descriptions |
-| `apps/ios`, later | Swift, ARKit, Meta DAT, AVAudioEngine | A native shell for the chest phone once the browser runs out: capture with the screen locked, a local wake word, hardware-button push-to-talk. Also the Ray-Ban Meta client |
+| `apps/ios` | Capacitor 8 (Swift Package Manager), later Swift, ARKit, Meta DAT, AVAudioEngine | Today a WKWebView that loads the deployed web app from `CAP_SERVER_URL`, grants the camera and mic to that origin only, and keeps the screen on. Native capture with the screen locked, hardware-button push-to-talk, a local wake word, and the Ray-Ban Meta client get added here in Swift. See ADR 0004 |
 
 One design rule makes the latency goal reachable. **Do the expensive work when an item is seen, not when it's asked about.** Vision descriptions and optional room classification/embeddings happen at write time in the background. Once enrichment finishes, the answer is one indexed read away. Earlier questions get a conservative pending-description answer.
 
@@ -464,7 +464,9 @@ Next.js:
 | `POST /api/ask` | Takes `{ transcript, requestId }`, returns `X-Interaction-Id` before streaming audio; deduplicates by wearer and request ID. Until TTS lands it returns the interaction as JSON |
 | `POST /api/auth/login`, `POST /api/auth/logout` | The one caregiver login, from `CAREGIVER_EMAIL` and `CAREGIVER_PASSWORD`. Sets a signed session cookie |
 | `GET /api/health` | Unauthenticated. Whether the database answers and its validators are current |
-| `GET /api/stt/token` | Mints a short-lived Deepgram key so the client streams audio to Deepgram directly and skips a hop |
+| `GET /api/stt/token` | Mints a short-lived Deepgram key so the client streams audio to Deepgram directly and skips a hop. 503 without `DEEPGRAM_API_KEY`, and the page uses the browser's recognizer |
+| `GET, PATCH /api/settings` | The wearer's settings. The wear page reads speaking rate and recording permission; the caregiver edits them |
+| `GET /api/capture` | Whether the chest camera is live, paused, or offline, from the newest capture session |
 | `GET /api/perception/token` | Mints a short-lived token for the frame socket. A browser can't set headers on a WebSocket, so the page sends it as the first message |
 | `GET, POST /api/items`, `PATCH /api/items/:id` | Item CRUD and photo enrollment |
 | `GET /api/sightings` | Filter by item and time range |
@@ -527,7 +529,7 @@ hackmit26/
   CLAUDE.md                  repo layout, commands, gotchas
   apps/
     web/                     Next.js dashboard, API, /wear, /sim
-    ios/                     later: native chest-phone shell, and the Ray-Ban DAT client
+    ios/                     Capacitor shell that loads the web app; native features and the Ray-Ban DAT client later
   services/
     perception/              FastAPI, YOLOE-26, tracker, description jobs
   packages/
@@ -613,7 +615,18 @@ cloudflared tunnel --url http://localhost:3000
 cloudflared tunnel --url http://localhost:8000
 ```
 
-`next dev` blocks dev assets for hostnames it doesn't know. `apps/web/next.config.ts` allows `*.trycloudflare.com`. Add the hostname there if you use a different tunnel. Open `/wear` on the phone from the tunnel URL, tap Start, and clip the phone into the chest harness. A recording made on the phone is also a replay fixture: copy the file off and feed it to `replay.py`.
+`next dev` blocks dev assets for hostnames it doesn't know. `apps/web/next.config.ts` allows `*.trycloudflare.com`. Add the hostname there if you use a different tunnel. Open `/wear` on the phone from the tunnel URL, sign in once, tap Start, resume capture, and clip the phone into the chest harness. On iPhone, Add to Home Screen gives the page the whole screen. A recording made on the phone is also a replay fixture: copy the file off and feed it to `replay.py`.
+
+The iOS app wraps the same page. It needs Xcode, and the server URL is baked in at sync time:
+
+```bash
+cd apps/ios
+CAP_SERVER_URL=https://<tunnel-or-vercel-host> pnpm sync   # rerun when the URL changes
+pnpm open                                                  # Xcode; pick a device and run
+pnpm build:sim                                             # simulator build without signing
+```
+
+See `apps/ios/README.md` for signing and limits.
 
 ## Testing
 

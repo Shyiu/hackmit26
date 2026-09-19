@@ -1,16 +1,17 @@
 # memory-glasses
 
 A wearable camera that helps people with dementia find misplaced items. The hackathon build runs on
-a phone worn on the chest (ADR 0003); Ray-Ban Meta is a later client. `/headset` is left over from a
-dropped VR headset and is being turned into `/wear`. README.md is the source of
+a phone worn on the chest (ADR 0003); Ray-Ban Meta is a later client. The chest page is `/wear`;
+`/headset` redirects there. README.md is the source of
 truth for the spec, architecture, data model, current status, and build order. Read it first.
 
 ## Repo layout
 
-pnpm workspace plus one uv project. `apps/ios` is planned but not scaffolded.
+pnpm workspace plus one uv project.
 
 ```text
-apps/web/             Next.js 16 App Router: /headset wearer view, /sim flat fallback, dashboard, API routes
+apps/web/             Next.js 16 App Router: /wear chest page, /sim flat fallback, dashboard, API routes
+apps/ios/             Capacitor 8 iOS shell (SPM, no CocoaPods); its WKWebView loads the deployed web app
 packages/shared/      zod 3 wire contract: API bodies, the /ws/frames protocol, signed tokens, fixtures
 packages/db/          zod 4 stored-document schemas, the collection registry, repositories, retention
 services/perception/  Python FastAPI service: frame socket, sighting writes, description job queue
@@ -19,9 +20,10 @@ docs/decisions/       ADRs
 docs/research/        dated model and vision research, each ending with proposed README changes
 ```
 
-Wearer client code lives in `apps/web/src/hooks/` (camera, recorder, push-to-talk, wake lock, HUD
-message) and `apps/web/src/components/wearer/`. `/headset` and `/sim` render the same hooks with a
-different view, so a client feature added there reaches both capture paths.
+Wearer client code lives in `apps/web/src/hooks/` and `apps/web/src/lib/client/`. `useWearerClient`
+composes the camera, recorder, voice turn (Deepgram or browser speech to text), ask-and-speak loop,
+perception frame socket, caregiver message polling, wake lock, and stall watchdog. `/wear` and `/sim`
+both render it with a different view, so a client feature added there reaches both capture paths.
 
 ## Commands
 
@@ -38,6 +40,8 @@ pnpm db:seed          # demo wearer, caregiver, 3 items with sightings; --reset 
 pnpm db:sweep         # delete records past retention
 cd services/perception && uv run pytest   # the Python tests, also against MongoDB
 cloudflared tunnel --url http://localhost:3000   # HTTPS URL for testing on a phone
+cd apps/ios && CAP_SERVER_URL=https://<host> pnpm sync   # point the iOS app at a URL; rerun on change
+pnpm --filter @memory-glasses/ios build:sim             # simulator build, no signing
 ```
 
 Copy `apps/web/.env.example` to `apps/web/.env.local`. The database needs `MONGODB_URI`; signing in
@@ -74,10 +78,17 @@ scripts read the same file.
 - The React Compiler lint rules are on, including `set-state-in-effect`, `refs`, and `purity`.
   React 19.2 has `useEffectEvent`, which the wearer views use for window listeners.
 - Hidden and headless browser tabs render about once a second, so `useFeedWatchdog` reports a
-  stalled feed and `/headset` shows its stall card. Test the headset in a visible tab, or shim
+  stalled feed and `/wear` shows its stall card. Test the wear page in a visible tab, or shim
   `HTMLVideoElement.prototype.requestVideoFrameCallback`.
 - Several agent sessions often edit this repo at once. Stage files by explicit path, and read
   `git diff --cached --stat` before committing: anything already staged, including a `git rm`,
   rides along in your commit.
 - The db tests use `MONGODB_TEST_URI`, default `mongodb://127.0.0.1:27017/?directConnection=true`.
   Each test file creates and drops its own database, so they can share a server with dev data.
+- The iOS app has no Web Speech API, so speech to text there needs `DEEPGRAM_API_KEY`. It also
+  needs an https `CAP_SERVER_URL`; a new tunnel means a new `pnpm sync` and maybe a new
+  `allowedDevOrigins` entry. `apps/ios/ios/App/App/capacitor.config.json` is generated and ignored.
+- Answers are spoken with the browser's `speechSynthesis` until server TTS lands. iPhone only speaks
+  after a tap has spoken once, so `primeSpeech()` runs inside every tap that can lead to an answer.
+- Buttons and inputs grow on `pointer-coarse`. A desktop preview reports a mouse, so check touch
+  sizes on a phone.
