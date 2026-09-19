@@ -1,4 +1,4 @@
-# Memory glasses (working title)
+# Memior (working title)
 
 A wearable camera that remembers where things are, notices when someone's about to forget something, and watches for danger, for people living with dementia.
 
