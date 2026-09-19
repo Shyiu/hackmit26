@@ -41,7 +41,7 @@ export async function createPatient(
 
 export async function createCaregiver(
   db: Db,
-  input: { email: string; name: string; patientIds: PatientId[]; id?: CaregiverId },
+  input: { email: string; name: string; patientIds: PatientId[]; passwordHash?: string; id?: CaregiverId },
   now = new Date(),
 ): Promise<CaregiverDoc> {
   const doc = parseDocument(caregiverDocSchema, {
@@ -49,6 +49,7 @@ export async function createCaregiver(
     email: input.email.trim().toLowerCase(),
     name: input.name,
     patientIds: input.patientIds,
+    ...(input.passwordHash && { passwordHash: input.passwordHash }),
     lastLoginAt: null,
     createdAt: now,
     updatedAt: now,

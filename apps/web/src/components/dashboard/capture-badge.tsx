@@ -22,7 +22,7 @@ const DOTS: Record<CaptureState | "unknown", string> = {
 
 // Whether the chest camera is streaming, from the newest capture session. Polls
 // every few seconds while the tab is visible.
-export function CaptureBadge({ className }: { className?: string }) {
+export function CaptureBadge({ className, compact = false }: { className?: string; compact?: boolean }) {
   const [state, setState] = useState<CaptureState | "unknown">("unknown");
 
   useEffect(() => {
@@ -49,12 +49,12 @@ export function CaptureBadge({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1.5 rounded-full border-2 border-terracotta/25 bg-terracotta-soft/40 px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-terracotta-deep",
         className,
       )}
     >
       <span className={cn("size-2 rounded-full", DOTS[state])} />
-      {LABELS[state]}
+      {compact ? LABELS[state].replace("Camera ", "") : LABELS[state]}
     </span>
   );
 }

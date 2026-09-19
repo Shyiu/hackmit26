@@ -13,11 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Memory glasses", template: "%s · Memory glasses" },
+  title: { default: "Memior", template: "%s · Memior" },
   description: "A wearable camera that remembers where things are, for people living with dementia.",
-  applicationName: "Memory glasses",
+  applicationName: "Memior",
   // "Add to Home Screen" on iPhone opens the app without Safari's chrome.
-  appleWebApp: { capable: true, title: "Memory glasses", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Memior", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
 };
 
