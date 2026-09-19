@@ -34,7 +34,7 @@ export async function sweepExpired(db: Db, options: SweepOptions = {}): Promise<
     report.deleted[key] = (report.deleted[key] ?? 0) + n;
   };
   const dropObjects = async (keys: (string | null | undefined)[]) => {
-    const present = keys.filter((key): key is string => Boolean(key));
+    const present = [...new Set(keys.filter((key): key is string => Boolean(key)))];
     if (present.length === 0) return;
     await options.deleteObjects?.(present);
     report.objectKeys += present.length;
@@ -61,10 +61,18 @@ export async function sweepExpired(db: Db, options: SweepOptions = {}): Promise<
     );
     report.clearedSnapshots += latest.modifiedCount + resting.modifiedCount;
 
-    const jobs = await collection(db, "descriptionJobs").deleteMany({ sightingId: { $in: ids } });
-    count("descriptionJobs", jobs.deletedCount);
-
-    await dropObjects(batch.flatMap((sighting) => [sighting.keyframeKey, sighting.thumbKey]));
+    // A sighting's jobs point at every keyframe it ever had, including ones a
+    // sharper frame replaced, so their keys go with it.
+    const descriptionJobs = collection(db, "descriptionJobs");
+    const jobs = await descriptionJobs
+      .find({ sightingId: { $in: ids } }, { projection: { keyframeKey: 1 } })
+      .toArray();
+    await dropObjects([
+      ...batch.flatMap((sighting) => [sighting.keyframeKey, sighting.thumbKey]),
+      ...jobs.map((job) => job.keyframeKey),
+    ]);
+    const deletedJobs = await descriptionJobs.deleteMany({ sightingId: { $in: ids } });
+    count("descriptionJobs", deletedJobs.deletedCount);
     const deleted = await sightings.deleteMany({ _id: { $in: ids } });
     count("sightings", deleted.deletedCount);
     // TODO(M6): recompute history-based usualSpots for the affected items once they exist.

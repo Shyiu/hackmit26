@@ -43,17 +43,17 @@ describe("sweepExpired", () => {
       description: ready,
     });
     const now = new Date();
-    await collection(env.db, "descriptionJobs").insertOne(
+    const job = (keyframeRevision: number, keyframeKey: string, status: "queued" | "superseded") =>
       parseDocument(descriptionJobDocSchema, {
         _id: newId<DescriptionJobId>(),
         patientId: tenant.patientId,
         itemId: keys._id,
         sightingId: old._id,
         observationVersion: 1,
-        keyframeRevision: 1,
-        keyframeKey: "keyframes/old.jpg",
+        keyframeRevision,
+        keyframeKey,
         bbox: [0.1, 0.1, 0.1, 0.1],
-        status: "queued",
+        status,
         attempts: 0,
         maxAttempts: 3,
         runAfter: now,
@@ -63,8 +63,12 @@ describe("sweepExpired", () => {
         updatedAt: now,
         finishedAt: null,
         expiresAt: new Date(now.getTime() + DAY_MS),
-      }),
-    );
+      });
+    // A sharper frame replaced revision 1; only the job still knows its key.
+    await collection(env.db, "descriptionJobs").insertMany([
+      job(1, "keyframes/old-rev1.jpg", "superseded"),
+      job(2, "keyframes/old.jpg", "queued"),
+    ]);
     const expiredQuestion = await tenant.interactions.begin({
       requestId: "old",
       transcript: "keys?",
@@ -79,10 +83,10 @@ describe("sweepExpired", () => {
     });
 
     expect(report.deleted.sightings).toBe(1);
-    expect(report.deleted.descriptionJobs).toBe(1);
+    expect(report.deleted.descriptionJobs).toBe(2);
     expect(report.deleted.interactions).toBe(1);
     expect(report.clearedSnapshots).toBe(2);
-    expect(removedKeys.sort()).toEqual(["keyframes/old.jpg", "thumbs/old.jpg"]);
+    expect(removedKeys.sort()).toEqual(["keyframes/old-rev1.jpg", "keyframes/old.jpg", "thumbs/old.jpg"]);
 
     const storedKeys = await collection(env.db, "items").findOne({ _id: keys._id });
     expect(storedKeys?.lastSighting).toBeNull();

@@ -1,7 +1,8 @@
 import type { Document, MatchKeysAndValues } from "mongodb";
-import { duplicateKeyOf, parseDocument } from "../errors";
+import { z } from "zod";
+import { ConflictError, duplicateKeyOf, parseDocument } from "../errors";
 import { newId, type DeviceId, type InteractionId } from "../ids";
-import { interactionStatus, type InteractionStatus } from "../schema/common";
+import { interactionStatus, playbackOutcome, type InteractionStatus } from "../schema/common";
 import {
   interactionDocSchema,
   TIMING_STAGES,
@@ -25,6 +26,14 @@ const TRANSITIONS: Readonly<Record<InteractionStatus, readonly InteractionStatus
 function sourcesOf(to: InteractionStatus): InteractionStatus[] {
   return interactionStatus.options.filter((from) => TRANSITIONS[from].includes(to));
 }
+
+const playbackReportInput = z.strictObject({
+  outcome: playbackOutcome,
+  /** A minute is already a broken answer; larger values are client bugs. */
+  clientFirstPlaybackMs: z.number().nonnegative().max(60_000).optional(),
+});
+
+export type PlaybackReport = z.input<typeof playbackReportInput>;
 
 export type BeginInteraction = {
   requestId: string;
@@ -50,13 +59,15 @@ export function interactionsRepo(ctx: RepoContext) {
      * voice provider again.
      */
     async begin(input: BeginInteraction): Promise<{ interaction: InteractionDoc; created: boolean }> {
-      const askedAt = input.askedAt ?? ctx.now();
+      const now = ctx.now();
+      const askedAt = input.askedAt ?? now;
       const fields = {
         _id: newId<InteractionId>(),
         deviceId: input.deviceId ?? null,
         askedAt,
         expiresAt: expiresAt(ctx, askedAt),
-        transcript: input.transcript,
+        // Stored as parsed, so the trimmed text is what lands.
+        transcript: parseDocument(interactionDocSchema.shape.transcript, input.transcript),
         status: "generating" as const,
         path: null,
         itemId: null,
@@ -69,20 +80,22 @@ export function interactionsRepo(ctx: RepoContext) {
         completedAt: null,
       };
       parseDocument(interactionDocSchema, { ...fields, patientId: ctx.patientId, requestId: input.requestId });
+      let result: { doc: InteractionDoc; created: boolean };
       try {
         // patientId and requestId come from the filter, the rest only on insert.
-        const { doc, created } = await interactions.upsertOne(
-          { requestId: input.requestId },
-          { $setOnInsert: fields },
-        );
-        return { interaction: doc, created };
+        result = await interactions.upsertOne({ requestId: input.requestId }, { $setOnInsert: fields });
       } catch (error) {
         // Two copies of one request raced and the loser hit request_unique. The winner's row exists.
         if (duplicateKeyOf(error)?.index !== "request_unique") throw error;
         const existing = await interactions.findOne({ requestId: input.requestId });
         if (!existing) throw error;
-        return { interaction: existing, created: false };
+        result = { doc: existing, created: false };
       }
+      // A requestId from a record past retention would otherwise hand back its transcript.
+      if (!result.created && result.doc.expiresAt <= now) {
+        throw new ConflictError("That requestId was used before; send a new one", "requestId", input.requestId);
+      }
+      return { interaction: result.doc, created: result.created };
     },
 
     /**
@@ -103,19 +116,19 @@ export function interactionsRepo(ctx: RepoContext) {
     },
 
     /** Client playback telemetry. The first report wins; a retried report changes nothing. */
-    async recordPlayback(
-      id: InteractionId,
-      report: { outcome: NonNullable<InteractionDoc["playbackOutcome"]>; clientFirstPlaybackMs?: number },
-    ) {
+    async recordPlayback(id: InteractionId, input: PlaybackReport) {
+      const report = parseDocument(playbackReportInput, input);
+      const now = ctx.now();
       const $set: MatchKeysAndValues<InteractionDoc> = {
         playbackOutcome: report.outcome,
-        playbackReportedAt: ctx.now(),
+        playbackReportedAt: now,
       };
       if (report.clientFirstPlaybackMs !== undefined) {
         $set["timingsMs.clientFirstPlayback"] = report.clientFirstPlaybackMs;
       }
-      const updated = await interactions.findOneAndUpdate({ _id: id, playbackReportedAt: null }, { $set });
-      return updated ?? interactions.findOne({ _id: id });
+      const live = { _id: id, expiresAt: { $gt: now } };
+      const updated = await interactions.findOneAndUpdate({ ...live, playbackReportedAt: null }, { $set });
+      return updated ?? interactions.findOne(live);
     },
 
     get(id: InteractionId) {
@@ -145,7 +158,10 @@ export function interactionsRepo(ctx: RepoContext) {
         group[`${stage}Samples`] = { $sum: { $cond: [{ $isNumber: field }, 1, 0] } };
       }
       const [row] = await interactions
-        .aggregate<Document>([{ $match: { askedAt: { $gte: since }, status: "complete" } }, { $group: group }])
+        .aggregate<Document>([
+          { $match: { askedAt: { $gte: since }, status: "complete", expiresAt: { $gt: ctx.now() } } },
+          { $group: group },
+        ])
         .toArray();
 
       const stages = Object.fromEntries(

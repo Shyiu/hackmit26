@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { ConflictError, InvalidInputError } from "../src/errors";
 import { collection } from "../src/registry";
 import { tenantRepos } from "../src/repos";
 import { fixedClock, newTenant, openTestDb } from "./helpers";
@@ -91,6 +92,34 @@ describe("interactions", () => {
     const again = await tenant.interactions.recordPlayback(interaction._id, { outcome: "failed" });
     expect(again?.playbackOutcome).toBe("played");
     expect(again?.timingsMs.clientFirstPlayback).toBe(310);
+  });
+
+  it("stores the transcript it validated", async () => {
+    const tenant = await newTenant(env.db);
+    const { interaction } = await tenant.interactions.begin({ requestId: "trim", transcript: "  where are my keys?  " });
+    expect(interaction.transcript).toBe("where are my keys?");
+  });
+
+  it("rejects bad playback reports with a 400-class error", async () => {
+    const tenant = await newTenant(env.db);
+    const { interaction } = await tenant.interactions.begin({ requestId: "r", transcript: "keys?" });
+    await expect(
+      tenant.interactions.recordPlayback(interaction._id, { outcome: "played", clientFirstPlaybackMs: -5 }),
+    ).rejects.toThrow(InvalidInputError);
+  });
+
+  it("hides interactions past retention from every path", async () => {
+    const clock = fixedClock(new Date("2026-09-01T12:00:00Z"));
+    const tenant = await newTenant(env.db, { now: clock.now, retentionDays: 1 });
+    const { interaction } = await tenant.interactions.begin({ requestId: "old", transcript: "keys?" });
+    await tenant.interactions.transition(interaction._id, "complete", { timingsMs: { db: 5 } });
+    clock.advance(2 * 24 * 60 * 60 * 1000);
+
+    expect(await tenant.interactions.get(interaction._id)).toBeNull();
+    expect(await tenant.interactions.recordPlayback(interaction._id, { outcome: "played" })).toBeNull();
+    await expect(tenant.interactions.begin({ requestId: "old", transcript: "keys?" })).rejects.toThrow(ConflictError);
+    const stats = await tenant.interactions.latencyStats({ since: new Date("2026-08-01T00:00:00Z") });
+    expect(stats.interactions).toBe(0);
   });
 
   it("computes stage percentiles over completed interactions", async () => {

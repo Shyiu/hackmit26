@@ -19,6 +19,8 @@ export function notificationsRepo(ctx: RepoContext) {
     async create(input: NewNotification): Promise<NotificationDoc> {
       const now = ctx.now();
       const showAt = input.kind === "reminder" && input.showAt ? input.showAt : now;
+      // Retention counts from when it's due, and never from the past.
+      const dueFrom = showAt > now ? showAt : now;
       const doc = parseDocument(notificationDocSchema, {
         _id: newId<NotificationId>(),
         patientId: ctx.patientId,
@@ -29,7 +31,7 @@ export function notificationsRepo(ctx: RepoContext) {
         status: "queued",
         shownAt: null,
         createdAt: now,
-        expiresAt: expiresAt(ctx, showAt),
+        expiresAt: expiresAt(ctx, dueFrom),
       });
       await notifications.insertOne(doc);
       return doc;
@@ -46,9 +48,10 @@ export function notificationsRepo(ctx: RepoContext) {
 
     /** Queued to shown, once. A second device marking the same one gets null back. */
     markShown(id: NotificationId): Promise<NotificationDoc | null> {
+      const now = ctx.now();
       return notifications.findOneAndUpdate(
-        { _id: id, status: "queued" },
-        { $set: { status: "shown", shownAt: ctx.now() } },
+        { _id: id, status: "queued", expiresAt: { $gt: now } },
+        { $set: { status: "shown", shownAt: now } },
       );
     },
 
