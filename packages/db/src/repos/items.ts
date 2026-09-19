@@ -18,7 +18,12 @@ export type NewItem = {
   plural?: boolean;
 };
 
-export type ItemPatch = Partial<NewItem>;
+export type ItemPatch = Partial<NewItem> & {
+  /** false archives the item: its history stays and its names free up. */
+  active?: boolean;
+  /** The `updatedAt` the caller's form loaded. A save made since then wins, and this one gets a 409. */
+  expectedUpdatedAt?: Date;
+};
 
 export type ItemResolution =
   | { kind: "none" }
@@ -31,6 +36,7 @@ const configFields = itemDocSchema.pick({
   aliases: true,
   lookupKeys: true,
   detectorPrompts: true,
+  active: true,
   updatedAt: true,
 });
 
@@ -75,6 +81,39 @@ function rethrowLookupConflict(error: unknown): never {
 export function itemsRepo(ctx: RepoContext) {
   const items = tenantCollection(ctx, "items");
 
+  /**
+   * Edits names, prompts, and whether the item is archived. The write is
+   * guarded on the `updatedAt` it read, so a save that lands in between gets
+   * a conflict instead of losing an alias. Pass `expectedUpdatedAt` to extend
+   * that guard back to when the caregiver's form loaded.
+   */
+  async function update(id: ItemId, patch: ItemPatch): Promise<ItemDoc | null> {
+    const current = await items.findOne({ _id: id });
+    if (!current) return null;
+    const changedMeanwhile = () =>
+      new ConflictError("Someone else changed this item; reload and try again", "updatedAt", id.toHexString());
+    if (patch.expectedUpdatedAt && patch.expectedUpdatedAt.getTime() !== current.updatedAt.getTime()) {
+      throw changedMeanwhile();
+    }
+    const name = patch.name?.trim() ?? current.name;
+    const aliases = patch.aliases ? cleanAliases(name, patch.aliases) : current.aliases;
+    const changes = parseDocument(configFields, {
+      name,
+      plural: patch.plural ?? current.plural,
+      aliases,
+      lookupKeys: lookupKeysFor(name, aliases),
+      detectorPrompts: patch.detectorPrompts?.length ? [...patch.detectorPrompts] : current.detectorPrompts,
+      active: patch.active ?? current.active,
+      updatedAt: ctx.now(),
+    });
+    const updated = await items
+      .findOneAndUpdate({ _id: id, updatedAt: current.updatedAt }, { $set: changes })
+      .catch(rethrowLookupConflict);
+    if (!updated) throw changedMeanwhile();
+    await bumpConfigVersion(ctx);
+    return withLiveSnapshots(updated, ctx.now());
+  }
+
   return {
     async list({ includeArchived = false }: { includeArchived?: boolean } = {}): Promise<ItemDoc[]> {
       const now = ctx.now();
@@ -113,38 +152,11 @@ export function itemsRepo(ctx: RepoContext) {
       return doc;
     },
 
-    /**
-     * Edits the names and prompts. Guarded on `updatedAt`, so two caregivers
-     * saving at once get a conflict instead of silently losing an alias.
-     */
-    async update(id: ItemId, patch: ItemPatch): Promise<ItemDoc | null> {
-      const current = await items.findOne({ _id: id });
-      if (!current) return null;
-      const name = patch.name?.trim() ?? current.name;
-      const aliases = patch.aliases ? cleanAliases(name, patch.aliases) : current.aliases;
-      const changes = parseDocument(configFields, {
-        name,
-        plural: patch.plural ?? current.plural,
-        aliases,
-        lookupKeys: lookupKeysFor(name, aliases),
-        detectorPrompts: patch.detectorPrompts?.length ? [...patch.detectorPrompts] : current.detectorPrompts,
-        updatedAt: ctx.now(),
-      });
-      const updated = await items
-        .findOneAndUpdate({ _id: id, updatedAt: current.updatedAt }, { $set: changes })
-        .catch(rethrowLookupConflict);
-      if (!updated) throw new ConflictError("The item changed while saving; reload and try again", "updatedAt", id);
-      await bumpConfigVersion(ctx);
-      return withLiveSnapshots(updated, ctx.now());
-    },
+    update,
 
     /** Archiving keeps the history and frees the item's names for another item. */
-    async setActive(id: ItemId, active: boolean): Promise<ItemDoc | null> {
-      const updated = await items
-        .findOneAndUpdate({ _id: id }, { $set: { active, updatedAt: ctx.now() } })
-        .catch(rethrowLookupConflict);
-      if (updated) await bumpConfigVersion(ctx);
-      return updated && withLiveSnapshots(updated, ctx.now());
+    setActive(id: ItemId, active: boolean): Promise<ItemDoc | null> {
+      return update(id, { active });
     },
 
     /**

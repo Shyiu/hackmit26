@@ -100,7 +100,6 @@ export async function seedObservation(
       $set: {
         lastSighting: snapshot,
         ...(input.state === "resting" && { lastRestingSighting: snapshot }),
-        updatedAt: new Date(),
       },
     },
   );

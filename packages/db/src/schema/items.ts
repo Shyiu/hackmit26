@@ -9,7 +9,6 @@ import {
   observationState,
   sentenceText,
   shortText,
-  timestamps,
   unitInterval,
 } from "./common";
 
@@ -76,7 +75,12 @@ export const itemDocSchema = z.strictObject({
   /** The last place it sat still. History once newer held or moving evidence arrives. */
   lastRestingSighting: sightingSnapshotSchema.nullable(),
   usualSpots: z.array(usualSpotSchema).max(5),
-  ...timestamps,
+  createdAt: z.date(),
+  /**
+   * The last configuration edit. Snapshot writes leave it alone, so a new
+   * sighting never turns a caregiver's save into a conflict.
+   */
+  updatedAt: z.date(),
 });
 
 export type ItemDoc = z.infer<typeof itemDocSchema>;

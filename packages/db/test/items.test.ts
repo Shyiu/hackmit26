@@ -51,6 +51,18 @@ describe("items", () => {
     expect(await tenant.items.list({ includeArchived: true })).toHaveLength(2);
   });
 
+  it("refuses a save from a form loaded before someone else's save", async () => {
+    const tenant = await newTenant(env.db);
+    const keys = await tenant.items.create({ name: "keys" });
+    const loadedAt = keys.updatedAt;
+    await tenant.items.update(keys._id, { aliases: ["house keys"], expectedUpdatedAt: loadedAt });
+
+    await expect(
+      tenant.items.update(keys._id, { aliases: ["key ring"], expectedUpdatedAt: loadedAt }),
+    ).rejects.toThrow(/Someone else changed this item/);
+    expect((await tenant.items.get(keys._id))?.aliases).toEqual(["house keys"]);
+  });
+
   it("rejects names that can't be matched", async () => {
     const tenant = await newTenant(env.db);
     await expect(tenant.items.create({ name: "???" })).rejects.toThrow(InvalidInputError);
