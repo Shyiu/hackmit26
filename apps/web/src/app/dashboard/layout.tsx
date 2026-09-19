@@ -1,36 +1,17 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
-
-const NAV_LINKS = [
-  { href: "/dashboard/items", label: "Items" },
-  { href: "/dashboard/rooms", label: "Rooms" },
-  { href: "/dashboard/questions", label: "Questions" },
-  { href: "/dashboard/messages", label: "Messages" },
-  { href: "/dashboard/recordings", label: "Recordings" },
-  { href: "/dashboard/latency", label: "Latency" },
-  { href: "/dashboard/settings", label: "Settings" },
-];
+import { MobileHeader, Sidebar, TabBar } from "@/components/dashboard/nav";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen">
-      <aside className="w-56 shrink-0 border-r px-4 py-6">
-        <Link href="/" className="mb-6 block text-sm font-semibold">
-          Memory glasses
-        </Link>
-        <nav className="flex flex-col gap-1">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-      </aside>
-      <main className="flex-1 p-8">{children}</main>
+    <div className="flex min-h-dvh">
+      <Sidebar />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <MobileHeader />
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 md:px-8 md:pt-8 md:pb-10">
+          {children}
+        </main>
+      </div>
+      <TabBar />
     </div>
   );
 }

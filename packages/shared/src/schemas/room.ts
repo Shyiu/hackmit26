@@ -16,6 +16,15 @@ export const createRoomSchema = z
   })
   .strict();
 
+// Renames a room or flips its private flag. The room id comes from the URL.
+export const updateRoomSchema = z
+  .object({
+    name: z.string().trim().min(1).max(60).optional(),
+    /** For the later on-device privacy gate. Not a server-side guarantee. */
+    private: z.boolean().optional(),
+  })
+  .strict();
+
 export const roomRefEmbeddingSchema = z.object({
   _id: z.string(),
   patientId: z.string(),
@@ -26,4 +35,5 @@ export const roomRefEmbeddingSchema = z.object({
 
 export type Room = z.infer<typeof roomSchema>;
 export type CreateRoom = z.infer<typeof createRoomSchema>;
+export type UpdateRoom = z.infer<typeof updateRoomSchema>;
 export type RoomRefEmbedding = z.infer<typeof roomRefEmbeddingSchema>;

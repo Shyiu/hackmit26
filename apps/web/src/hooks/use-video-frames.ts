@@ -24,8 +24,8 @@ export function useVideoAspect(video: HTMLVideoElement | null) {
   );
 }
 
-// True once `video` goes `timeoutMs` without presenting a new frame. In the
-// headset that means the wearer is looking at a frozen room.
+// True once `video` goes `timeoutMs` without presenting a new frame. On the
+// chest nobody is watching the screen, so the page plays a tone instead.
 export function useFeedWatchdog(video: HTMLVideoElement | null, active: boolean, timeoutMs = 1000) {
   const [stalled, setStalled] = useState(false);
 

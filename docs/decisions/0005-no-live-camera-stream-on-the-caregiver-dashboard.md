@@ -1,4 +1,4 @@
-# 4. No live camera stream on the caregiver dashboard
+# 5. No live camera stream on the caregiver dashboard
 
 Date: 2026-09-19
 

@@ -8,12 +8,12 @@ function safeNext(next: string | string[] | undefined): string {
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { next } = await searchParams;
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
+    <div className="flex min-h-dvh items-center justify-center px-5 pt-safe pb-safe">
       <div className="flex w-full max-w-sm flex-col gap-6">
         <div>
           <h1 className="text-2xl font-semibold">Caregiver sign in</h1>
           <p className="text-muted-foreground">
-            Sign in on the headset phone once, and the wearer pages use the same session.
+            Sign in on the chest phone once, and the wear page uses the same session.
           </p>
         </div>
         <LoginForm next={safeNext(next)} />

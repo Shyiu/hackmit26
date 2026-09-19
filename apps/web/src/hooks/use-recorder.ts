@@ -20,7 +20,7 @@ function fileName(startedAt: Date, mimeType: string) {
   const pad = (n: number) => String(n).padStart(2, "0");
   const date = `${startedAt.getFullYear()}-${pad(startedAt.getMonth() + 1)}-${pad(startedAt.getDate())}`;
   const time = `${pad(startedAt.getHours())}${pad(startedAt.getMinutes())}${pad(startedAt.getSeconds())}`;
-  return `headset-${date}-${time}.${mimeType.includes("webm") ? "webm" : "mp4"}`;
+  return `memory-${date}-${time}.${mimeType.includes("webm") ? "webm" : "mp4"}`;
 }
 
 // Records a camera stream to a file on the device. Nothing uploads it. The

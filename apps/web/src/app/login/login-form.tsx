@@ -3,9 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-
-const inputClass =
-  "rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function LoginForm({ next }: { next: string }) {
   const router = useRouter();
@@ -37,16 +36,16 @@ export function LoginForm({ next }: { next: string }) {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1 text-sm">
-        Email
-        <input name="email" type="email" autoComplete="username" required className={inputClass} />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Password
-        <input name="password" type="password" autoComplete="current-password" required className={inputClass} />
-      </label>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="email">Email</Label>
+        <Input id="email" name="email" type="email" inputMode="email" autoComplete="username" autoCapitalize="none" required />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="password">Password</Label>
+        <Input id="password" name="password" type="password" autoComplete="current-password" required />
+      </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" size="lg" disabled={pending}>
         {pending ? "Signing in..." : "Sign in"}
       </Button>
     </form>

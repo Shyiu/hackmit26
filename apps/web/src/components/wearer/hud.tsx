@@ -2,7 +2,6 @@ import type { CSSProperties } from "react";
 import { Bell, Mic } from "lucide-react";
 import type { Detection } from "@memory-glasses/shared";
 import type { HudMessage } from "@/hooks/use-hud-message";
-import type { TurnOutcome } from "@/hooks/use-push-to-talk";
 import { cn } from "@/lib/utils";
 
 type HudProps = {
@@ -15,9 +14,8 @@ type HudProps = {
   style?: CSSProperties;
 };
 
-// Status marks near the top, one message in the lower middle. The same component
-// draws into each eye and onto the flat page, so the layout never changes. See
-// README "What the HUD shows".
+// Status marks near the top, one message in the lower middle, drawn over the
+// simulator's video. See README "What the screens show".
 export function Hud({
   message,
   messageVisible,
@@ -85,20 +83,14 @@ export function ItemLabels({ detections }: { detections: Detection[] }) {
   );
 }
 
-// Covers the view when the camera feed freezes. A frozen picture hides the real
-// room, so this is the one blunt message the HUD ever shows.
-export function StallCard({ textStyle }: { textStyle?: CSSProperties }) {
+// Covers the view when the camera feed freezes, so a frozen picture never
+// passes for the room.
+export function StallCard({ className }: { className?: string }) {
   return (
-    <div className="absolute inset-0 bg-black">
-      <p className="absolute top-1/2 text-center text-2xl font-semibold text-white" style={textStyle}>
-        Please take off the headset.
+    <div className={cn("absolute inset-0 flex items-center justify-center bg-black p-6", className)}>
+      <p className="max-w-sm text-center text-2xl font-semibold text-white">
+        The camera stopped. Check the phone.
       </p>
     </div>
   );
-}
-
-// What the HUD says when a push-to-talk turn ends. Speech to text and /api/ask
-// aren't wired up yet, so the honest answer is that nothing is listening.
-export function turnEndCaption(outcome: TurnOutcome) {
-  return outcome === "mic-blocked" ? "The microphone is blocked." : "Answers aren't connected yet.";
 }
