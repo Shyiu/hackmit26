@@ -80,32 +80,15 @@ export function useDisplayMode() {
   return useSyncExternalStore(subscribeDisplayMode, getDisplayMode, (): DisplayMode => "browser");
 }
 
-// Element fullscreen and a landscape lock, where the browser allows them. iPhone
-// Safari has neither, so the headset runs as a home screen web app there. Call
+// Element fullscreen where the browser allows it, to hide Android's browser
+// chrome. iPhone Safari has none, so there the page runs as a home screen web
+// app. No orientation lock: the chest clamp may hold the phone either way. Call
 // this from a tap handler before any await, or the browser refuses.
 export async function enterFullscreen() {
   if (!document.fullscreenEnabled || document.fullscreenElement) return;
   try {
     await document.documentElement.requestFullscreen({ navigationUI: "hide" });
-    // TypeScript's DOM types dropped lock(); Chrome on Android still has it.
-    const orientation = screen.orientation as ScreenOrientation & {
-      lock?: (orientation: "landscape") => Promise<void>;
-    };
-    await orientation.lock?.("landscape");
   } catch {
     // Refused or unsupported. The page still works with the browser chrome showing.
   }
-}
-
-function subscribeResize(onChange: () => void) {
-  window.addEventListener("resize", onChange);
-  return () => window.removeEventListener("resize", onChange);
-}
-
-export function useWindowHeight() {
-  return useSyncExternalStore(
-    subscribeResize,
-    () => window.innerHeight,
-    () => 0
-  );
 }
