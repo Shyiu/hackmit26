@@ -6,11 +6,12 @@ import {
   type Face,
   type FrameHeader,
 } from "@memory-glasses/shared";
+import { CAMERA_ROTATE_DEG, isSidewaysRotation } from "@/lib/client/camera-rotation";
 
 // Frames to the perception service over /ws/frames. See the protocol notes in
 // packages/shared/src/schemas/perception.ts and PLAN.md "Frame handling".
 
-const FRAMES_PER_SECOND = 3;
+const FRAMES_PER_SECOND = 30;
 const FRAME_WIDTH = 1280;
 const JPEG_QUALITY = 0.7;
 // A label drawn where the keys were half a second ago is worse than no label.
@@ -50,13 +51,27 @@ function encodeFrame(header: FrameHeader, jpeg: ArrayBuffer) {
 }
 
 // Shared with use-scan-feed, which grabs its own frames when this socket isn't sending.
+// Rotated by CAMERA_ROTATE_DEG so a sideways chest mount sends upright frames --
+// matching what LiveVideo shows, so a detection's bbox lines up with no extra
+// transform needed on the label overlay.
 export function grabJpeg(video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<Blob | null> {
   const width = Math.min(FRAME_WIDTH, video.videoWidth);
   const height = Math.round((video.videoHeight / video.videoWidth) * width);
   if (!width || !height) return Promise.resolve(null);
-  canvas.width = width;
-  canvas.height = height;
-  canvas.getContext("2d")?.drawImage(video, 0, 0, width, height);
+  const sideways = isSidewaysRotation(CAMERA_ROTATE_DEG);
+  canvas.width = sideways ? height : width;
+  canvas.height = sideways ? width : height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return Promise.resolve(null);
+  if (CAMERA_ROTATE_DEG) {
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((CAMERA_ROTATE_DEG * Math.PI) / 180);
+    ctx.drawImage(video, -width / 2, -height / 2, width, height);
+    ctx.restore();
+  } else {
+    ctx.drawImage(video, 0, 0, width, height);
+  }
   return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY));
 }
 

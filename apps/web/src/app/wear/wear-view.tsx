@@ -9,6 +9,7 @@ import { ScanStatusChip } from "@/components/wearer/scan-status";
 import { useStoredNumber } from "@/hooks/use-stored-setting";
 import { useVideoAspect } from "@/hooks/use-video-frames";
 import { useWearerClient } from "@/hooks/use-wearer-client";
+import { CAMERA_ROTATE_DEG, rotatedAspect } from "@/lib/client/camera-rotation";
 import { cn } from "@/lib/utils";
 import { SetupPanel } from "./setup-panel";
 
@@ -26,7 +27,7 @@ export function WearView() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [textScale, setTextScale] = useStoredNumber("wear.textScale", 1);
   const { hud, voice, live, capturing, answer, stalled, recorder, camera, perception } = client;
-  const aspect = useVideoAspect(client.video);
+  const aspect = rotatedAspect(useVideoAspect(client.video), CAMERA_ROTATE_DEG);
 
   function handleTap() {
     if (!live || panelOpen) return;
@@ -59,7 +60,12 @@ export function WearView() {
             className="relative"
             style={{ aspectRatio: aspect, width: `min(100%, calc(100dvh * ${aspect}))` }}
           >
-            <LiveVideo stream={camera.stream} onElement={client.setVideo} className="h-full w-full opacity-40" />
+            <LiveVideo
+              stream={camera.stream}
+              onElement={client.setVideo}
+              rotateDeg={CAMERA_ROTATE_DEG}
+              className="h-full w-full opacity-40"
+            />
             <ItemLabels detections={perception.detections} />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-page/80 via-page/30 to-page/85" />
           </div>

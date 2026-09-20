@@ -11,6 +11,7 @@ import { LiveVideo } from "@/components/wearer/live-video";
 import { useItemStatuses } from "@/hooks/use-item-statuses";
 import { useVideoAspect } from "@/hooks/use-video-frames";
 import { useWearerClient } from "@/hooks/use-wearer-client";
+import { CAMERA_ROTATE_DEG, rotatedAspect } from "@/lib/client/camera-rotation";
 import { cn } from "@/lib/utils";
 import { DetectionLegend, DetectionOverlay } from "./detection-overlay";
 import { ItemStatusPanel } from "./item-status-panel";
@@ -29,7 +30,7 @@ import { ItemStatusPanel } from "./item-status-panel";
 export function ItemSimView() {
   const client = useWearerClient({ turnMode: "hold", autoResumeOnReconnect: true });
   const { camera, hud, voice, perception, live, capturing } = client;
-  const aspect = useVideoAspect(client.video);
+  const aspect = rotatedAspect(useVideoAspect(client.video), CAMERA_ROTATE_DEG);
   const [question, setQuestion] = useState("");
   const { items, error: itemsError, fetchedAt } = useItemStatuses();
 
@@ -66,7 +67,12 @@ export function ItemSimView() {
       )}
 
       <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: aspect }}>
-        <LiveVideo stream={camera.stream} onElement={client.setVideo} className="absolute inset-0 size-full object-contain" />
+        <LiveVideo
+          stream={camera.stream}
+          onElement={client.setVideo}
+          rotateDeg={CAMERA_ROTATE_DEG}
+          className="absolute inset-0 size-full"
+        />
         <DetectionOverlay detections={perception.detections} items={items} fetchedAt={fetchedAt} />
         <Hud
           className="inset-x-[6%] text-[0.85rem] sm:text-base"

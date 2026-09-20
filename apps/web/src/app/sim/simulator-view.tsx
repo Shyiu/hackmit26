@@ -12,6 +12,7 @@ import { NoticeStack } from "@/components/wearer/notice-stack";
 import { RecordingsList } from "@/components/wearer/recordings-list";
 import { useVideoAspect } from "@/hooks/use-video-frames";
 import { useWearerClient } from "@/hooks/use-wearer-client";
+import { CAMERA_ROTATE_DEG, rotatedAspect } from "@/lib/client/camera-rotation";
 import { cn } from "@/lib/utils";
 
 // Capture path A: the same client as /wear, with one video on the page, labels
@@ -20,7 +21,7 @@ import { cn } from "@/lib/utils";
 export function SimulatorView() {
   const client = useWearerClient({ turnMode: "hold", autoResumeOnReconnect: true });
   const { camera, recorder, hud, voice, perception, live, capturing } = client;
-  const aspect = useVideoAspect(client.video);
+  const aspect = rotatedAspect(useVideoAspect(client.video), CAMERA_ROTATE_DEG);
   const [question, setQuestion] = useState("");
   // Ticks the "faces last seen Ns ago" debug line below.
   const [now, setNow] = useState(() => Date.now());
@@ -85,7 +86,12 @@ export function SimulatorView() {
       )}
 
       <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: aspect }}>
-        <LiveVideo stream={camera.stream} onElement={client.setVideo} className="absolute inset-0 size-full object-contain" />
+        <LiveVideo
+          stream={camera.stream}
+          onElement={client.setVideo}
+          rotateDeg={CAMERA_ROTATE_DEG}
+          className="absolute inset-0 size-full"
+        />
         <ItemLabels detections={perception.detections} />
         <FaceLabels faces={perception.faces} />
         <NoticeStack notices={client.notices} onDismiss={client.dismissNotice} className="absolute top-3 right-3 z-10 w-72 max-w-[80%]" />
