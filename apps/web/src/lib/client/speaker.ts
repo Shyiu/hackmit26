@@ -193,10 +193,11 @@ export function speak(text: string, rate = 0.9): Speech {
     // onstart never fired: nothing is speaking, so report failure and let the
     // caller move on instead of blocking the wearer pipeline forever.
     startTimer = window.setTimeout(() => {
+      const outcome: SpeechOutcome = cancelled ? "cancelled" : "failed";
       cancelled = true;
       synth.cancel();
       resolveStarted(null);
-      resolve("failed");
+      resolve(outcome);
     }, SPEECH_START_TIMEOUT_MS);
     utterance.onstart = () => {
       window.clearTimeout(startTimer);
