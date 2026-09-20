@@ -88,18 +88,17 @@ export async function principalFromSession(
 
 export async function principalFromRequest(
   request: Request,
-  sessionCookie: string | undefined,
+  cookies: { session: string | undefined; device: string | undefined },
 ): Promise<Principal | null> {
   const authorization = request.headers.get("authorization");
   if (authorization?.startsWith("Bearer ")) {
     return principalFromDeviceToken(authorization.slice("Bearer ".length));
   }
-  const deviceCookie = request.headers.get("cookie")?.match(new RegExp(`(?:^|;\\s*)${DEVICE_COOKIE}=([^;]+)`))?.[1];
-  if (deviceCookie) {
-    const principal = await principalFromDeviceToken(decodeURIComponent(deviceCookie));
+  if (cookies.device) {
+    const principal = await principalFromDeviceToken(cookies.device);
     if (principal) return principal;
   }
-  return principalFromSession(sessionCookie, request.headers.get("x-patient-id"));
+  return principalFromSession(cookies.session, request.headers.get("x-patient-id"));
 }
 
 export async function principalFromDeviceToken(token: string): Promise<Principal | null> {

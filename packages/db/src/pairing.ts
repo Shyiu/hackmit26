@@ -145,9 +145,6 @@ export type RedeemCaregiverCodeResult =
 /**
  * Compares a guess against every live code before claiming a matching one.
  * Wrong guesses burn all outstanding codes after the maximum number of tries.
- * Mirrors the device-pairing redeem shape exactly (packages/db/src/pairing.ts
- * on origin/devin/1789876293-device-pairing), operating on caregiverPairingCodes
- * instead of pairingCodes, and setting redeemedBy instead of a deviceId.
  */
 export async function redeemCaregiverPairingCode(
   db: Db,
