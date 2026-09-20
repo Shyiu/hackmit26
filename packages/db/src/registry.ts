@@ -14,6 +14,7 @@ import {
   caregiverPairingCodeDocSchema,
   deviceDocSchema,
   patientDocSchema,
+  pairingCodeDocSchema,
 } from "./schema/tenancy";
 
 type Leaf = string | number | boolean | null | undefined | Date | ObjectId;
@@ -178,6 +179,19 @@ export const collections = {
         name: "patient_codes",
         key: { patientId: 1, createdAt: -1 },
         purpose: "a wearer's live codes, newest first",
+      },
+    ],
+  }),
+
+  pairingCodes: defineCollection({
+    name: "pairingCodes",
+    schema: pairingCodeDocSchema,
+    writers: ["web"],
+    indexes: [
+      {
+        name: "patient_codes",
+        key: { patientId: 1, createdAt: -1 },
+        purpose: "a wearer's live device codes, newest first",
       },
     ],
   }),
@@ -348,7 +362,7 @@ export const collections = {
   people: defineCollection({
     name: "people",
     schema: personDocSchema,
-    writers: ["perception"],
+    writers: ["web", "perception"],
     indexes: [
       {
         name: "patient_people_by_name",

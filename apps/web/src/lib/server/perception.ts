@@ -4,7 +4,15 @@ import {
   reloadClassesResponseSchema,
   type ReloadClassesRequest,
 } from "@memory-glasses/shared";
-import type { PatientId } from "@memory-glasses/db";
+import {
+  ObjectId,
+  type FrameObservationDoc,
+  type PatientId,
+  type PersonId,
+  type PublicPerson,
+  type TenantRepos,
+} from "@memory-glasses/db";
+import { z } from "zod";
 import { HttpError } from "./api";
 import { mintDeviceToken } from "./auth";
 import { optionalEnv } from "./env";
@@ -85,52 +93,64 @@ export type EnrolledPerson = {
   lastMatchConfidence: number | null;
 };
 
-type PersonDoc = {
-  _id: string;
-  name: string;
-  relation: string | null;
-  referenceImageKeys: string[];
-  embeddingModel: string;
-  createdAt: string;
-};
-type FrameDoc = { capturedAt: string; faces: { personId: string | null; matchConfidence: number | null }[] };
-
-export function personView(doc: PersonDoc, frames: FrameDoc[] = []): EnrolledPerson {
+export function personView(doc: PublicPerson, frames: FrameObservationDoc[] = []): EnrolledPerson {
   // Frames come newest first.
-  const seen = frames.find((frame) => frame.faces.some((face) => face.personId === doc._id));
-  const face = seen?.faces.find((item) => item.personId === doc._id);
+  const seen = frames.find((frame) => frame.faces.some((face) => face.personId?.equals(doc._id)));
+  const face = seen?.faces.find((item) => item.personId?.equals(doc._id));
   return {
-    id: doc._id,
+    id: doc._id.toHexString(),
     name: doc.name,
     relation: doc.relation,
     photos: doc.referenceImageKeys.length,
     embeddingModel: doc.embeddingModel,
-    createdAt: doc.createdAt,
-    lastSeenAt: seen?.capturedAt ?? null,
+    createdAt: doc.createdAt.toISOString(),
+    lastSeenAt: seen?.capturedAt.toISOString() ?? null,
     lastMatchConfidence: face?.matchConfidence ?? null,
   };
 }
 
 export type LastSeenPerson = { name: string; relation: string | null; seenAt: string };
 
+// Matches perception's `person_recall_window_s` default: how far back "who is this" looks.
+const PERSON_RECALL_WINDOW_MS = 10 * 60 * 1000;
+
 /** The most recently recognized enrolled face, for "who is this" -- null when nobody's
- * been matched within the perception service's recall window (or ever). */
-export async function getLastSeenPerson(patientId: PatientId): Promise<LastSeenPerson | null> {
-  try {
-    const response = await perceptionFetch(patientId, "/people/last-seen");
-    return (await response.json()) as LastSeenPerson;
-  } catch (error) {
-    if (error instanceof HttpError && error.status === 404) return null;
-    throw error;
-  }
+ * been matched within the recall window (or ever). Read from Mongo, which perception
+ * writes to, so it works wherever the web app runs. */
+export async function getLastSeenPerson(tenant: TenantRepos): Promise<LastSeenPerson | null> {
+  const person = await tenant.people.latestRecognized(PERSON_RECALL_WINDOW_MS);
+  return person && { name: person.name, relation: person.relation, seenAt: person.seenAt.toISOString() };
 }
 
-export async function listPeople(patientId: PatientId): Promise<EnrolledPerson[]> {
-  const [people, frames] = await Promise.all([
-    perceptionFetch(patientId, "/people").then((response) => response.json() as Promise<PersonDoc[]>),
-    perceptionFetch(patientId, "/frame-observations?limit=100").then(
-      (response) => response.json() as Promise<FrameDoc[]>,
-    ),
-  ]);
+export async function listPeople(tenant: TenantRepos): Promise<EnrolledPerson[]> {
+  const [people, frames] = await Promise.all([tenant.people.list(), tenant.people.recentFramesWithFaces(100)]);
   return people.map((person) => personView(person, frames));
 }
+
+/** The perception service's answer to an enroll or add-photos call, as stored in `people`. */
+export function personFromUpstream(body: unknown): PublicPerson {
+  const parsed = upstreamPersonSchema.safeParse(body);
+  if (!parsed.success) throw new HttpError(502, "The perception service answered with an unexpected shape");
+  const { _id, createdAt, consentedAt, expiresAt, ...rest } = parsed.data;
+  return {
+    ...rest,
+    _id: new ObjectId(_id) as PersonId,
+    patientId: new ObjectId(parsed.data.patientId) as PatientId,
+    createdAt: new Date(createdAt),
+    consentedAt: new Date(consentedAt),
+    expiresAt: new Date(expiresAt),
+  };
+}
+
+const upstreamPersonSchema = z.object({
+  _id: z.string().regex(/^[0-9a-f]{24}$/),
+  patientId: z.string().regex(/^[0-9a-f]{24}$/),
+  name: z.string(),
+  relation: z.string().nullable(),
+  referenceImageKeys: z.array(z.string()),
+  embeddingModel: z.string(),
+  consentedAt: z.string(),
+  consentedBy: z.string(),
+  createdAt: z.string(),
+  expiresAt: z.string(),
+});

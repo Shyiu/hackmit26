@@ -1,7 +1,8 @@
 import "server-only";
 import type { CaregiverDoc } from "@memory-glasses/db";
-import type { NextResponse } from "next/server";
-import { PATIENT_COOKIE, createSessionToken, SESSION_COOKIE, SESSION_TTL_SECONDS } from "./auth";
+import { NextResponse } from "next/server";
+import { createSessionToken, DEVICE_TOKEN_TTL_SECONDS, SESSION_COOKIE, SESSION_TTL_SECONDS } from "./auth";
+import { DEVICE_COOKIE, PATIENT_COOKIE } from "../session-cookie";
 
 /** Signs the caregiver in on this browser. */
 export async function setSessionCookie(response: NextResponse, caregiver: CaregiverDoc) {
@@ -13,7 +14,6 @@ export async function setSessionCookie(response: NextResponse, caregiver: Caregi
     maxAge: SESSION_TTL_SECONDS,
   });
 }
-
 export function setPatientCookie(response: NextResponse, patientId: string) {
   response.cookies.set(PATIENT_COOKIE, patientId, {
     httpOnly: true,
@@ -21,5 +21,25 @@ export function setPatientCookie(response: NextResponse, patientId: string) {
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
+  });
+}
+
+export function setDeviceCookie(response: NextResponse, token: string) {
+  response.cookies.set(DEVICE_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: DEVICE_TOKEN_TTL_SECONDS,
+  });
+}
+
+export function clearDeviceCookie(response: NextResponse) {
+  response.cookies.set(DEVICE_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
   });
 }

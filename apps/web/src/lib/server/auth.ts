@@ -24,8 +24,9 @@ import { requireEnv } from "./env";
 // on the phone, and a bearer device token for native clients later. Either
 // way the wearer comes from a signed credential, never from a request body.
 
-export { PATIENT_COOKIE, SESSION_COOKIE } from "../session-cookie";
+export { DEVICE_COOKIE, PATIENT_COOKIE, SESSION_COOKIE } from "../session-cookie";
 export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
+export const DEVICE_TOKEN_TTL_SECONDS = 180 * 24 * 60 * 60;
 
 const objectIdHex = z.string().regex(/^[0-9a-f]{24}$/);
 
@@ -106,21 +107,28 @@ export async function sessionPatientIds(
 
 export async function principalFromRequest(
   request: Request,
-  sessionCookie: string | undefined,
-  preferredPatient?: string | null,
+  cookies: { session: string | undefined; device: string | undefined; patient?: string | undefined },
 ): Promise<Principal | null> {
   const authorization = request.headers.get("authorization");
   if (authorization?.startsWith("Bearer ")) {
-    const verified = await verifyDeviceToken(authorization.slice("Bearer ".length), requireEnv("DEVICE_TOKEN_SECRET"));
-    // API tokens must name a device, or revoking it couldn't cut them off.
-    if (verified.kind !== "valid" || verified.claims.scope !== "api" || !verified.claims.sub) return null;
-    const deviceId = trustedId<DeviceId>(verified.claims.sub);
-    const patientId = trustedId<PatientId>(verified.claims.pid);
-    const device = await collection(getDb(), "devices").findOne({ _id: deviceId, patientId, revokedAt: null });
-    if (!device || device.tokenVersion !== verified.claims.tv) return null;
-    return { kind: "device", deviceId, patientId };
+    return principalFromDeviceToken(authorization.slice("Bearer ".length));
   }
-  return principalFromSession(sessionCookie, request.headers.get("x-patient-id"), preferredPatient);
+  if (cookies.device) {
+    const principal = await principalFromDeviceToken(cookies.device);
+    if (principal) return principal;
+  }
+  return principalFromSession(cookies.session, request.headers.get("x-patient-id"), cookies.patient);
+}
+
+export async function principalFromDeviceToken(token: string): Promise<Principal | null> {
+  const verified = await verifyDeviceToken(token, requireEnv("DEVICE_TOKEN_SECRET"));
+  // API tokens must name a device, or revoking it couldn't cut them off.
+  if (verified.kind !== "valid" || verified.claims.scope !== "api" || !verified.claims.sub) return null;
+  const deviceId = trustedId<DeviceId>(verified.claims.sub);
+  const patientId = trustedId<PatientId>(verified.claims.pid);
+  const device = await collection(getDb(), "devices").findOne({ _id: deviceId, patientId, revokedAt: null });
+  if (!device || device.tokenVersion !== verified.claims.tv) return null;
+  return { kind: "device", deviceId, patientId };
 }
 
 export type MintedToken = { token: string; expiresAt: string };

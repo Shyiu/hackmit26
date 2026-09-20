@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "958afd09a60f31b46fc0f38da13363e5101f8f5f90e67245e19bf6c1442093f1",
+  "fingerprint": "f4398ad6cc7eced5ff9694ec36895067d2fd2b8b8dad1dc0f0990df1467b9e0a",
   "collections": {
     "patients": {
       "validator": {
@@ -347,6 +347,98 @@
             "expiresAt",
             "redeemedAt",
             "redeemedBy",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "patient_codes",
+          "key": {
+            "patientId": 1,
+            "createdAt": -1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "pairingCodes": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "codeHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "attempts": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            },
+            "redeemedAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "redeemedBy": {
+              "anyOf": [
+                {
+                  "bsonType": "objectId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "headset",
+                "simulator",
+                "glasses"
+              ]
+            },
+            "createdAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "codeHash",
+            "attempts",
+            "expiresAt",
+            "redeemedAt",
+            "redeemedBy",
+            "kind",
             "createdAt"
           ],
           "additionalProperties": false

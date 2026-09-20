@@ -14,7 +14,7 @@ import {
 } from "@memory-glasses/db";
 import { NextResponse, type NextRequest } from "next/server";
 import type { z } from "zod";
-import { PATIENT_COOKIE, principalFromRequest, SESSION_COOKIE, type Principal } from "./auth";
+import { DEVICE_COOKIE, PATIENT_COOKIE, principalFromRequest, SESSION_COOKIE, type Principal } from "./auth";
 import { getDb } from "./db";
 import { MissingEnvError } from "./env";
 
@@ -122,14 +122,18 @@ export function withTenant<TParams extends Record<string, string> = Record<strin
     try {
       const principal = await principalFromRequest(
         request,
-        request.cookies.get(SESSION_COOKIE)?.value,
-        request.cookies.get(PATIENT_COOKIE)?.value,
+        {
+          session: request.cookies.get(SESSION_COOKIE)?.value,
+          device: request.cookies.get(DEVICE_COOKIE)?.value,
+          patient: request.cookies.get(PATIENT_COOKIE)?.value,
+        },
       );
       if (!principal) return problem(401, "Sign in first");
       if (access !== "any" && principal.kind !== access) return problem(403, `Only a ${access} can do this`);
       const settings = await settingsFor(principal.patientId);
       if (!settings) return problem(403, "That wearer no longer exists");
       const tenant = tenantRepos(getDb(), principal.patientId, { retentionDays: settings.retentionDays });
+      if (principal.kind === "device") void tenant.devices.touch(principal.deviceId).catch(() => {});
       return await handler({ request, params: await context.params, principal, tenant, settings });
     } catch (error) {
       return errorResponse(error);

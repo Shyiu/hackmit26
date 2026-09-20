@@ -425,7 +425,13 @@ class SafetyStore:
         """
         cutoff = to_ms(now - timedelta(seconds=within_s))
         frame = await self._frames.find_one(
-            {"patientId": patient_id, "faces.personId": {"$ne": None}, "capturedAt": {"$gte": cutoff}},
+            # `$ne` on an array field only matches when no element is null, so a frame with
+            # one stranger and one match would be skipped; `$elemMatch` asks for any match.
+            {
+                "patientId": patient_id,
+                "faces": {"$elemMatch": {"personId": {"$ne": None}}},
+                "capturedAt": {"$gte": cutoff},
+            },
             sort=[("capturedAt", -1)],
         )
         if frame is None:
