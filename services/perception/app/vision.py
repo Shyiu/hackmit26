@@ -27,7 +27,9 @@ SYSTEM_PROMPT = (
     "up to five other objects visible near the item. The sentence field is not a standalone sentence: "
     "it fills the blank in 'I last saw your <item> ___', so write only the location fragment, starting "
     "with a preposition, with no leading capital letter and no trailing period, for example 'on the "
-    "kitchen counter, next to the coffee maker'. Never restate what the item is or its color."
+    "kitchen counter, next to the coffee maker'. Never restate what the item is or its color. Set "
+    "item_visible to false if the object inside the box is clearly not the named item or you cannot "
+    "see any such item there; in that case still fill the other fields with 'unknown'."
 )
 
 
@@ -48,20 +50,29 @@ def _response_schema() -> dict:
                 },
                 "sentence": {"type": "string"},
                 "nearby_objects": {"type": "array", "items": {"type": "string"}},
+                "item_visible": {"type": "boolean"},
             },
-            "required": ["room", "surface", "relation", "state", "sentence", "nearby_objects"],
+            "required": [
+                "room",
+                "surface",
+                "relation",
+                "state",
+                "sentence",
+                "nearby_objects",
+                "item_visible",
+            ],
         },
     }
 
 
 class DescriptionVLM(Protocol):
-    def describe(self, image: bytes, bbox: BBox) -> DescriptionResult: ...
+    def describe(self, image: bytes, bbox: BBox, label: str | None) -> DescriptionResult: ...
 
 
 class MockDescriptionVLM:
     """No OpenAI key configured. An honest "I don't know" beats a made-up room."""
 
-    def describe(self, image: bytes, bbox: BBox) -> DescriptionResult:
+    def describe(self, image: bytes, bbox: BBox, label: str | None) -> DescriptionResult:
         return DescriptionResult(state="unknown", sentence="I saw it, but I could not tell where it was.")
 
 
@@ -73,13 +84,14 @@ class OpenAIDescriptionVLM:
         self.model = settings.vlm_model
         self.client = client or httpx.Client()
 
-    def describe(self, image: bytes, bbox: BBox) -> DescriptionResult:
+    def describe(self, image: bytes, bbox: BBox, label: str | None) -> DescriptionResult:
         x, y, w, h = bbox
+        item_text = f"The item should be: {label}. " if label else ""
         content = [
             {
                 "type": "text",
                 "text": (
-                    "The item is the object inside the normalized bounding box "
+                    f"{item_text}The item is the object inside the normalized bounding box "
                     f"x={x:.3f}, y={y:.3f}, w={w:.3f}, h={h:.3f} (origin top-left, "
                     "fractions of the frame's width and height)."
                 ),
@@ -112,6 +124,8 @@ class OpenAIDescriptionVLM:
         if isinstance(raw, list):
             raw = "".join(part.get("text", "") for part in raw)
         payload = json.loads(raw)
+        if not payload["item_visible"]:
+            return DescriptionResult(state="unknown", sentence="not confirmed in the frame")
         return DescriptionResult(
             room=payload.get("room"),
             surface=payload.get("surface"),

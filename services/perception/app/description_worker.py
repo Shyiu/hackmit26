@@ -58,8 +58,9 @@ class DescriptionWorker:
         if job is None:
             return False
         try:
+            label = await self._store.item_name(job.patient_id, job.item_id)
             image = await asyncio.to_thread(self._frame_store.get, job.keyframe_key)
-            result = await asyncio.to_thread(self._vlm.describe, image, job.bbox)
+            result = await asyncio.to_thread(self._vlm.describe, image, job.bbox, label)
         except Exception as error:
             outcome = await self._store.fail_job(job, self._worker_id, str(error), self._clock())
             log.warning("Description job %s failed: %s (%s)", job.id, error, outcome)

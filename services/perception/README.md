@@ -195,3 +195,7 @@ Late and replayed writes can't undo newer evidence:
 - A description reaches the item only while the item still shows the same version, sighting and keyframe revision. Otherwise it only enriches the old sighting, and the item's last resting spot if that is still the described keyframe.
 - Snapshot writes leave the item's `updatedAt` alone. It marks caregiver edits, and the web app refuses a save when it moved.
 - A worker finishes only the attempt it claimed. The job's `attempts` count is the fencing token, and `runAfter` doubles as the lease expiry.
+
+## Description worker
+
+The background vision call also verifies the item, and records a box it cannot verify as unknown.

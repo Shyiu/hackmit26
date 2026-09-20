@@ -21,10 +21,10 @@ class FakeVLM:
     def __init__(self, result: DescriptionResult | None = None, error: Exception | None = None) -> None:
         self.result = result or DescriptionResult(room="kitchen", state="resting", sentence="on the counter")
         self.error = error
-        self.calls: list[tuple[bytes, BBox]] = []
+        self.calls: list[tuple[bytes, BBox, str | None]] = []
 
-    def describe(self, image: bytes, bbox: BBox) -> DescriptionResult:
-        self.calls.append((image, bbox))
+    def describe(self, image: bytes, bbox: BBox, label: str | None) -> DescriptionResult:
+        self.calls.append((image, bbox, label))
         if self.error:
             raise self.error
         return self.result
@@ -69,7 +69,7 @@ async def test_process_one_completes_a_queued_job(db: Database, job_scene):
     worker = DescriptionWorker(store, frame_store, vlm, "worker-1", clock=lambda: T0)
 
     assert await worker.process_one() is True
-    assert vlm.calls == [(b"\xff\xd8\xff fake jpeg", BBOX)]
+    assert vlm.calls == [(b"\xff\xd8\xff fake jpeg", BBOX, "keys")]
 
     sighting = await db["sightings"].find_one({"_id": sighting_id})
     assert sighting["descriptionStatus"] == "ready"
