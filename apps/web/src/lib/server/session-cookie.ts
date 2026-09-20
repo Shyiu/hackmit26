@@ -4,8 +4,9 @@ import { NextResponse } from "next/server";
 import { createSessionToken, DEVICE_TOKEN_TTL_SECONDS, SESSION_COOKIE, SESSION_TTL_SECONDS } from "./auth";
 import { DEVICE_COOKIE, PATIENT_COOKIE } from "../session-cookie";
 
-/** Signs the caregiver in on this browser. */
+/** Signs the caregiver in on this browser, and off any wearer account it held. */
 export async function setSessionCookie(response: NextResponse, caregiver: CaregiverDoc) {
+  clearDeviceCookie(response);
   response.cookies.set(SESSION_COOKIE, await createSessionToken(caregiver), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -35,7 +36,17 @@ export function setDeviceCookie(response: NextResponse, token: string) {
 }
 
 export function clearDeviceCookie(response: NextResponse) {
-  response.cookies.set(DEVICE_COOKIE, "", {
+  expire(response, DEVICE_COOKIE);
+}
+
+/** One browser holds one account: signing a wearer in drops any caregiver session. */
+export function clearSessionCookies(response: NextResponse) {
+  expire(response, SESSION_COOKIE);
+  expire(response, PATIENT_COOKIE);
+}
+
+function expire(response: NextResponse, name: string) {
+  response.cookies.set(name, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

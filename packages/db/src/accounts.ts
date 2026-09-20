@@ -1,6 +1,6 @@
 import type { Db } from "mongodb";
 import { parseDocument } from "./errors";
-import { newId, type CaregiverId, type PatientId } from "./ids";
+import { newId, type CaregiverId, type DeviceId, type PatientId } from "./ids";
 import { collection } from "./registry";
 import {
   caregiverDocSchema,
@@ -9,6 +9,7 @@ import {
   type CaregiverDoc,
   type PatientDoc,
   type PatientSettings,
+  type WearerAccount,
 } from "./schema/tenancy";
 
 // Cross-tenant operations: logging in, and creating wearers. Everything a
@@ -16,6 +17,28 @@ import {
 
 export function findCaregiverByEmail(db: Db, email: string): Promise<CaregiverDoc | null> {
   return collection(db, "caregivers").findOne({ email: email.trim().toLowerCase() });
+}
+
+/** The wearer behind their own sign-in. Wearers a caregiver created have no account. */
+export function findPatientByAccountEmail(db: Db, email: string): Promise<PatientDoc | null> {
+  return collection(db, "patients").findOne({ "account.email": email.trim().toLowerCase() });
+}
+
+export function findPatientById(db: Db, id: PatientId): Promise<PatientDoc | null> {
+  return collection(db, "patients").findOne({ _id: id });
+}
+
+/** The device the wearer's account signs in on. Their old one stops being them. */
+export async function setWearerAccountDevice(db: Db, id: PatientId, deviceId: DeviceId): Promise<void> {
+  await collection(db, "patients").updateOne(
+    { _id: id, account: { $exists: true } },
+    { $set: { "account.deviceId": deviceId, updatedAt: new Date() } },
+  );
+}
+
+/** Whether any caregiver has joined this wearer yet, which is what a pairing code buys. */
+export async function patientHasCaregiver(db: Db, patientId: PatientId): Promise<boolean> {
+  return (await collection(db, "caregivers").countDocuments({ patientIds: patientId }, { limit: 1 })) > 0;
 }
 
 export function listPatientsByIds(
@@ -34,12 +57,21 @@ export async function recordLogin(db: Db, id: CaregiverId, at = new Date()): Pro
 
 export async function createPatient(
   db: Db,
-  input: { displayName: string; settings?: Partial<PatientSettings>; id?: PatientId },
+  input: {
+    displayName: string;
+    /** Set only when the wearer signs themselves up and needs to sign back in. */
+    account?: Omit<WearerAccount, "deviceId">;
+    settings?: Partial<PatientSettings>;
+    id?: PatientId;
+  },
   now = new Date(),
 ): Promise<PatientDoc> {
   const doc = parseDocument(patientDocSchema, {
     _id: input.id ?? newId<PatientId>(),
     displayName: input.displayName,
+    ...(input.account && {
+      account: { ...input.account, email: input.account.email.trim().toLowerCase(), deviceId: null },
+    }),
     settings: { ...DEFAULT_PATIENT_SETTINGS, ...input.settings },
     configVersion: 0,
     createdAt: now,
