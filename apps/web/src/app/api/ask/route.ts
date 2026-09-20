@@ -1,7 +1,8 @@
 import { askRequestSchema } from "@memory-glasses/shared";
 import { waitUntil } from "@vercel/functions";
-import { composeAnswer } from "@/lib/server/answer";
+import { composeAnswer, composeWhoIsThisAnswer, isWhoIsThisQuestion } from "@/lib/server/answer";
 import { readBody, withTenant } from "@/lib/server/api";
+import { getLastSeenPerson } from "@/lib/server/perception";
 import { pcmHeaders, ttsProvider } from "@/lib/server/tts";
 import { timedStream } from "@/lib/server/tts/timed-stream";
 import { interactionView } from "@/lib/server/views";
@@ -32,9 +33,12 @@ export const POST = withTenant("any", async ({ request, principal, tenant, setti
 
   try {
     const lookupStarted = performance.now();
-    const resolution = await tenant.items.resolve(body.transcript);
+    // "Who is this" is about the most recently recognized face, not an item -- skip
+    // the item-lookup index entirely rather than resolving it and discarding the result.
+    const answer = isWhoIsThisQuestion(body.transcript)
+      ? composeWhoIsThisAnswer(await getLastSeenPerson(principal.patientId), new Date())
+      : composeAnswer(await tenant.items.resolve(body.transcript), settings, new Date());
     const lookupMs = performance.now() - lookupStarted;
-    const answer = composeAnswer(resolution, settings, new Date());
     const outcome = { path: "fast" as const, itemId: answer.itemId, answerTemplate: answer.template, answerText: answer.text };
     headers.set("Server-Timing", `db;dur=${round(lookupMs)}`);
 

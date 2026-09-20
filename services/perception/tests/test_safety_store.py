@@ -97,6 +97,40 @@ async def test_events_merge_and_are_tenant_scoped(safety_store, db):
 
 
 @pytest.mark.asyncio
+async def test_person_recognized_cooldown_persists_in_mongo(safety_store, db):
+    from conftest import Seed
+
+    patient_id = await Seed(db).patient()
+    person_id = ObjectId()
+    first = datetime.now(UTC)
+    assert await safety_store.was_recently_announced(patient_id, person_id, first, 120.0) is False
+    await safety_store.queue_person_recognized_notification(patient_id, person_id, "Alex", "son")
+    stored = await db["notifications"].find_one({"patientId": patient_id, "personId": person_id})
+    assert stored["kind"] == "person_recognized"
+    # Still within the cooldown window.
+    assert (
+        await safety_store.was_recently_announced(
+            patient_id, person_id, first + timedelta(seconds=30), 120.0
+        )
+        is True
+    )
+    # A fresh SafetyStore instance sees the same cooldown -- it's in Mongo, not process memory.
+    reloaded = SafetyStore(db, ObservationStore(db), settings())
+    assert (
+        await reloaded.was_recently_announced(patient_id, person_id, first + timedelta(seconds=30), 120.0)
+        is True
+    )
+    # Past the window, and for a different person, it's clear again.
+    assert (
+        await safety_store.was_recently_announced(
+            patient_id, person_id, first + timedelta(seconds=121), 120.0
+        )
+        is False
+    )
+    assert await safety_store.was_recently_announced(patient_id, ObjectId(), first, 120.0) is False
+
+
+@pytest.mark.asyncio
 async def test_gallery_is_cached_until_the_wearers_people_change(safety_store, db):
     from conftest import Seed
 

@@ -31,6 +31,13 @@ export {
 export { sweepExpired, type SweepOptions, type SweepReport } from "./retention";
 export { TenantCollection } from "./tenant-collection";
 export { createCaregiver, createPatient, findCaregiverByEmail, recordLogin } from "./accounts";
+export {
+  addPatientToCaregiver,
+  createCaregiverPairingCode,
+  redeemCaregiverPairingCode,
+  type AttachPatientResult,
+  type RedeemCaregiverCodeResult,
+} from "./pairing";
 export { tenantRepos, type TenantOptions, type TenantRepos } from "./repos";
 export type { ItemPatch, ItemResolution, NewItem } from "./repos/items";
 export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/interactions";
