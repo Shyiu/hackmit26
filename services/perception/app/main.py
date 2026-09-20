@@ -18,16 +18,19 @@ from typing import Any, Literal
 from bson import ObjectId
 from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from pymongo import AsyncMongoClient
 from pymongo.errors import PyMongoError
 from starlette.requests import HTTPConnection
 
 from .config import Settings
 from .description_worker import DescriptionWorker
-from .detector import Detector, Prompt, Prompts, build_detector
+from .detector import Detector, Prompts, build_detector
+from .prompts import PromptCache
 from .protocol import (
     CaptureCommand,
+    ConfigClassesRequest,
+    ConfigClassesResponse,
     Face,
     FaceCandidate,
     Frame,
@@ -44,10 +47,11 @@ from .protocol import (
 from .safety.adapters.registry import Adapters, build_adapters
 from .safety.images import LocalFrameStore
 from .safety.models import FaceObservation
+from .safety.routes import _claims
 from .safety.routes import router as safety_router
 from .safety.service import SafetyService
 from .safety.store import SafetyStore
-from .store import CaptureSource, ItemPrompts, ObservationStore, UnknownPatientError
+from .store import CaptureSource, ObservationStore, UnknownPatientError
 from .tokens import DeviceTokenClaims, InvalidTokenError, Scope, verify_device_token
 from .tracker import SightingTracker, SightingWriter, TrackerConfig
 from .vision import build_description_vlm
@@ -72,6 +76,7 @@ class Services:
     store: ObservationStore
     detector: Detector
     frame_store: LocalFrameStore
+    prompts: PromptCache
     token_clock: Callable[[], float]
     safety: SafetyService | None = None
 
@@ -102,6 +107,7 @@ def create_app(
         db = client[resolved.mongodb_db]
         store = ObservationStore(db)
         frame_store = LocalFrameStore(resolved.frame_image_dir)
+        prompts = PromptCache(store, resolved.prompt_refresh_seconds)
         safety = None
         if resolved.safety_enabled:
             safety = SafetyService(
@@ -120,7 +126,7 @@ def create_app(
                 },
             )
         app.state.services = Services(
-            resolved, store, detector or build_detector(resolved), frame_store, token_clock, safety
+            resolved, store, detector or build_detector(resolved), frame_store, prompts, token_clock, safety
         )
         description_worker = DescriptionWorker(
             store,
@@ -181,6 +187,7 @@ async def health(request: Request) -> JSONResponse:
         "detector": services.detector.name,
         "db": db,
         "queueDepth": queue_depth,
+        "classes": services.prompts.versions(),
         "safety": safety_names,
     }
     # 503 lets a tunnel or load balancer health check see that the database is gone.
@@ -188,10 +195,31 @@ async def health(request: Request) -> JSONResponse:
 
 
 @router.post("/config/classes")
-async def reload_classes() -> JSONResponse:
-    # M1: reload the detector's prompt list after a caregiver edits items. It
-    # needs a credential from the web app before it can do anything.
-    return JSONResponse({"error": "not implemented"}, status_code=501)
+async def reload_classes(request: Request) -> JSONResponse:
+    claims = _claims(request, "api")
+    try:
+        body = await request.body()
+        parsed = ConfigClassesRequest.model_validate_json(body) if body else ConfigClassesRequest()
+    except ValidationError:
+        raise HTTPException(422, "Invalid request body") from None
+    services = _services(request)
+    patient_id = ObjectId(claims.pid)
+    cached = await services.prompts.reload(patient_id, parsed.version)
+    classes: list[str] = []
+    seen: set[str] = set()
+    for prompt in cached.prompts:
+        if prompt.text not in seen:
+            seen.add(prompt.text)
+            classes.append(prompt.text)
+    log.info(
+        "reloaded %d classes for wearer %s (version %d)",
+        len(classes),
+        patient_id,
+        cached.version,
+    )
+    return JSONResponse(
+        ConfigClassesResponse(patientId=str(patient_id), classes=classes, version=cached.version).model_dump()
+    )
 
 
 @router.websocket("/ws/debug")
@@ -223,7 +251,7 @@ async def frames_socket(ws: WebSocket) -> None:
             await _refuse(ws, "Device is unknown or was revoked")
             return
         session_id = await services.store.open_capture_session(patient_id, device_id, source)
-        prompts = await services.store.active_items(patient_id)
+        prompts = (await services.prompts.get(patient_id)).prompts
     except UnknownPatientError:
         await _refuse(ws, "Unknown wearer")
         return
@@ -241,7 +269,7 @@ async def frames_socket(ws: WebSocket) -> None:
         source=source,
         frame_store=services.frame_store,
     )
-    connection.set_prompts(prompts)
+    connection.prompts = prompts
     await connection.run()
 
 
@@ -311,6 +339,7 @@ class FrameConnection:
         self.detector = services.detector
         self.settings = services.settings
         self.services_safety = services.safety
+        self.services_prompts = services.prompts
         self.patient_id = patient_id
         self.device_id = device_id
         self.session_id = session_id
@@ -325,16 +354,9 @@ class FrameConnection:
         self.faces_in_view = False
         self.send_lock = asyncio.Lock()
         self.prompts: Prompts = ()
-        self.prompts_loaded_at = time.monotonic()
         self.tracker = SightingTracker(TrackerConfig.from_settings(services.settings))
         # None until the socket has a device and source to write sightings for.
         self.writer: SightingWriter | None = None
-
-    def set_prompts(self, items: list[ItemPrompts]) -> None:
-        self.prompts = tuple(
-            Prompt(str(item.item_id), item.name, text) for item in items for text in item.prompts
-        )
-        self.prompts_loaded_at = time.monotonic()
 
     async def run(self) -> None:
         worker = asyncio.create_task(self._work())
@@ -534,9 +556,7 @@ class FrameConnection:
         )
 
     async def _refresh_prompts(self) -> None:
-        # A caregiver edit to the item list reaches the detector within this long.
-        if time.monotonic() - self.prompts_loaded_at >= self.settings.prompt_refresh_seconds:
-            self.set_prompts(await self.store.active_items(self.patient_id))
+        self.prompts = (await self.services_prompts.get(self.patient_id)).prompts
 
     async def _drop_pending(self) -> None:
         dropped, self.pending = self.pending, None

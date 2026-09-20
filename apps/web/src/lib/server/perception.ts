@@ -1,5 +1,9 @@
 import "server-only";
 
+import {
+  reloadClassesResponseSchema,
+  type ReloadClassesRequest,
+} from "@memory-glasses/shared";
 import type { PatientId } from "@memory-glasses/db";
 import { HttpError } from "./api";
 import { mintDeviceToken } from "./auth";
@@ -45,6 +49,28 @@ export async function perceptionFetch(patientId: PatientId, path: string, init: 
     );
   }
   return response;
+}
+
+// Tells the perception service a caregiver changed this wearer's items. Fire-and-forget:
+// an item edit must succeed even when perception is down, so failures are only logged.
+export function reloadClasses(patientId: PatientId): void {
+  void perceptionFetch(patientId, "/config/classes", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({} satisfies ReloadClassesRequest),
+    signal: AbortSignal.timeout(2_000),
+  })
+    .then(async (response) => {
+      const parsed = reloadClassesResponseSchema.safeParse(await response.json());
+      if (parsed.success) {
+        console.info(
+          `perception reloaded ${parsed.data.classes.length} classes (version ${parsed.data.version})`,
+        );
+      }
+    })
+    .catch((error: unknown) => {
+      console.warn("perception class reload failed", error instanceof Error ? error.message : error);
+    });
 }
 
 export type EnrolledPerson = {
