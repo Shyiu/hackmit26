@@ -29,7 +29,12 @@ export default async function ItemsPage() {
         icon={KeyRound}
         description="Where each tracked item was last seen."
         action={
-          <Link href="/dashboard/items/new" className={buttonVariants({ size: "sm" })}>
+          // Sized to the camera-state pill next to it, including on touch, so the
+          // two chips in the header bar sit on one line.
+          <Link
+            href="/dashboard/items/new"
+            className={cn(buttonVariants({ size: "sm" }), "h-5 rounded-[0.3rem] px-1.5 pointer-coarse:h-5")}
+          >
             <Plus />
             Add item
           </Link>
