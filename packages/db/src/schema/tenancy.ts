@@ -37,7 +37,7 @@ export const patientSettingsSchema = z.strictObject({
   wakeWordEnabled: z.boolean(),
   wakeWordSensitivity: unitInterval,
   /** Off by default: a recognized face is always a silent notification; this only
-   * adds a short chime on top. Never speech -- see PLAN.md "Faces, danger, and routines". */
+   * adds a short chime on top. Never speech -- see PLAN.md "Faces and routines". */
   faceAnnounceSoundEnabled: z.boolean(),
 });
 

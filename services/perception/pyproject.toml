@@ -31,8 +31,7 @@ yoloe = [
   # it here installs it properly through uv's own resolver instead.
   "clip @ git+https://github.com/ultralytics/CLIP.git",
 ]
-# The safety pass's optional real adapters. See README "Safety pipeline".
-dfine = ["torch>=2", "transformers>=4.52"]
+# Real face recognition. See README "Safety pipeline".
 faces = ["insightface>=0.7", "onnxruntime>=1.18"]
 
 [dependency-groups]

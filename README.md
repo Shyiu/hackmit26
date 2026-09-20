@@ -46,9 +46,9 @@ their own phone or laptop.
 | | Wearer | Caregiver |
 |---|---|---|
 | Device | A phone in a chest harness, open to `/wear`, with earbuds | Any browser, signed in to `/dashboard` |
-| Sees | A dim screen with one large caption at a time | Item cards, live camera view, question log, alerts, latency |
+| Sees | A dim screen with one large caption at a time | Item cards, live camera view, question log, latency |
 | Does | Taps anywhere on the screen and asks a question | Names items and aliases, enrolls family faces, sends messages, sets the voice, pauses capture |
-| Hears | Spoken answers, caregiver messages, and reminders | A push alert with sound if the wearer is in danger or out of the approved area |
+| Hears | Spoken answers, caregiver messages, and reminders | A push alert with sound if the wearer is out of the approved area |
 
 ## Screenshots
 
@@ -77,11 +77,9 @@ their own phone or laptop.
   </tr>
   <tr>
     <td width="50%"><img src="docs/media/screenshots/people.png" alt="Faces: enrolled family members and caregivers, with when each was last seen."></td>
-    <td width="50%"><img src="docs/media/screenshots/alerts.png" alt="Alerts: danger and out-of-area events, newest first."></td>
   </tr>
   <tr>
     <td align="center"><b>Faces</b> — enroll family and caregivers from photos so the system knows who's around.</td>
-    <td align="center"><b>Alerts</b> — danger and lost-alert log; these also arrive as a push with sound.</td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/media/screenshots/latency.png" alt="Latency: P50 and P95 per stage from speech end to first audio."></td>
@@ -104,7 +102,7 @@ their own phone or laptop.
   <tr>
     <td align="center"><b><code>/wear</code></b> — the chest page. Dark, one large caption at a time, tap anywhere to ask.</td>
     <td align="center"><b>Items on a phone</b> — the caregiver's dashboard is built for phones too.</td>
-    <td align="center"><b>Dashboard home on a phone</b> — lookups this week, alerts, and what needs a look.</td>
+    <td align="center"><b>Dashboard home on a phone</b> — lookups this week and what needs a look.</td>
   </tr>
 </table>
 
@@ -184,9 +182,6 @@ network, and the Latency tab shows P50/P95 from real questions.
 - **Faces.** Caregivers enroll family members and other caregivers from a few photos. The perception
   service matches faces against that patient's own enrolled set only, never anyone else's, and never
   sends the photos to a third party.
-- **Danger alerts.** The perception service runs a conservative single-frame hazard pass (a hand near
-  a hot stove) and writes `danger_events`, which the Alerts tab lists and which push to the caregiver
-  ahead of the dashboard's normal two-second poll.
 - **Messages.** The caregiver types a short message; the wearer hears it read aloud.
 - **Privacy.** Capture starts paused and the wearer resumes it. Keyframes are the only images that
   leave the phone, retention is a per-wearer setting, and `pnpm db:sweep` deletes everything past it,
@@ -195,7 +190,7 @@ network, and the Latency tab shows P50/P95 from real questions.
   `patientId`, devices pair with a short-lived code and get their own HMAC-signed token, and
   tenant-isolation tests run on every API route.
 
-**Status.** Item tracking, the voice loop, the dashboard, faces, and hazard events are built.
+**Status.** Item tracking, the voice loop, the dashboard, and faces are built.
 `/sim` runs the same wearer client on a flat page (hold to ask, or type the question) for laptop
 development and as the demo fallback. Two
 MVP features are scoped in [`PLAN.md`](PLAN.md) but not yet built: proactive reminders (medication
@@ -208,7 +203,7 @@ last answer.
 | Piece | Stack | Job |
 |---|---|---|
 | [`apps/web`](apps/web) | Next.js 16 App Router, React 19, TypeScript, Tailwind 4, shadcn/ui, MongoDB Node driver | `/wear` chest page, `/sim` flat fallback, the caregiver dashboard, the REST API, `POST /api/ask` with streamed TTS |
-| [`services/perception`](services/perception) | Python 3.12, FastAPI, pymongo, Ultralytics YOLOE-26, optional face and hazard adapters | Frame socket, detection and tracking, sighting writes, keyframe description jobs, face enrollment and matching |
+| [`services/perception`](services/perception) | Python 3.12, FastAPI, pymongo, Ultralytics YOLOE-26, optional face adapters | Frame socket, detection and tracking, sighting writes, keyframe description jobs, face enrollment and matching |
 | [`packages/shared`](packages/shared) | zod 3 | The wire contract: API bodies, the `/ws/frames` protocol, signed tokens, fixtures shared with Python |
 | [`packages/db`](packages/db) | zod 4 | Stored-document schemas that become MongoDB validators, the collection registry, repositories, retention |
 | [`apps/ios`](apps/ios) | Capacitor 8 | A WKWebView shell that loads the deployed web app and keeps the screen on ([ADR 0004](docs/decisions/0004-ios-shell-with-capacitor.md)) |

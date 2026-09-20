@@ -4,7 +4,6 @@ export * from "./schemas/room";
 export * from "./schemas/interaction";
 export * from "./schemas/detection";
 export * from "./schemas/notification";
-export * from "./schemas/danger-event";
 export * from "./schemas/recording";
 export * from "./schemas/perception";
 export * from "./schemas/auth";

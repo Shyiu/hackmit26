@@ -78,10 +78,6 @@ class Settings(TokenSettings):
 
     safety_enabled: bool = True
     safety_sample_every_n_frames: int = Field(default=3, ge=1)
-    # The safety pass has its own detector seam, separate from the item detector above.
-    safety_detector: Literal["mock", "dfine", "yoloe"] = "mock"
-    dfine_model_id: str = "ustc-community/dfine-medium-obj365"
-    safety_detector_device: str = "cpu"
     face_detector: Literal["mock", "insightface"] = "mock"
     face_embedder: Literal["mock", "insightface"] = "mock"
     insightface_model: str = "buffalo_l"
@@ -104,14 +100,12 @@ class Settings(TokenSettings):
     # not how long the wearer can still ask about who they just saw.
     person_recall_window_s: float = Field(default=600.0, gt=0.0)
     face_embedding_key: str | None = Field(default=None, repr=False)
-    vlm: Literal["mock", "openai", "off"] = "mock"
+    # The description model (app/vision.py) that captions item keyframes.
     vlm_model: str = "gpt-5.6-luna"
     vlm_base_url: str = "https://api.openai.com/v1"
     vlm_api_key: str | None = Field(default=None, repr=False)
     vlm_reasoning_effort: str = "none"
     vlm_timeout_s: float = Field(default=20, gt=0)
-    safety_hazard_labels_extra: str = ""
-    safety_mock_labels: str = ""
     safety_mock_faces: int = Field(default=0, ge=0)
     # The root LocalFrameStore writes under: it builds "frames/..." and "people/..."
     # keys itself, so this must NOT already end in "/frames" or every keyframe write
@@ -119,7 +113,6 @@ class Settings(TokenSettings):
     frame_image_dir: str = "./data"
     allow_local_path_ingest: bool = False
     ingest_allowed_dir: str | None = None
-    danger_event_merge_window_s: int = Field(default=30, ge=1)
     _ephemeral_warning_logged: bool = PrivateAttr(default=False)
 
     @cached_property

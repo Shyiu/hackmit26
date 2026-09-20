@@ -73,27 +73,10 @@ async def test_safety_api_enrolls_and_records_a_real_mongo_frame(db: Database, t
         frame = client.post(
             "/frames",
             headers={"Authorization": f"Bearer {frame_token}"},
-            files={"file": ("knife_face.jpg", _jpeg(), "image/jpeg")},
+            files={"file": ("face.jpg", _jpeg(), "image/jpeg")},
         )
         assert frame.status_code == 201, frame.text
         assert frame.json()["faces"][0]["personId"] == enrollment.json()["_id"]
-        assert frame.json()["dangerEventIds"]
-
-        events = client.get(
-            "/danger-events",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        assert events.status_code == 200
-        assert events.json()[0]["kind"] == "weapon_visible"
-        event_id = events.json()[0]["_id"]
-        acknowledged = client.patch(
-            f"/danger-events/{event_id}",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"status": "acknowledged", "acknowledgedBy": "caregiver"},
-        )
-        assert acknowledged.status_code == 200
-        assert acknowledged.json()["acknowledgedBy"] == "caregiver"
-        assert acknowledged.json()["acknowledgedAt"] is not None
 
 
 async def _token(patient_id: ObjectId, scope: str, sub: ObjectId | None = None, tv: int = 0) -> str:
@@ -150,13 +133,6 @@ async def test_safety_api_auth_and_local_path_guards(db: Database, tmp_path) -> 
             ).status_code
             == 403
         )
-        assert (
-            client.get(
-                "/danger-events",
-                headers={"Authorization": f"Bearer {await _token(ObjectId(), 'api')}"},
-            ).json()
-            == []
-        )
 
 
 async def test_people_patch_and_photos(db: Database, tmp_path) -> None:
@@ -194,7 +170,10 @@ async def test_people_patch_and_photos(db: Database, tmp_path) -> None:
         added = client.post(
             f"/people/{person_id}/photos",
             headers=bearer,
-            files=[("photos", ("a.jpg", _jpeg(), "image/jpeg")), ("photos", ("b.jpg", _jpeg(), "image/jpeg"))],
+            files=[
+                ("photos", ("a.jpg", _jpeg(), "image/jpeg")),
+                ("photos", ("b.jpg", _jpeg(), "image/jpeg")),
+            ],
         )
         assert added.status_code == 200, added.text
         assert len(added.json()["referenceImageKeys"]) == 3
@@ -208,8 +187,7 @@ async def test_people_patch_and_photos(db: Database, tmp_path) -> None:
 
         other_bearer = {"Authorization": f"Bearer {other_token}"}
         assert (
-            client.patch(f"/people/{person_id}", headers=other_bearer, json={"name": "X"}).status_code
-            == 404
+            client.patch(f"/people/{person_id}", headers=other_bearer, json={"name": "X"}).status_code == 404
         )
         assert (
             client.post(

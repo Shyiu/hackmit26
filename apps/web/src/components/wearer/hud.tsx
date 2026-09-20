@@ -84,7 +84,7 @@ export function ItemLabels({ detections }: { detections: Detection[] }) {
 }
 
 // Boxes for faces the perception service saw this frame, named where it matched
-// an enrolled person and confident enough (PLAN.md "Faces, danger, and routines").
+// an enrolled person and confident enough (PLAN.md "Faces and routines").
 // Debug tool for /sim: shows the raw detector/match confidence pairs, not the
 // wearer-facing wording.
 export function FaceLabels({ faces }: { faces: Face[] }) {

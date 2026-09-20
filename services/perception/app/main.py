@@ -123,10 +123,8 @@ def create_app(
             log.info(
                 "safety adapters configured",
                 extra={
-                    "safety_detector": safety.adapters.detector.name,
                     "safety_face_detector": safety.adapters.face_detector.name,
                     "safety_face_embedder": safety.adapters.face_embedder.name,
-                    "safety_vlm": safety.adapters.vlm.name if safety.adapters.vlm else None,
                 },
             )
         app.state.services = Services(
@@ -188,10 +186,8 @@ async def health(request: Request) -> JSONResponse:
     safety = services.safety
     safety_names = (
         {
-            "detector": safety.adapters.detector.name,
             "faceDetector": safety.adapters.face_detector.name,
             "faceEmbedder": safety.adapters.face_embedder.name,
-            "vlm": safety.adapters.vlm.name if safety.adapters.vlm else None,
         }
         if safety
         else None
@@ -531,13 +527,13 @@ class FrameConnection:
             try:
                 analysis = await safety.analyze(self.patient_id, jpeg, on_faces=report)
                 # Faces are already on their way to the page. Storage is sampled, except that a
-                # frame behind a danger event, or one that failed, is always kept.
+                # frame that failed is always kept.
                 last = self.safety_persisted_seq
                 due = last is None or header.seq - last >= every
                 if not analysis.width:
                     # It never decoded, so there is no image to keep and nothing to say about it.
                     continue
-                if due or analysis.candidates or analysis.processing_status != "complete":
+                if due or analysis.processing_status != "complete":
                     self.safety_persisted_seq = header.seq
                     await safety.persist(
                         self.patient_id,
