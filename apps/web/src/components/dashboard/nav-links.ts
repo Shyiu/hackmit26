@@ -1,4 +1,5 @@
 import {
+  AlarmClock,
   Clock,
   Gauge,
   House,
@@ -24,6 +25,7 @@ export const PRIMARY_LINKS: NavLink[] = [
 
 export const SECONDARY_LINKS: NavLink[] = [
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
+  { href: "/dashboard/routines", label: "Routines", icon: AlarmClock },
   { href: "/dashboard/people", label: "Faces", icon: ScanFace },
   { href: "/dashboard/recordings", label: "Recordings", icon: Clock },
   { href: "/dashboard/latency", label: "Latency", icon: Gauge },

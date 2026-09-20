@@ -13,6 +13,13 @@ function statusBadge(notification: NotificationDoc, now: Date) {
   return <Badge>Waiting to be spoken</Badge>;
 }
 
+function notificationLabel(kind: NotificationDoc["kind"]) {
+  if (kind === "reminder") return "Reminder for ";
+  if (kind === "proactive_reminder") return "Routine, ";
+  if (kind === "danger_alert") return "Alert, ";
+  return "Message, ";
+}
+
 export default async function MessagesPage() {
   const { tenant, settings } = await dashboardTenant("/dashboard/messages");
   const notifications = await tenant.notifications.listRecent({ limit: 30 });
@@ -46,7 +53,7 @@ export default async function MessagesPage() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                     <span>
-                      {notification.kind === "reminder" ? "Reminder for " : "Message, "}
+                      {notificationLabel(notification.kind)}
                       {dayAndTime(notification.showAt, settings.timezone)}
                     </span>
                     {statusBadge(notification, now)}

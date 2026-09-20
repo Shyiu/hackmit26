@@ -55,6 +55,12 @@ async function seed(db: Db) {
   const keys = await tenant.items.create({ name: "keys", aliases: ["car keys", "house keys", "key ring"] });
   const wallet = await tenant.items.create({ name: "wallet", aliases: ["billfold"] });
   const glasses = await tenant.items.create({ name: "glasses", aliases: ["eyeglasses", "reading glasses"] });
+  await tenant.routines.create({
+    name: "Evening medication",
+    trigger: { kind: "time", at: "21:00" },
+    text: "Don't forget your evening medication.",
+    cooldownMinutes: 120,
+  });
   const observe = (item: typeof keys, rest: Omit<Parameters<typeof seedObservation>[1], "patientId" | "itemId" | "label">) =>
     seedObservation(db, { patientId: DEMO_PATIENT_ID, itemId: item._id, label: item.name, ...rest });
 
