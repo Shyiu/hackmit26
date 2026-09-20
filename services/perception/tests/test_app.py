@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import tempfile
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -68,7 +69,13 @@ async def wearer_db(db: Database) -> Database:
 
 
 def _client(db_name: str, uri: str = TEST_URI, detector: Detector | None = None) -> TestClient:
-    settings = Settings(mongodb_uri=uri, mongodb_db=db_name, device_token_secret=SECRET)
+    settings = Settings(
+        mongodb_uri=uri,
+        mongodb_db=db_name,
+        device_token_secret=SECRET,
+        # An opened sighting writes a keyframe file; give each client its own scratch directory.
+        frame_image_dir=tempfile.mkdtemp(prefix="perception-frames-"),
+    )
     # The fixture token was minted for a fixed moment, so the app reads that as now.
     return TestClient(create_app(settings, detector=detector, token_clock=lambda: FIXTURE["validAt"]))
 
@@ -508,6 +515,13 @@ def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_fram
         assert item is not None
         if disconnect_during_write:
             assert write_finished.wait(5)
+        # The description worker in the same process may already be draining this job, so its
+        # status isn't asserted here — only that a keyframe was queued and actually saved.
+        job = _wait_for(
+            lambda: db["description_jobs"].find_one({"patientId": PATIENT, "sightingId": sighting["_id"]})
+        )
+        assert job["bbox"] == [0.4, 0.3, 0.2, 0.2]
+        assert Path(client.app.state.services.frame_store.directory / job["keyframeKey"]).is_file()
         ws.close()
         release_write.set()
         _wait_for(lambda: db["sightings"].find_one({"_id": sighting["_id"], "status": "closed"}))
