@@ -31,7 +31,7 @@ export function ArchiveItemButton({ id, name, active }: { id: string; name: stri
     <div className="flex flex-col gap-2">
       <Button
         type="button"
-        size="lg"
+        size="sm"
         variant={active ? "destructive" : "default"}
         disabled={pending}
         onClick={() => void toggle()}
