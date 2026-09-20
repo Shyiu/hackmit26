@@ -576,7 +576,7 @@ Perception service:
 
 | Route | Does |
 |---|---|
-| `WS /ws/frames` | Binary JPEG frames in, with the versioned session/sequence/timestamp envelope. JSON out per frame: `{ seq, detections: [{ itemId, label, bbox, confidence }] }` with boxes normalized to the frame |
+| `WS /ws/frames` | Binary JPEG frames in, with the versioned session/sequence/timestamp envelope. JSON out per frame: `{ seq, detections: [{ itemId, label, bbox, confidence }] }` with boxes normalized to the frame. While a face is in view it also sends `{ type: "faces", seq, faces: [{ personId, name, relation, bbox, confidence, matchConfidence }] }`, matched only against that wearer's enrolled people, and one empty list when the last face leaves |
 | `WS /ws/debug` | Detections and annotated frames for the dashboard live view |
 | `POST /config/classes` | Reloads the prompt list after a caregiver edits items |
 | `GET /health` | Model loaded, current fps, queue depth |
