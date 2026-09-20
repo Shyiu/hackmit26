@@ -29,11 +29,16 @@ export default async function ItemsPage() {
         icon={KeyRound}
         description="Where each tracked item was last seen."
         action={
-          // Sized to the camera-state pill next to it, including on touch, so the
-          // two chips in the header bar sit on one line.
+          // On a phone this shares the header bar with the camera-state pill, so it
+          // takes the pill's size there, on touch too. From md up the pill lives in
+          // the sidebar and the button goes back to the normal small size.
           <Link
             href="/dashboard/items/new"
-            className={cn(buttonVariants({ size: "sm" }), "h-5 rounded-[0.3rem] px-1.5 pointer-coarse:h-5")}
+            className={cn(
+              buttonVariants({ size: "sm" }),
+              "h-5 rounded-[0.3rem] px-1.5 pointer-coarse:h-5",
+              "md:h-6 md:rounded-md md:px-2 md:pointer-coarse:h-9",
+            )}
           >
             <Plus />
             Add item
