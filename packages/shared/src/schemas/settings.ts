@@ -16,6 +16,7 @@ export const updateSettingsSchema = z
     staleAfterMinutes: z.number().int().min(1).max(24 * 60),
     wakeWordEnabled: z.boolean(),
     wakeWordSensitivity: z.number().min(0).max(1),
+    faceAnnounceSoundEnabled: z.boolean(),
   })
   .partial()
   .strict();

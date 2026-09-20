@@ -13,6 +13,8 @@ export const answerTemplate = z.enum([
   "unseen",
   "ambiguous",
   "not_understood",
+  "person_recalled",
+  "no_one_recalled",
 ]);
 
 export type AnswerTemplate = z.infer<typeof answerTemplate>;

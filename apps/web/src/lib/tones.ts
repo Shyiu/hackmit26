@@ -23,3 +23,10 @@ export function playListeningChime(ctx: AudioContext) {
 export function playStallTone(ctx: AudioContext) {
   beep(ctx, 330, ctx.currentTime, 0.4, 0.25);
 }
+
+// A single soft chime: someone was just recognized. Deliberately not the
+// listening chime's rising pair, so the two are never confused -- this one
+// never means the mic is open.
+export function playFaceChime(ctx: AudioContext) {
+  beep(ctx, 520, ctx.currentTime, 0.15, 0.12);
+}
