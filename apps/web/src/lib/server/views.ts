@@ -7,6 +7,7 @@ import {
   type ItemDoc,
   type NotificationDoc,
   type RoomDoc,
+  type RoutineDoc,
   type SightingDoc,
 } from "@memory-glasses/db";
 
@@ -64,6 +65,10 @@ export function roomView(room: RoomDoc) {
   return toJson(without(room, ["patientId", "normalizedName"]));
 }
 
+export function routineView(routine: RoutineDoc) {
+  return toJson(without(routine, ["patientId"]));
+}
+
 export function notificationView(notification: NotificationDoc) {
   return toJson(without(notification, ["patientId"]));
 }
@@ -93,4 +98,5 @@ export type ItemView = ReturnType<typeof itemView>;
 export type SightingView = ReturnType<typeof sightingView>;
 export type InteractionView = ReturnType<typeof interactionView>;
 export type RoomView = ReturnType<typeof roomView>;
+export type RoutineView = ReturnType<typeof routineView>;
 export type NotificationView = ReturnType<typeof notificationView>;
