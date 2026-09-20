@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { CameraSelect } from "@/components/wearer/camera-select";
 import { FaceLabels, Hud, ItemLabels, StallCard } from "@/components/wearer/hud";
 import { LiveVideo } from "@/components/wearer/live-video";
+import { NoticeStack } from "@/components/wearer/notice-stack";
 import { RecordingsList } from "@/components/wearer/recordings-list";
 import { useVideoAspect } from "@/hooks/use-video-frames";
 import { useWearerClient } from "@/hooks/use-wearer-client";
@@ -84,6 +85,7 @@ export function SimulatorView() {
         <LiveVideo stream={camera.stream} onElement={client.setVideo} className="absolute inset-0 size-full object-contain" />
         <ItemLabels detections={perception.detections} />
         <FaceLabels faces={perception.faces} />
+        <NoticeStack notices={client.notices} onDismiss={client.dismissNotice} className="absolute top-3 right-3 z-10 w-72 max-w-[80%]" />
         <Hud
           className="inset-x-[6%] text-[0.85rem] sm:text-base"
           message={hud.message}

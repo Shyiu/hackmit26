@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
+import type { NotificationKind } from "@memory-glasses/shared";
 import type { TurnMode } from "@/lib/client/deepgram";
 import {
   pcmFormatFromHeaders,
@@ -20,7 +21,9 @@ import { useVoiceTurn, type TurnResult } from "./use-voice-turn";
 
 type WearerSettings = { speakingRate: number; recordingAllowed: boolean; faceAnnounceSoundEnabled: boolean };
 type InteractionView = { _id: string; status: string; answerText?: string };
-type NotificationView = { _id: string; kind: string; text: string };
+type NotificationView = { _id: string; kind: NotificationKind; text: string };
+
+export type WearerNotice = { id: string; kind: NotificationKind; text: string; at: number };
 
 export type AnswerState = "idle" | "thinking" | "speaking";
 
@@ -166,6 +169,7 @@ export function useWearerClient({
   const [answer, setAnswer] = useState<AnswerState>("idle");
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastQuestion, setLastQuestion] = useState<string | null>(null);
+  const [notices, setNotices] = useState<WearerNotice[]>([]);
   const audioRef = useRef<AudioContext | null>(null);
   const speechRef = useRef<Speech | null>(null);
   const answerSeqRef = useRef(0);
@@ -402,6 +406,11 @@ export function useWearerClient({
     if (!response?.ok) return;
     const { notification } = (await response.json()) as { notification: NotificationView | null };
     if (!notification || notificationRef.current) return;
+    setNotices((current) =>
+      current.some((notice) => notice.id === notification._id)
+        ? current
+        : [{ id: notification._id, kind: notification.kind, text: notification.text, at: Date.now() }, ...current].slice(0, 5),
+    );
     notificationRef.current = notification._id;
     try {
       if (notification.kind === "person_recognized") {
@@ -420,6 +429,9 @@ export function useWearerClient({
       notificationRef.current = null;
     }
   });
+  const dismissNotice = useCallback((id: string) => {
+    setNotices((current) => current.filter((notice) => notice.id !== id));
+  }, []);
   useEffect(() => {
     if (!live || signedIn !== true) return;
     const timer = window.setInterval(() => void checkNotifications(), NOTIFICATION_POLL_MS);
@@ -457,6 +469,8 @@ export function useWearerClient({
     pause,
     startRecording,
     stopSpeaking,
+    notices,
+    dismissNotice,
   };
 }
 
