@@ -100,6 +100,9 @@ scripts read the same file.
   identifies specific real people. Never send it to a third-party API, never widen a query to cross
   `patientId`, and never add a code path that matches against anything but that patient's own
   enrolled set. See README.md "Faces, danger, and routines" and "Privacy and safety".
+- Face enrollment lives in the perception service, which owns the embedder and the encryption key.
+  `/api/people` proxies to it through `apps/web/src/lib/server/perception.ts`, at `PERCEPTION_URL`,
+  else the socket's host, else `http://127.0.0.1:8000`. The Faces page says so when it's down.
 - `CAREGIVER_EMAIL`/`CAREGIVER_PASSWORD` only seed the one demo pair (`pnpm db:seed`). Real caregiver
   signup is a separate flow (`POST /api/auth/signup`); don't assume there's exactly one caregiver
   account when writing a route or a test.
