@@ -374,6 +374,25 @@ async def test_a_description_applies_when_versions_match(scene: Scene) -> None:
     assert (done["status"], done["finishedAt"]) == ("succeeded", at(2))
 
 
+async def test_an_unconfirmed_item_is_marked_failed_not_a_fake_ready_answer(scene: Scene) -> None:
+    opened = await scene.sight("e1", 0)
+    job = await scene.enqueue(opened)
+    claimed = await scene.store.claim_job("w1", T0)
+    assert claimed is not None
+
+    not_visible = DescriptionResult(state="unknown", sentence="not confirmed in the frame", item_visible=False)
+    assert await scene.store.complete_job(claimed, "w1", not_visible, at(2)) == "not_visible"
+    sighting = await scene.sighting(opened.sighting_id)
+    # descriptionStatus stays out of "ready" so the answer falls back to an honest "I don't
+    # know" instead of speaking the sentinel sentence as if it were a real location.
+    assert sighting["descriptionStatus"] == "failed"
+    assert sighting["sentence"] is None
+    item = await scene.item()
+    assert item["lastSighting"]["descriptionStatus"] == "failed"
+    done = await scene.job(job.id)
+    assert done["status"] == "succeeded"
+
+
 async def test_a_late_description_only_enriches_the_old_sighting(scene: Scene) -> None:
     old = await scene.sight("e-old", 0)
     await scene.enqueue(old)

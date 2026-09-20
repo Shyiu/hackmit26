@@ -121,6 +121,9 @@ class DescriptionResult(BaseModel):
     state: ObservationState
     sentence: str = Field(min_length=1, max_length=300)
     nearbyObjects: list[ShortText] = Field(default_factory=list, max_length=20)
+    # False when the model looked at the bbox and couldn't confirm the item is there.
+    # sentence is still a sentinel in that case, never a real location fragment.
+    item_visible: bool = True
 
     @field_validator("room", mode="before")
     @classmethod
@@ -289,7 +292,7 @@ _USUAL_SPOT_SAMPLE = {
 }
 
 
-CompleteOutcome = Literal["applied", "history_only", "superseded", "lost_lease"]
+CompleteOutcome = Literal["applied", "history_only", "not_visible", "superseded", "lost_lease"]
 FailOutcome = Literal["retry", "failed", "lost_lease"]
 
 
@@ -779,6 +782,13 @@ class ObservationStore:
         job, and the guarded writes make the second run harmless.
         """
         now = to_ms(now)
+        if not result.item_visible:
+            # The model looked at the bbox and couldn't confirm the item is there. Writing
+            # result.sentence (a sentinel, not a location) as a "ready" description would
+            # answer with a fabricated place instead of an honest "I don't know" -- mark it
+            # failed instead, the same as a job that errored out.
+            await self._mark_description_failed(job)
+            return "not_visible" if await self._finish(job, worker_id, "succeeded", now) else "lost_lease"
         changes: Document = {
             "descriptionStatus": "ready",
             "sentence": result.sentence,
