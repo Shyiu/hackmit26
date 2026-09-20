@@ -13,6 +13,23 @@ const NO_SPLAT_GRACE_MS = 15_000;
 
 type SplatObject = Object3D & { dispose(): void; context: { numSplats: { value: number } } };
 
+/** Cameras further than this many radii from the middle are SLAM strays: not framed, not drawn. */
+const STRAY_RADII = 3;
+
+const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+
+/**
+ * The middle and size of the capture from the camera positions themselves. splat-slam's own
+ * target and spread are means, and one pose thrown far off drags the whole view after it.
+ */
+function captureBounds(cameras: PosedCamera[]): { centre: Vec3; radius: number } {
+  const centre = [0, 1, 2].map((axis) => median(cameras.map((camera) => camera.position[axis]))) as Vec3;
+  const reach = cameras
+    .map((camera) => Math.hypot(...camera.position.map((value, axis) => value - centre[axis])))
+    .sort((a, b) => a - b);
+  return { centre, radius: Math.max(reach[Math.floor(reach.length * 0.8)], 1e-3) };
+}
+
 /**
  * A growing splat-slam scene, after splat-slam's web/live.js: poll the state, load each new splat
  * version and swap it in once it has initialised, redraw the camera path when the map grows.
@@ -34,6 +51,7 @@ export async function createLiveViewer(
   let sceneId: string | null = null;
   let scene: LiveSceneState | null = null;
   let cams: LiveCameras | null = null;
+  let bounds: { centre: Vec3; radius: number } | null = null;
   let camsAt = 0;
   let byFile = new Map<string, PosedCamera>();
   let mapVersion = -1;
@@ -79,36 +97,45 @@ export async function createLiveViewer(
     });
   }
 
+  /** A point SLAM threw far outside the capture. A ray from there lands nowhere useful. */
+  function isStray(point: Vec3) {
+    const { centre, radius } = bounds!;
+    return Math.hypot(...point.map((value, axis) => value - centre[axis])) > radius * STRAY_RADII;
+  }
+
   function drawPath() {
     clearPath();
-    if (!cams || cams.cameras.length < 2) return;
-    line(cams.cameras.map((camera) => camera.position), 0x9aa3b5, 0.8);
+    if (!cams || !bounds || cams.cameras.length < 2) return;
+    const { radius } = bounds;
+    const near = cams.cameras.filter((camera) => !isStray(camera.position));
+    line(near.map((camera) => camera.position), 0x9aa3b5, 0.8);
     // The newest camera as a small frustum.
     const newest = cams.cameras[cams.cameras.length - 1];
-    const depth = cams.spread * 0.18;
+    const depth = radius * 0.25;
     const corners = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([u, v]) => pointAlong(rayFor(newest, u, v), depth));
     line(corners, 0xffffff, 1, true);
     for (const corner of corners) line([newest.position, corner], 0xffffff, 1);
   }
 
   function frameHome() {
-    if (!cams) return;
-    const target = new THREE.Vector3(...cams.target);
+    if (!cams || !bounds) return;
+    const target = new THREE.Vector3(...bounds.centre);
     // The first map's up is kept: a changed up makes the engine rebuild its orbit controls,
     // which would drop a drag each time the map grows.
     firstUp ??= new THREE.Vector3(...cams.up).normalize().toArray() as Vec3;
     const up = new THREE.Vector3(...firstUp);
     // Above and behind the capture, looking down at the whole path.
-    const reach = Math.max(cams.distance, cams.spread) * 2.2;
+    const reach = bounds.radius * 2.4;
     const back = new THREE.Vector3(...cams.cameras[0].position).sub(target).setLength(reach);
     const position = target.clone().addScaledVector(up, reach * 0.8).add(back);
-    engine.setFrame({ up: firstUp, centre: cams.target, scale: Math.max(cams.spread, 1e-3) });
-    engine.setHome(position.toArray() as Vec3, cams.target, !framed);
+    engine.setFrame({ up: firstUp, centre: bounds.centre, scale: bounds.radius });
+    engine.setHome(position.toArray() as Vec3, bounds.centre, !framed);
     framed = true;
   }
 
   function forgetScene() {
     cams = null;
+    bounds = null;
     byFile = new Map();
     mapVersion = -1;
     framed = false;
@@ -158,21 +185,22 @@ export async function createLiveViewer(
    */
   const splatReady = () => splat !== null && splat.context.numSplats.value > 0;
 
-  /** Where the ray lands in the splat, else half the capture's distance along it. */
+  /** Where the ray lands in the splat, else half the capture's radius along it. */
   function solve(ray: { origin: Vec3; direction: Vec3 }): Vec3 {
-    const frame = cams!;
+    const { radius } = bounds!;
     if (splat && splatReady()) {
       const raycaster = new THREE.Raycaster(
         new THREE.Vector3(...ray.origin),
         new THREE.Vector3(...ray.direction),
-        frame.distance * 0.05,
-        frame.distance * 10,
+        radius * 0.05,
+        radius * STRAY_RADII * 2,
       );
       splat.updateMatrixWorld(true);
       const hit = raycaster.intersectObject(splat, false)[0];
-      if (hit) return hit.point.toArray() as Vec3;
+      // A floater far outside the room is a worse answer than the fallback.
+      if (hit && !isStray(hit.point.toArray() as Vec3)) return hit.point.toArray() as Vec3;
     }
-    return pointAlong(ray, frame.distance * 0.5);
+    return pointAlong(ray, radius * 0.5);
   }
 
   function resolve(pin: ScanPin, frame: string, ray: { origin: Vec3; direction: Vec3 }) {
@@ -198,12 +226,15 @@ export async function createLiveViewer(
 
   function showPins() {
     const visuals: PinVisual[] = pins.map((pin) => {
-      if (pin.position || !pin.observation || !cams) return { id: pin.itemId, position: pin.position, ray: null };
+      const solved = { id: pin.itemId, position: pin.position, ray: null };
+      // Solved from this very frame, placed by hand, or nothing to solve from.
+      if (!pin.observation || pin.observation.frame === pin.positionFrame || !cams || !bounds) return solved;
+      // No pose yet, or a stray one: keep the last solved spot, which a lost frame must not erase.
       const camera = byFile.get(pin.observation.frame);
-      if (!camera) return { id: pin.itemId, position: null, ray: null };
+      if (!camera || isStray(camera.position)) return solved;
       const ray = rayFor(camera, pin.observation.u, pin.observation.v);
       resolve(pin, pin.observation.frame, ray);
-      return { id: pin.itemId, position: null, ray: { ...ray, length: cams.distance * 0.5 } };
+      return pin.position ? solved : { id: pin.itemId, position: null, ray: { ...ray, length: bounds.radius * 0.5 } };
     });
     engine.setPins(visuals);
     events.onPins(pins);
@@ -245,6 +276,7 @@ export async function createLiveViewer(
         if (next.cameras?.length) {
           if (!cams) camsAt = Date.now();
           cams = next;
+          bounds = captureBounds(next.cameras);
           byFile = new Map(next.cameras.map((camera) => [camera.file, camera]));
           // The file's own version: the state poll can run ahead of the cameras.json on disk.
           mapVersion = next.map_version ?? scene.map_version ?? mapVersion;
