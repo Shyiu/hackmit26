@@ -22,3 +22,14 @@ export const updateSettingsSchema = z
   .strict();
 
 export type UpdateSettings = z.infer<typeof updateSettingsSchema>;
+
+// The caregiver's own account preferences, PATCH /api/account/preferences. These
+// follow the signed-in caregiver across every wearer they care for.
+export const updateCaregiverPreferencesSchema = z
+  .object({
+    soundNotificationsEnabled: z.boolean(),
+  })
+  .partial()
+  .strict();
+
+export type UpdateCaregiverPreferences = z.infer<typeof updateCaregiverPreferencesSchema>;

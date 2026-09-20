@@ -25,10 +25,11 @@ import { RoleChip } from "@/components/brand";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { WeeklyMetric, type Trend } from "@/components/home/weekly-metric";
 import { NotificationCenter, type CenterEntry } from "@/components/home/notification-center";
+import { NotificationSound } from "@/components/home/notification-sound";
 import { SectionTitle, ShortcutStrip, Tile } from "@/components/home/tiles";
 import { STATUS_LABELS, whereLine } from "@/lib/item-status";
 import { relativeTime } from "@/lib/relative-time";
-import { dashboardTenant } from "@/lib/server/dashboard";
+import { dashboardPreferences, dashboardTenant } from "@/lib/server/dashboard";
 
 export const metadata = { title: "Home" };
 
@@ -60,16 +61,17 @@ async function recentQuestions(tenant: Awaited<ReturnType<typeof dashboardTenant
 }
 
 export default async function DashboardHomePage() {
-  const { tenant, patient } = await dashboardTenant("/dashboard");
+  const { tenant, patient, principal } = await dashboardTenant("/dashboard");
   const now = new Date();
   const DAY = 24 * 60 * 60 * 1000;
   const dayAgo = now.getTime() - DAY;
   const monthAgo = now.getTime() - 28 * DAY;
-  const [items, questions, notifications, openAlerts] = await Promise.all([
+  const [items, questions, notifications, openAlerts, preferences] = await Promise.all([
     tenant.items.list(),
     recentQuestions(tenant, new Date(monthAgo)),
     tenant.notifications.listRecent({ limit: 20 }),
     tenant.dangerEvents.countOpen(),
+    dashboardPreferences(principal),
   ]);
 
   const needsALook = items.filter((item) => NEEDS_A_LOOK.includes(locationStatus(item.lastSighting)));
@@ -188,6 +190,7 @@ export default async function DashboardHomePage() {
   return (
     <>
       <AutoRefresh intervalMs={5000} />
+      {preferences.soundNotificationsEnabled && <NotificationSound alertIds={alerts.map((alert) => alert._id.toHexString())} />}
       <PageHeader title="Home" icon={House} action={<RoleChip label="★ Caring" value={patient?.displayName ?? "Wearer"} />} />
       <PageBody>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:grid-rows-[minmax(0,1fr)] sm:[&>*]:h-60">

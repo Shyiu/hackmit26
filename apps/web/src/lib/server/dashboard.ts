@@ -1,8 +1,15 @@
 import "server-only";
-import { DEFAULT_PATIENT_SETTINGS, listPatientsByIds, tenantRepos } from "@memory-glasses/db";
+import {
+  caregiverPreferences,
+  DEFAULT_PATIENT_SETTINGS,
+  findCaregiverById,
+  listPatientsByIds,
+  tenantRepos,
+  type CaregiverPreferences,
+} from "@memory-glasses/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { PATIENT_COOKIE, principalFromSession, sessionPatientIds, SESSION_COOKIE } from "./auth";
+import { PATIENT_COOKIE, principalFromSession, sessionPatientIds, SESSION_COOKIE, type Principal } from "./auth";
 import { getDb } from "./db";
 
 export async function caregiverWearers() {
@@ -20,6 +27,12 @@ export async function caregiverWearers() {
     patients: patients.map((patient) => ({ id: patient._id.toHexString(), displayName: patient.displayName })),
     selectedId: selected?.patientId.toHexString() ?? null,
   };
+}
+
+/** The signed-in caregiver's own preferences; a device principal gets the defaults. */
+export async function dashboardPreferences(principal: Principal): Promise<CaregiverPreferences> {
+  const caregiver = principal.kind === "caregiver" ? await findCaregiverById(getDb(), principal.caregiverId) : null;
+  return caregiverPreferences(caregiver);
 }
 
 /**
