@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useEffectEvent, useState } from "react";
-import { Mic, Pause, Play, Settings2 } from "lucide-react";
-import { StallCard } from "@/components/wearer/hud";
+import { Camera, Mic, Pause, Play, ScanEye, Settings2 } from "lucide-react";
+import { ItemLabels, StallCard } from "@/components/wearer/hud";
 import { LiveVideo } from "@/components/wearer/live-video";
+import { NoticeStack } from "@/components/wearer/notice-stack";
 import { useStoredNumber } from "@/hooks/use-stored-setting";
+import { useVideoAspect } from "@/hooks/use-video-frames";
 import { useWearerClient } from "@/hooks/use-wearer-client";
 import { cn } from "@/lib/utils";
 import { SetupPanel } from "./setup-panel";
@@ -18,7 +20,8 @@ export function WearView() {
   const client = useWearerClient({ turnMode: "auto", fullscreen: true });
   const [panelOpen, setPanelOpen] = useState(true);
   const [textScale, setTextScale] = useStoredNumber("wear.textScale", 1);
-  const { hud, voice, live, capturing, answer, stalled, recorder } = client;
+  const { hud, voice, live, capturing, answer, stalled, recorder, camera, perception } = client;
+  const aspect = useVideoAspect(client.video);
 
   function handleTap() {
     if (!live || panelOpen) return;
@@ -46,6 +49,16 @@ export function WearView() {
         className="absolute inset-0 flex touch-none flex-col [-webkit-touch-callout:none]"
         onPointerDown={handleTap}
       >
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div
+            className="relative"
+            style={{ aspectRatio: aspect, width: `min(100%, calc(100dvh * ${aspect}))` }}
+          >
+            <LiveVideo stream={camera.stream} onElement={client.setVideo} className="h-full w-full opacity-60" />
+            <ItemLabels detections={perception.detections} />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/70" />
+          </div>
+        </div>
         <header className="flex items-start justify-between gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
           <div className="flex flex-wrap gap-2 text-sm font-medium">
             <StatusChip tone={capturing ? "live" : "paused"}>
@@ -56,6 +69,18 @@ export function WearView() {
               <StatusChip tone="neutral">
                 <Mic className="size-4" />
                 Listening
+              </StatusChip>
+            )}
+            {camera.lens !== "unknown" && (
+              <StatusChip tone="neutral">
+                <Camera className="size-4" />
+                {camera.lens === "ultrawide" ? "0.5×" : "1×"}
+              </StatusChip>
+            )}
+            {perception.status === "connected" && (
+              <StatusChip tone="neutral">
+                <ScanEye className="size-4" />
+                Seeing
               </StatusChip>
             )}
           </div>
@@ -101,10 +126,7 @@ export function WearView() {
           )}
         </main>
 
-        <footer className="flex items-end justify-between gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <div className="w-28 overflow-hidden rounded-lg bg-white/5 opacity-60 sm:w-36">
-            <LiveVideo stream={client.camera.stream} onElement={client.setVideo} className="aspect-video w-full object-cover" />
-          </div>
+        <footer className="flex items-end justify-end gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <button
             type="button"
             disabled={!live}
@@ -121,6 +143,11 @@ export function WearView() {
         </footer>
       </div>
 
+      <NoticeStack
+        notices={client.notices}
+        onDismiss={client.dismissNotice}
+        className="absolute inset-x-4 top-[calc(env(safe-area-inset-top)+4.5rem)] z-20 mx-auto max-w-md"
+      />
       {stalled && <StallCard />}
 
       {panelOpen && (

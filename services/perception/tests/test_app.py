@@ -590,7 +590,11 @@ def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_fram
         )
         assert item is not None
         if disconnect_during_write:
+            # The keyframe is enqueued after open_sighting returns, so the socket goes away
+            # while the write is still held and the held write is then released.
             assert write_finished.wait(5)
+            ws.close()
+            release_write.set()
         # The description worker in the same process may already be draining this job, so its
         # status isn't asserted here — only that a keyframe was queued and actually saved.
         job = _wait_for(
@@ -598,8 +602,8 @@ def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_fram
         )
         assert job["bbox"] == [0.4, 0.3, 0.2, 0.2]
         assert Path(client.app.state.services.frame_store.directory / job["keyframeKey"]).is_file()
-        ws.close()
-        release_write.set()
+        if not disconnect_during_write:
+            ws.close()
         _wait_for(lambda: db["sightings"].find_one({"_id": sighting["_id"], "status": "closed"}))
 
     # Only the active item's prompts reached the detector.

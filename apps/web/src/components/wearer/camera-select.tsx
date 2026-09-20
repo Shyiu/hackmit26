@@ -3,7 +3,7 @@
 import type { CameraChoice } from "@/hooks/use-camera";
 
 // Every camera the browser lists. On a multi-lens iPhone each rear lens shows up
-// separately. Pick the one whose view holds steady up close.
+// separately; the ultra-wide lens is picked by default.
 export function CameraSelect({
   cameras,
   activeDeviceId,
