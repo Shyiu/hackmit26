@@ -1,14 +1,18 @@
 /* eslint-disable @next/next/no-img-element */
 import { locationStatus, parseId, type ItemId } from "@memory-glasses/db";
-import { ImageOff, Volume2 } from "lucide-react";
+import { STATIC_SCAN_SCENE_ID } from "@memory-glasses/shared";
+import { ImageOff, Map as MapIcon, Volume2 } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { ArchiveItemButton } from "@/components/dashboard/archive-item-button";
 import { BackLink } from "@/components/dashboard/back-link";
 import { ItemForm } from "@/components/dashboard/item-form";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
+import { ScanPanel } from "@/components/dashboard/scan-panel";
 import { Section, listBlockClass } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusDot } from "@/components/dashboard/status-dot";
 import { whereLine } from "@/lib/item-status";
@@ -17,6 +21,14 @@ import { composeAnswer } from "@/lib/server/answer";
 import { dashboardTenant } from "@/lib/server/dashboard";
 import { sightingPhrase, stateWords } from "@/lib/sighting-words";
 
+// The live scan wins when it saw the item after the bundled room scan did.
+function scanMode(pins: Array<{ sceneId: string; seenAt: Date }>): "static" | "live" {
+  const roomPin = pins.find((pin) => pin.sceneId === STATIC_SCAN_SCENE_ID);
+  return pins.some((pin) => pin.sceneId !== STATIC_SCAN_SCENE_ID && (!roomPin || pin.seenAt > roomPin.seenAt))
+    ? "live"
+    : "static";
+}
+
 export default async function ItemPage({ params }: PageProps<"/dashboard/items/[id]">) {
   const { id } = await params;
   const { tenant, settings } = await dashboardTenant(`/dashboard/items/${id}`);
@@ -24,6 +36,7 @@ export default async function ItemPage({ params }: PageProps<"/dashboard/items/[
   const item = itemId && (await tenant.items.get(itemId));
   if (!item) notFound();
   const sightings = await tenant.sightings.list({ itemId: item._id, limit: 30 });
+  const pins = await tenant.scanPins.listByItem(item._id);
   const now = new Date();
   const status = locationStatus(item.lastSighting);
   const answer = composeAnswer({ kind: "match", item, matchedKey: item.name }, settings, now);
@@ -102,6 +115,29 @@ export default async function ItemPage({ params }: PageProps<"/dashboard/items/[
             </CardContent>
           </Card>
         </div>
+
+        <Section
+          title="Where it was last seen"
+          action={
+            <Link
+              href={`/dashboard/map?item=${item._id.toHexString()}`}
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+            >
+              <MapIcon />
+              Open in Map
+            </Link>
+          }
+        >
+          {pins.length === 0 && (
+            <p className="text-sm text-muted-foreground">No 3D location yet. Open the Map to place it.</p>
+          )}
+          <ScanPanel
+            compact
+            mode={scanMode(pins)}
+            focusItemId={item._id.toHexString()}
+            className="aspect-[4/5] max-w-3xl sm:aspect-[16/10]"
+          />
+        </Section>
 
         <Section title="Sightings">
           {sightings.length === 0 ? (

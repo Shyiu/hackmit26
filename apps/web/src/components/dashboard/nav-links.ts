@@ -3,6 +3,7 @@ import {
   Gauge,
   House,
   KeyRound,
+  Map as MapIcon,
   MessageSquare,
   MessagesSquare,
   ScanFace,
@@ -24,6 +25,7 @@ export const PRIMARY_LINKS: NavLink[] = [
 ];
 
 export const SECONDARY_LINKS: NavLink[] = [
+  { href: "/dashboard/map", label: "Map", icon: MapIcon },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/people", label: "Faces", icon: ScanFace },
   { href: "/dashboard/alerts", label: "Alerts", icon: TriangleAlert },
