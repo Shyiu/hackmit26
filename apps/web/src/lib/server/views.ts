@@ -5,6 +5,7 @@ import {
   type CaptureSessionDoc,
   type InteractionDoc,
   type ItemDoc,
+  type ListedPerson,
   type NotificationDoc,
   type RoomDoc,
   type SightingDoc,
@@ -64,6 +65,10 @@ export function roomView(room: RoomDoc) {
   return toJson(without(room, ["patientId", "normalizedName"]));
 }
 
+export function personView(person: ListedPerson) {
+  return toJson(without(person, ["patientId", "referenceImageKeys", "embeddingModel", "expiresAt"]));
+}
+
 export function notificationView(notification: NotificationDoc) {
   return toJson(without(notification, ["patientId"]));
 }
@@ -92,5 +97,6 @@ export function captureView(session: CaptureSessionDoc, now: Date) {
 export type ItemView = ReturnType<typeof itemView>;
 export type SightingView = ReturnType<typeof sightingView>;
 export type InteractionView = ReturnType<typeof interactionView>;
+export type PersonView = ReturnType<typeof personView>;
 export type RoomView = ReturnType<typeof roomView>;
 export type NotificationView = ReturnType<typeof notificationView>;

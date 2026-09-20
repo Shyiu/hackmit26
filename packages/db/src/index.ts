@@ -34,6 +34,7 @@ export { createCaregiver, createPatient, findCaregiverByEmail, recordLogin } fro
 export { tenantRepos, type TenantOptions, type TenantRepos } from "./repos";
 export type { ItemPatch, ItemResolution, NewItem } from "./repos/items";
 export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/interactions";
+export type { ListedPerson } from "./repos/people";
 export type { NewNotification } from "./repos/notifications";
 export type { SightingQuery } from "./repos/sightings";
 
