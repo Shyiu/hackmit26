@@ -92,17 +92,19 @@ def _unit(*values: float) -> np.ndarray:
 def test_match_scores_each_person_by_their_best_photo():
     alex = EnrolledPerson(ObjectId(), (_unit(0, 1, 0), _unit(1, 0.1, 0)), "m", name="Alex")
     sam = EnrolledPerson(ObjectId(), (_unit(0, 0, 1),), "m", name="Sam")
-    person, score = _match_person(_unit(1, 0, 0), Gallery.build((alex, sam), "m"), 0.45)
+    person, score, ranked = _match_person(_unit(1, 0, 0), Gallery.build((alex, sam), "m"), 0.45)
     assert person is alex
     assert score is not None and score > 0.99
+    assert [candidate for candidate, _ in ranked] == [alex, sam]
 
 
 def test_match_names_nobody_when_two_people_are_too_close():
     alex = EnrolledPerson(ObjectId(), (_unit(1, 0.02, 0),), "m")
     sam = EnrolledPerson(ObjectId(), (_unit(1, 0, 0.02),), "m")
-    person, score = _match_person(_unit(1, 0, 0), Gallery.build((alex, sam), "m"), 0.45)
+    person, score, ranked = _match_person(_unit(1, 0, 0), Gallery.build((alex, sam), "m"), 0.45)
     assert person is None
     assert score is not None and score > 0.99
+    assert len(ranked) == 2
 
 
 def test_gallery_leaves_out_people_enrolled_by_another_model():
@@ -111,7 +113,7 @@ def test_gallery_leaves_out_people_enrolled_by_another_model():
     gallery = Gallery.build((mock, real), "insightface-buffalo_l")
     assert gallery.people == (real,)
     assert _match_person(_unit(1, 0, 0), gallery, 0.45)[0] is None
-    assert _match_person(_unit(1, 0, 0), Gallery.build((), "m"), 0.45) == (None, None)
+    assert _match_person(_unit(1, 0, 0), Gallery.build((), "m"), 0.45) == (None, None, [])
 
 
 class _OnePassFaces:
@@ -123,7 +125,7 @@ class _OnePassFaces:
     def __init__(self, events: list[str]):
         self.events = events
 
-    def analyze(self, image, *, filename=""):
+    def analyze(self, image, *, filename="", for_enrollment=False):
         self.events.append("analyze")
         return [(FaceBox(bbox=BBox(x=0.1, y=0.1, w=0.2, h=0.2), confidence=0.9), _unit(1, 0, 0))]
 

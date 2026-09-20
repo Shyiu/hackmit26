@@ -10,40 +10,58 @@ from PIL import Image
 
 from ..config import Settings
 from .adapters.registry import Adapters
-from .models import EnrolledPerson, FaceBox, FaceObservation, FrameAnalysis, Gallery
+from .models import EnrolledPerson, FaceBox, FaceMatchCandidate, FaceObservation, FrameAnalysis, Gallery
 from .rules import evaluate_rules
 
 # A match has to beat the next person by this much, so a lookalike pair names nobody.
 MATCH_MARGIN = 0.05
 
 
-def _match_person(
-    embedding: np.ndarray, gallery: Gallery, threshold: float
-) -> tuple[EnrolledPerson | None, float | None]:
+def _ranked_candidates(embedding: np.ndarray, gallery: Gallery) -> list[tuple[EnrolledPerson, float]]:
+    """Every enrolled person's similarity to `embedding`, best first.
+
+    Each person scores as their best reference photo. Empty if there's no
+    gallery, or the embedding is zero or from a different model's space.
+    """
     if not gallery.people:
-        return None, None
+        return []
     norm = float(np.linalg.norm(embedding))
     if not norm or embedding.shape[0] != gallery.matrix.shape[1]:
-        return None, None
-    # Each person scores as their best reference photo.
+        return []
     scores = np.full(len(gallery.people), -1.0, dtype=np.float32)
     np.maximum.at(scores, gallery.owners, gallery.matrix @ (embedding / norm))
     order = np.argsort(scores)[::-1]
     # Clamped: float32 rounding puts an identical vector a hair over 1, which the model rejects.
-    best_score = float(min(max(scores[order[0]], 0.0), 1.0))
-    runner_up = float(scores[order[1]]) if len(order) > 1 else 0.0
-    if best_score < threshold or (len(order) > 1 and best_score - runner_up < MATCH_MARGIN):
-        return None, best_score
-    return gallery.people[int(order[0])], best_score
+    return [(gallery.people[int(i)], float(min(max(scores[i], 0.0), 1.0))) for i in order]
+
+
+def _match_person(
+    embedding: np.ndarray, gallery: Gallery, threshold: float
+) -> tuple[EnrolledPerson | None, float | None, list[tuple[EnrolledPerson, float]]]:
+    ranked = _ranked_candidates(embedding, gallery)
+    if not ranked:
+        return None, None, ranked
+    best_person, best_score = ranked[0]
+    runner_up = ranked[1][1] if len(ranked) > 1 else 0.0
+    if best_score < threshold or (len(ranked) > 1 and best_score - runner_up < MATCH_MARGIN):
+        return None, best_score, ranked
+    return best_person, best_score, ranked
 
 
 def detect_and_embed(
-    adapters: Adapters, image: np.ndarray, *, filename: str = ""
+    adapters: Adapters, image: np.ndarray, *, filename: str = "", for_enrollment: bool = False
 ) -> list[tuple[FaceBox, np.ndarray]]:
-    """One model pass when a single adapter does both jobs, as InsightFace does."""
+    """One model pass when a single adapter does both jobs, as InsightFace does.
+
+    `for_enrollment` asks the adapter for its most reliable (not necessarily
+    fastest) detection: enrollment is rare and its photos come in unpredictable
+    framing, unlike the live frame path, which stays on the fast setting.
+    """
     analyze = getattr(adapters.face_detector, "analyze", None)
     if analyze is not None and adapters.face_detector is adapters.face_embedder:
-        return list(analyze(image, filename=filename))
+        return list(analyze(image, filename=filename, for_enrollment=for_enrollment))
+    # The plain detect-then-embed path is the general FaceDetector/FaceEmbedder contract,
+    # implemented by mocks and test doubles that know nothing about for_enrollment.
     faces = adapters.face_detector.detect(image, filename=filename)
     embeddings = adapters.face_embedder.embed(image, faces) if faces else []
     return list(zip(faces, embeddings, strict=True))
@@ -85,7 +103,7 @@ def match_faces(
         current_stage = "faces"
         stage_started = time.perf_counter()
         for face, embedding in detect_and_embed(adapters, array, filename=filename):
-            person, score = _match_person(embedding, gallery, settings.face_match_threshold)
+            person, score, ranked = _match_person(embedding, gallery, settings.face_match_threshold)
             analysis.faces.append(
                 FaceObservation(
                     bbox=face.bbox,
@@ -94,6 +112,15 @@ def match_faces(
                     match_confidence=score,
                     name=person.name if person else None,
                     relation=person.relation if person else None,
+                    candidates=tuple(
+                        FaceMatchCandidate(
+                            person_id=candidate.person_id,
+                            name=candidate.name,
+                            relation=candidate.relation,
+                            similarity=similarity,
+                        )
+                        for candidate, similarity in ranked
+                    ),
                 )
             )
         analysis.stage_timings_ms["faces"] = (time.perf_counter() - stage_started) * 1000
