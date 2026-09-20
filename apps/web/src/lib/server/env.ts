@@ -16,6 +16,8 @@ export type ServerEnvName =
   | "OPENAI_API_KEY"
   | "NEXT_PUBLIC_PERCEPTION_WS_URL"
   | "PERCEPTION_URL"
+  | "SPLAT_SLAM_URL"
+  | "SPLAT_SLAM_KEY"
   | "S3_ENDPOINT"
   | "S3_BUCKET"
   | "S3_ACCESS_KEY_ID"
