@@ -7,7 +7,7 @@ runs on a phone worn on the chest (ADR 0003); Ray-Ban Meta is a later client. Th
 `/wear`; `/headset` redirects there. One Next.js app serves both the wearer
 pages and the caregiver dashboard, behind real per-family accounts: face recognition, danger
 detection, and proactive reminders are MVP scope now, not stretch goals, and every family's data is
-isolated by `patientId`, never by a single seeded login. README.md is the source of truth for the
+isolated by `patientId`, never by a single seeded login. PLAN.md is the source of truth for the
 spec, architecture, data model, current status, and build order. Read it first.
 
 ## Repo layout
@@ -22,7 +22,7 @@ packages/db/          zod 4 stored-document schemas, the collection registry, re
 services/perception/  Python FastAPI service: frame socket, sighting writes, description job queue
 scripts/              db:setup, db:seed, db:sweep, bench:tts, run from the repo root with pnpm
 docs/decisions/       ADRs
-docs/research/        dated model and vision research, each ending with proposed README changes
+docs/research/        dated model and vision research, each ending with proposed PLAN.md changes
 ```
 
 Wearer client code lives in `apps/web/src/hooks/` and `apps/web/src/lib/client/`. `useWearerClient`
@@ -57,7 +57,7 @@ scripts read the same file.
 ## Conventions
 
 - API routes live under `apps/web/src/app/api/*/route.ts`, one file per resource, matching the
-  table in README.md "API sketch". A route that isn't built yet validates its input and returns 501.
+  table in PLAN.md "API sketch". A route that isn't built yet validates its input and returns 501.
 - Wire shapes (request bodies, socket messages) are defined once, in `packages/shared/src/schemas/*.ts`.
   Stored documents are defined once, in `packages/db/src/schema/*.ts`, and each becomes its
   collection's MongoDB validator. See docs/decisions/0002. After changing a stored schema, run
@@ -70,7 +70,7 @@ scripts read the same file.
   keyframe guards, job leases) live in `app/store.py`, tested against the generated validators.
 - Dashboard pages live under `apps/web/src/app/dashboard/*`, one folder per nav item, including the
   newer `people` (face enrollment), `alerts` (danger/lost log), and `routines` (proactive reminders)
-  tabs from README.md "Caregiver dashboard".
+  tabs from PLAN.md "Caregiver dashboard".
 - `notifications.kind` values `danger_alert` and `lost_alert` are pushed to the caregiver immediately
   over Web Push, not just queued for the normal two-second poll. Don't downgrade a new alert-like
   notification kind to poll-only without adding its push path too.
@@ -85,7 +85,7 @@ scripts read the same file.
   Test on a phone through a tunnel or a Vercel URL. `allowedDevOrigins` in `apps/web/next.config.ts`
   lists the tunnel hostnames `next dev` accepts.
 - iPhone Safari has no element fullscreen, drops answer audio to the earpiece while the mic is open,
-  and can switch rear lenses on its own. README.md "What the page has to do" has the table and fixes.
+  and can switch rear lenses on its own. PLAN.md "What the page has to do" has the table and fixes.
 - The React Compiler lint rules are on, including `set-state-in-effect`, `refs`, and `purity`.
   React 19.2 has `useEffectEvent`, which the wearer views use for window listeners.
 - Hidden and headless browser tabs render about once a second, so `useFeedWatchdog` reports a
@@ -99,7 +99,7 @@ scripts read the same file.
 - `people` (face reference photos and embeddings) is consent-sensitive in a way `items` isn't: it
   identifies specific real people. Never send it to a third-party API, never widen a query to cross
   `patientId`, and never add a code path that matches against anything but that patient's own
-  enrolled set. See README.md "Faces, danger, and routines" and "Privacy and safety".
+  enrolled set. See PLAN.md "Faces, danger, and routines" and "Privacy and safety".
 - Face enrollment lives in the perception service, which owns the embedder and the encryption key.
   Enrolling and adding photos go through `apps/web/src/lib/server/perception.ts`, at `PERCEPTION_URL`,
   else the socket's host, else `http://127.0.0.1:8000`. Listing, renaming, and removing people read

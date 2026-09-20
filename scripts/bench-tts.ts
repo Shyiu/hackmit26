@@ -1,5 +1,5 @@
 // Measures the configured TTS provider from this machine: time to first audio
-// byte and total stream duration per run. See README.md "Text to speech:
+// byte and total stream duration per run. See PLAN.md "Text to speech:
 // ElevenLabs or Deepgram" and "Latency budget" (300 ms budget for first audio).
 //
 //   pnpm bench:tts [--runs 5] [--text "Your keys are on the kitchen table."]

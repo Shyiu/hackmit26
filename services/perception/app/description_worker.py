@@ -1,6 +1,6 @@
-"""Drains the description-job queue against the vision model. README "Description job".
+"""Drains the description-job queue against the vision model. PLAN.md "Description job".
 
-Runs as a background task in the same process as the frame socket, per README
+Runs as a background task in the same process as the frame socket, per PLAN.md
 "From detections to sightings": "the existing perception worker can process it
 without another queue service." `ObservationStore` already bounds queue size,
 coalesces superseded keyframes, and fences a completion against newer evidence,

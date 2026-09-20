@@ -15,7 +15,7 @@ const changes = await withDatabase((db) =>
     prune: flags.has("--prune"),
     search: flags.has("--search")
       ? {
-          // README: text-embedding-3-small is 1536 wide unless you ask for fewer.
+          // PLAN.md: text-embedding-3-small is 1536 wide unless you ask for fewer.
           textEmbeddingDimensions: intEnv("OPENAI_EMBEDDING_DIMENSIONS", 1536),
           roomEmbeddingDimensions: intEnv("ROOM_EMBEDDING_DIMENSIONS", 512),
         }

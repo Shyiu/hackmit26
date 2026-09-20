@@ -111,7 +111,7 @@ ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1
 
 
 class DescriptionResult(BaseModel):
-    """What the vision model returns for a keyframe. README "Description job"."""
+    """What the vision model returns for a keyframe. PLAN.md "Description job"."""
 
     model_config = ConfigDict(str_strip_whitespace=True, frozen=True)
 
@@ -375,7 +375,7 @@ class ObservationStore:
                 "patientId": patient_id,
                 "deviceId": device_id,
                 "source": source,
-                # Capture starts paused and the wearer resumes it. README "Privacy and safety".
+                # Capture starts paused and the wearer resumes it. PLAN.md "Privacy and safety".
                 "state": "paused",
                 "startedAt": now,
                 "updatedAt": now,

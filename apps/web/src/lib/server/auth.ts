@@ -19,7 +19,7 @@ import { z } from "zod";
 import { getDb } from "./db";
 import { requireEnv } from "./env";
 
-// Two ways in, per README "Caregiver dashboard": a caregiver session cookie,
+// Two ways in, per PLAN.md "Caregiver dashboard": a caregiver session cookie,
 // which the /headset and /sim pages also ride on once the caregiver signs in
 // on the phone, and a bearer device token for native clients later. Either
 // way the wearer comes from a signed credential, never from a request body.
@@ -163,7 +163,7 @@ function digest(value: string) {
 }
 
 /**
- * The one caregiver login from env, README open decision 7. Both comparisons
+ * The one caregiver login from env, PLAN.md open decision 7. Both comparisons
  * always run and take the same time whatever the input.
  */
 export function credentialsMatch(email: string, password: string): boolean {

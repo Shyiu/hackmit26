@@ -3,7 +3,7 @@ import { SimulatorView } from "./simulator-view";
 
 export const metadata: Metadata = { title: "Simulator" };
 
-// Capture path A: the wear client on a flat page. See README "Capture paths".
+// Capture path A: the wear client on a flat page. See PLAN.md "Capture paths".
 export default function SimPage() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-5 px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-8">

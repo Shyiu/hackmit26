@@ -18,7 +18,7 @@ export const viewport: Viewport = {
 };
 
 // The chest page: the rear camera streams frames, a tap asks a question, and
-// the answer is spoken and shown as a caption. README "What the page has to do".
+// the answer is spoken and shown as a caption. PLAN.md "What the page has to do".
 export default function WearPage() {
   return <WearView />;
 }
