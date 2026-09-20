@@ -198,4 +198,4 @@ Late and replayed writes can't undo newer evidence:
 
 ## Description worker
 
-The background vision call also verifies the item, and records a box it cannot verify as unknown.
+`app/description_worker.py` runs as a background task in the same process. It claims one due job at a time, loads the keyframe from `FRAME_IMAGE_DIR`, and sends it with the box and the item's name to the vision model (`app/vision.py`, `OPENAI_API_KEY` or `VLM_API_KEY`; without a key `MockDescriptionVLM` answers `unknown`). The model returns room, surface, relation, state, the location fragment, nearby objects, and `item_visible`. A box the model cannot confirm as the named item is recorded as state `unknown`, so the wearer hears "I could not tell where" rather than a description of the wrong object.
