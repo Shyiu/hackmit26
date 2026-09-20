@@ -312,6 +312,14 @@ class ObservationStore:
             await self.cancel_queued_jobs(patient_id, now)
         return result.matched_count == 1
 
+    async def touch_capture_session(self, patient_id: ObjectId, session_id: ObjectId) -> bool:
+        """Marks a still-open session as heard from. False if it's unknown or already ended."""
+        result = await self._sessions.update_one(
+            {"_id": session_id, "patientId": patient_id, "state": {"$ne": "ended"}},
+            {"$set": {"updatedAt": self._now()}},
+        )
+        return result.matched_count == 1
+
     async def record_frame(
         self, patient_id: ObjectId, session_id: ObjectId, seq: int, received_at: datetime, dropped: bool
     ) -> None:

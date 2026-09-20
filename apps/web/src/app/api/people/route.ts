@@ -1,10 +1,12 @@
 import { HttpError, withTenant } from "@/lib/server/api";
-import { listPeople, perceptionFetch, personView } from "@/lib/server/perception";
+import { listPeople, perceptionFetch, personFromUpstream, personView } from "@/lib/server/perception";
 
-// Face enrollment. The photos and embeddings live in the perception service, which
-// matches a wearer's frames against that wearer's own people and nobody else's.
-export const GET = withTenant("caregiver", async ({ principal }) => {
-  return Response.json({ people: await listPeople(principal.patientId) });
+// Face enrollment. Enrolling needs the perception service, which owns the face
+// embedder and the key the embeddings are encrypted with; it writes the person to
+// Mongo, which is where the list is read from, so listing works even when
+// perception is down or unreachable from where the web app is deployed.
+export const GET = withTenant("caregiver", async ({ tenant }) => {
+  return Response.json({ people: await listPeople(tenant) });
 });
 
 const MAX_PHOTOS = 5;
@@ -31,5 +33,5 @@ export const POST = withTenant("caregiver", async ({ request, principal }) => {
   for (const photo of photos) upstream.append("photos", photo, photo.name);
 
   const response = await perceptionFetch(principal.patientId, "/people", { method: "POST", body: upstream });
-  return Response.json(personView(await response.json()), { status: 201 });
+  return Response.json(personView(personFromUpstream(await response.json())), { status: 201 });
 });

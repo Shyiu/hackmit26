@@ -1,15 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { Circle, Square } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CameraSelect } from "@/components/wearer/camera-select";
+import { PairForm } from "@/components/wearer/pair-form";
 import { RecordingsList } from "@/components/wearer/recordings-list";
 import { useDisplayMode } from "@/hooks/use-screen";
 import type { WearerClient } from "@/hooks/use-wearer-client";
-import { cn } from "@/lib/utils";
 
 const SAMPLE_ANSWER =
   "I last saw your keys on the kitchen counter, next to the coffee maker, about twenty minutes ago.";
@@ -50,6 +49,8 @@ export function SetupPanel({
   const trackSettings = track?.getSettings();
   const resolution =
     trackSettings?.width && trackSettings.height ? `, ${trackSettings.width}×${trackSettings.height}` : "";
+  const lensLabel =
+    camera.lens === "ultrawide" ? " · 0.5× ultra wide" : camera.lens === "wide" ? " · 1× wide" : "";
 
   function submitQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,10 +73,13 @@ export function SetupPanel({
 
         {client.signedIn === false && (
           <div className="flex flex-col gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 p-4">
-            <p>Nobody is signed in on this phone. A caregiver signs in once, and this page uses that session.</p>
-            <Link href="/login?next=/wear" className={cn(buttonVariants({ size: "lg" }), "self-start")}>
-              Sign in
-            </Link>
+            <div>
+              <h2 className="font-medium">Pair this phone</h2>
+              <p className="mt-1 text-sm text-white/70">
+                Ask the caregiver to open Dashboard → Settings → Pair a phone and read you the 6-digit code.
+              </p>
+            </div>
+            <PairForm defaultLabel="Chest phone" />
           </div>
         )}
 
@@ -197,7 +201,7 @@ export function SetupPanel({
           <h2 className="font-medium">This phone</h2>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm text-white/80">
             <dt>Camera</dt>
-            <dd className="break-words">{track ? `${track.label || "unnamed"}${resolution}` : "not open"}</dd>
+            <dd className="break-words">{track ? `${track.label || "unnamed"}${resolution}${lensLabel}` : "not open"}</dd>
             <dt>Microphone</dt>
             <dd>{voice.error ?? (voice.micAllowed ? "allowed" : "not asked yet")}</dd>
             <dt>Speech to text</dt>

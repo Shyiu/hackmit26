@@ -607,29 +607,37 @@ def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_fram
         )
         assert item is not None
         if disconnect_during_write:
+            # The keyframe is enqueued after open_sighting returns, so the socket goes away
+            # while the write is still held and the held write is then released.
             assert write_finished.wait(5)
+            ws.close()
+            release_write.set()
         job = _wait_for(
             lambda: db["description_jobs"].find_one({"patientId": PATIENT, "sightingId": sighting["_id"]})
         )
         sighting = db["sightings"].find_one({"_id": sighting["_id"]})
-        assert job["status"] == "queued"
+        # After a disconnect the sighting may already be closed and the job cancelled,
+        # so its status is only asserted while the socket stays open.
+        assert disconnect_during_write or job["status"] == "queued"
         assert job["bbox"] == [0.4, 0.3, 0.2, 0.2]
         assert sighting["keyframeKey"] == job["keyframeKey"]
         assert sighting["thumbKey"] == job["keyframeKey"].removesuffix(".jpg") + ".thumb.jpg"
         bucket = GridFSBucket(db, bucket_name="keyframes")
         assert bucket.open_download_stream_by_name(sighting["keyframeKey"]).read() == JPEG
         assert bucket.open_download_stream_by_name(sighting["thumbKey"]).read()
-        ws.send_bytes(_frame(session_id, 4))
-        reply = parse_server_message(ws.receive_text())
-        assert isinstance(reply, DetectionsMessage) and reply.seq == 4
-        time.sleep(0.1)
-        assert db["description_jobs"].count_documents({"sightingId": sighting["_id"]}) == 1
-        ws.close()
-        release_write.set()
+        if not disconnect_during_write:
+            ws.send_bytes(_frame(session_id, 4))
+            reply = parse_server_message(ws.receive_text())
+            assert isinstance(reply, DetectionsMessage) and reply.seq == 4
+            time.sleep(0.1)
+            assert db["description_jobs"].count_documents({"sightingId": sighting["_id"]}) == 1
+            ws.close()
         _wait_for(lambda: db["sightings"].find_one({"_id": sighting["_id"], "status": "closed"}))
 
     # Only the active item's prompts reached the detector.
-    assert [[p.text for p in prompts] for _, prompts in detector.seen] == [["keys"]] * 4
+    assert [[p.text for p in prompts] for _, prompts in detector.seen] == [["keys"]] * (
+        3 if disconnect_during_write else 4
+    )
 
 
 def test_zero_keyframe_interval_enqueues_on_refresh(

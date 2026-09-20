@@ -1,14 +1,26 @@
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
-import type { Db } from "mongodb";
-import { newId, type CaregiverId, type CaregiverPairingCodeId, type PatientId } from "./ids";
+import type { Collection, Db, Document, Filter, ObjectId } from "mongodb";
+import {
+  newId,
+  type CaregiverId,
+  type CaregiverPairingCodeId,
+  type DeviceId,
+  type PairingCodeId,
+  type PatientId,
+} from "./ids";
 import { parseDocument } from "./errors";
 import { collection } from "./registry";
+import type { CaptureSource } from "./schema/common";
 import {
   CAREGIVER_PAIRING_CODE_LENGTH,
   CAREGIVER_PAIRING_CODE_MAX_ATTEMPTS,
   caregiverPairingCodeDocSchema,
+  PAIRING_CODE_LENGTH,
+  PAIRING_CODE_MAX_ATTEMPTS,
+  pairingCodeDocSchema,
   type CaregiverDoc,
   type CaregiverPairingCodeDoc,
+  type PairingCodeDoc,
 } from "./schema/tenancy";
 
 // A caregiver joining an existing wearer. Same hash/timing-safe-compare/expiry
@@ -27,6 +39,7 @@ export function generateCaregiverPairingCode(): string {
 }
 
 const CAREGIVER_PAIRING_CODE_TTL_SECONDS = 600; // 10 minutes
+const DEVICE_PAIRING_CODE_TTL_SECONDS = 600;
 
 export async function createCaregiverPairingCode(
   db: Db,
@@ -48,6 +61,83 @@ export async function createCaregiverPairingCode(
   return { code, pairingCode: doc };
 }
 
+export function generateDevicePairingCode(): string {
+  return randomInt(0, 10 ** PAIRING_CODE_LENGTH)
+    .toString()
+    .padStart(PAIRING_CODE_LENGTH, "0");
+}
+
+export async function createDevicePairingCode(
+  db: Db,
+  patientId: PatientId,
+  kind: CaptureSource,
+  now = new Date(),
+): Promise<{ code: string; pairingCode: PairingCodeDoc }> {
+  const code = generateDevicePairingCode();
+  const doc = parseDocument(pairingCodeDocSchema, {
+    _id: newId<PairingCodeId>(),
+    patientId,
+    codeHash: hashCaregiverPairingCode(code),
+    attempts: 0,
+    expiresAt: new Date(now.getTime() + DEVICE_PAIRING_CODE_TTL_SECONDS * 1000),
+    redeemedAt: null,
+    redeemedBy: null,
+    kind,
+    createdAt: now,
+  });
+  await collection(db, "pairingCodes").insertOne(doc);
+  return { code, pairingCode: doc };
+}
+
+type RedeemablePairingCode = {
+  _id: ObjectId;
+  codeHash: string;
+  attempts: number;
+  expiresAt: Date;
+  redeemedAt: Date | null;
+};
+
+async function redeemPairingCode<TCode extends RedeemablePairingCode>(
+  codes: Collection<TCode>,
+  code: string,
+  maxAttempts: number,
+  now: Date,
+): Promise<TCode | null> {
+  const liveFilter = {
+      redeemedAt: null,
+      expiresAt: { $gt: now },
+      attempts: { $lt: maxAttempts },
+    } as Filter<TCode>;
+  const live = await codes.find(liveFilter).toArray();
+  const guessHash = Buffer.from(hashCaregiverPairingCode(code), "hex");
+  const matches: ObjectId[] = [];
+  for (const pairingCode of live) {
+    const storedHash = Buffer.from(pairingCode.codeHash, "hex");
+    if (timingSafeEqual(guessHash, storedHash)) matches.push(pairingCode._id);
+  }
+  if (matches.length === 0) {
+    await codes.updateMany(
+      liveFilter,
+      { $inc: { attempts: 1 } } as Document,
+    );
+    return null;
+  }
+  for (const id of matches) {
+    const claimed = await codes.findOneAndUpdate(
+      {
+        _id: id,
+        redeemedAt: null,
+        expiresAt: { $gt: now },
+        attempts: { $lt: maxAttempts },
+      } as Filter<TCode>,
+      { $set: { redeemedAt: now } } as Document,
+      { returnDocument: "after" },
+    );
+    if (claimed) return claimed as TCode;
+  }
+  return null;
+}
+
 export type RedeemCaregiverCodeResult =
   | { kind: "redeemed"; pairingCode: CaregiverPairingCodeDoc }
   | { kind: "invalid" };
@@ -55,53 +145,36 @@ export type RedeemCaregiverCodeResult =
 /**
  * Compares a guess against every live code before claiming a matching one.
  * Wrong guesses burn all outstanding codes after the maximum number of tries.
- * Mirrors the device-pairing redeem shape exactly (packages/db/src/pairing.ts
- * on origin/devin/1789876293-device-pairing), operating on caregiverPairingCodes
- * instead of pairingCodes, and setting redeemedBy instead of a deviceId.
  */
 export async function redeemCaregiverPairingCode(
   db: Db,
   code: string,
   now = new Date(),
 ): Promise<RedeemCaregiverCodeResult> {
-  const live = await collection(db, "caregiverPairingCodes")
-    .find({
-      redeemedAt: null,
-      expiresAt: { $gt: now },
-      attempts: { $lt: CAREGIVER_PAIRING_CODE_MAX_ATTEMPTS },
-    })
-    .toArray();
-  const guessHash = Buffer.from(hashCaregiverPairingCode(code), "hex");
-  const matches: CaregiverPairingCodeId[] = [];
-  for (const pairingCode of live) {
-    const storedHash = Buffer.from(pairingCode.codeHash, "hex");
-    if (timingSafeEqual(guessHash, storedHash)) matches.push(pairingCode._id);
-  }
-  if (matches.length === 0) {
-    await collection(db, "caregiverPairingCodes").updateMany(
-      {
-        redeemedAt: null,
-        expiresAt: { $gt: now },
-        attempts: { $lt: CAREGIVER_PAIRING_CODE_MAX_ATTEMPTS },
-      },
-      { $inc: { attempts: 1 } },
-    );
-    return { kind: "invalid" };
-  }
-  for (const id of matches) {
-    const claimed = await collection(db, "caregiverPairingCodes").findOneAndUpdate(
-      {
-        _id: id,
-        redeemedAt: null,
-        expiresAt: { $gt: now },
-        attempts: { $lt: CAREGIVER_PAIRING_CODE_MAX_ATTEMPTS },
-      },
-      { $set: { redeemedAt: now } },
-      { returnDocument: "after" },
-    );
-    if (claimed) return { kind: "redeemed", pairingCode: claimed };
-  }
-  return { kind: "invalid" };
+  const pairingCode = await redeemPairingCode(
+    collection(db, "caregiverPairingCodes"),
+    code,
+    CAREGIVER_PAIRING_CODE_MAX_ATTEMPTS,
+    now,
+  );
+  return pairingCode ? { kind: "redeemed", pairingCode } : { kind: "invalid" };
+}
+
+export async function redeemDevicePairingCode(
+  db: Db,
+  code: string,
+  now = new Date(),
+): Promise<{ kind: "redeemed"; pairingCode: PairingCodeDoc } | { kind: "invalid" }> {
+  const pairingCode = await redeemPairingCode(collection(db, "pairingCodes"), code, PAIRING_CODE_MAX_ATTEMPTS, now);
+  return pairingCode ? { kind: "redeemed", pairingCode } : { kind: "invalid" };
+}
+
+export async function markPairingCodeRedeemedBy(
+  db: Db,
+  codeId: PairingCodeId,
+  deviceId: DeviceId,
+): Promise<void> {
+  await collection(db, "pairingCodes").updateOne({ _id: codeId }, { $set: { redeemedBy: deviceId } });
 }
 
 export type AttachPatientResult =

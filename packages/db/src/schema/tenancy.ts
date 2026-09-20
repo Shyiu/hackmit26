@@ -4,6 +4,7 @@ import {
   type CaregiverId,
   type CaregiverPairingCodeId,
   type DeviceId,
+  type PairingCodeId,
   type PatientId,
 } from "../ids";
 import { captureSource, shortText, timestamps, unitInterval } from "./common";
@@ -107,8 +108,10 @@ export type DeviceDoc = z.infer<typeof deviceDocSchema>;
 // first run" adjacent: same hash/timing-safe-compare/expiry shape as a device
 // pairing code (see redeemCaregiverPairingCode in ../pairing.ts), but redeemed
 // by a second caregiver's own account instead of minting a device token.
-export const CAREGIVER_PAIRING_CODE_LENGTH = 6;
-export const CAREGIVER_PAIRING_CODE_MAX_ATTEMPTS = 5;
+export const PAIRING_CODE_LENGTH = 6;
+export const PAIRING_CODE_MAX_ATTEMPTS = 5;
+export const CAREGIVER_PAIRING_CODE_LENGTH = PAIRING_CODE_LENGTH;
+export const CAREGIVER_PAIRING_CODE_MAX_ATTEMPTS = PAIRING_CODE_MAX_ATTEMPTS;
 
 export const caregiverPairingCodeDocSchema = z.strictObject({
   _id: idSchema<CaregiverPairingCodeId>(),
@@ -124,3 +127,19 @@ export const caregiverPairingCodeDocSchema = z.strictObject({
 });
 
 export type CaregiverPairingCodeDoc = z.infer<typeof caregiverPairingCodeDocSchema>;
+
+export const pairingCodeDocSchema = z.strictObject({
+  _id: idSchema<PairingCodeId>(),
+  patientId: idSchema<PatientId>(),
+  /** sha256 hex of the 6 digits. The plain code is shown once and never stored. */
+  codeHash: z.string().regex(/^[0-9a-f]{64}$/),
+  /** Wrong guesses seen while this code was live. At the max attempts it is burned. */
+  attempts: z.int().nonnegative(),
+  expiresAt: z.date(),
+  redeemedAt: z.date().nullable(),
+  redeemedBy: idSchema<DeviceId>().nullable(),
+  kind: captureSource,
+  createdAt: z.date(),
+});
+
+export type PairingCodeDoc = z.infer<typeof pairingCodeDocSchema>;

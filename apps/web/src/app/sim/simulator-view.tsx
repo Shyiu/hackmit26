@@ -1,13 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useEffectEvent, useState, type FormEvent } from "react";
 import { Circle, Mic, Pause, Play, Square } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CameraSelect } from "@/components/wearer/camera-select";
 import { FaceLabels, Hud, ItemLabels, StallCard } from "@/components/wearer/hud";
+import { PairForm } from "@/components/wearer/pair-form";
 import { LiveVideo } from "@/components/wearer/live-video";
+import { NoticeStack } from "@/components/wearer/notice-stack";
 import { RecordingsList } from "@/components/wearer/recordings-list";
 import { useVideoAspect } from "@/hooks/use-video-frames";
 import { useWearerClient } from "@/hooks/use-wearer-client";
@@ -72,11 +73,14 @@ export function SimulatorView() {
   return (
     <div className="flex flex-col gap-4">
       {client.signedIn === false && (
-        <div className="flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <p>Sign in first. Answers and frame upload use the caregiver session.</p>
-          <Link href="/login?next=/sim" className={buttonVariants()}>
-            Sign in
-          </Link>
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+          <div>
+            <h2 className="font-medium">Pair this phone</h2>
+            <p className="mt-1 text-muted-foreground">
+              Ask the caregiver to open Dashboard → Settings → Pair a phone and read you the 6-digit code.
+            </p>
+          </div>
+          <PairForm defaultLabel="Simulator" />
         </div>
       )}
 
@@ -84,6 +88,7 @@ export function SimulatorView() {
         <LiveVideo stream={camera.stream} onElement={client.setVideo} className="absolute inset-0 size-full object-contain" />
         <ItemLabels detections={perception.detections} />
         <FaceLabels faces={perception.faces} />
+        <NoticeStack notices={client.notices} onDismiss={client.dismissNotice} className="absolute top-3 right-3 z-10 w-72 max-w-[80%]" />
         <Hud
           className="inset-x-[6%] text-[0.85rem] sm:text-base"
           message={hud.message}

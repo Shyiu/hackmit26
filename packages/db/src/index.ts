@@ -30,11 +30,14 @@ export {
 } from "./setup";
 export { sweepExpired, type SweepOptions, type SweepReport } from "./retention";
 export { TenantCollection } from "./tenant-collection";
-export { createCaregiver, createPatient, findCaregiverByEmail, recordLogin } from "./accounts";
+export { createCaregiver, createPatient, findCaregiverByEmail, listPatientsByIds, recordLogin } from "./accounts";
 export {
   addPatientToCaregiver,
   createCaregiverPairingCode,
+  createDevicePairingCode,
+  markPairingCodeRedeemedBy,
   redeemCaregiverPairingCode,
+  redeemDevicePairingCode,
   type AttachPatientResult,
   type RedeemCaregiverCodeResult,
 } from "./pairing";
@@ -43,6 +46,7 @@ export type { ItemPatch, ItemResolution, NewItem } from "./repos/items";
 export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/interactions";
 export type { NewNotification } from "./repos/notifications";
 export type { DangerEventQuery } from "./repos/danger-events";
+export type { PersonPatch, PublicPerson, RecognizedPerson } from "./repos/people";
 export type { SightingQuery } from "./repos/sightings";
 
 export * from "./schema/common";
