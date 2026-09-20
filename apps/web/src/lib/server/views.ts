@@ -3,6 +3,7 @@ import {
   locationStatus,
   ObjectId,
   type CaptureSessionDoc,
+  type DangerEventDoc,
   type InteractionDoc,
   type ItemDoc,
   type NotificationDoc,
@@ -73,6 +74,10 @@ export function notificationView(notification: NotificationDoc) {
   return toJson(without(notification, ["patientId"]));
 }
 
+export function dangerEventView(event: DangerEventDoc) {
+  return toJson(without(event, ["patientId"]));
+}
+
 // A frame socket that hasn't sent anything for this long counts as gone, even
 // if the service never got to mark its session ended.
 const CAPTURE_STALE_AFTER_MS = 15_000;
@@ -100,3 +105,4 @@ export type InteractionView = ReturnType<typeof interactionView>;
 export type RoomView = ReturnType<typeof roomView>;
 export type RoutineView = ReturnType<typeof routineView>;
 export type NotificationView = ReturnType<typeof notificationView>;
+export type DangerEventView = ReturnType<typeof dangerEventView>;

@@ -36,6 +36,7 @@ export type { ItemPatch, ItemResolution, NewItem } from "./repos/items";
 export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/interactions";
 export type { NewNotification } from "./repos/notifications";
 export type { NewRoutine, RoutinePatch } from "./repos/routines";
+export type { DangerEventQuery } from "./repos/danger-events";
 export type { SightingQuery } from "./repos/sightings";
 
 export * from "./schema/common";
