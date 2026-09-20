@@ -429,7 +429,14 @@ class FrameConnection:
                     events = self.tracker.observe(
                         detections, pending.observed_at, header.seq, (header.width, header.height)
                     )
-                    await self.writer.apply(events)
+                    # A write can reach MongoDB before apply() records its sighting ID.
+                    # Finish that bookkeeping before disconnect cleanup closes the tracks.
+                    write = asyncio.create_task(self.writer.apply(events))
+                    try:
+                        await asyncio.shield(write)
+                    except asyncio.CancelledError:
+                        await write
+                        raise
             except WebSocketDisconnect:
                 return
             except Exception:
