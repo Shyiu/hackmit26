@@ -44,6 +44,7 @@ pnpm db:up            # local MongoDB 8.0 with Atlas Search in Docker, on :27017
 pnpm db:setup         # sync collections, validators, indexes; --search adds vector indexes
 pnpm db:seed          # demo wearer, caregiver, 3 items with sightings; --reset starts over
 pnpm db:sweep         # delete records past retention
+pnpm scan:sim --frames <dir>   # post a folder of JPEGs to the live room scan, as a phone would
 cd services/perception && uv run pytest   # the Python tests, also against MongoDB
 cloudflared tunnel --url http://localhost:3000   # HTTPS URL for testing on a phone
 cd apps/ios && CAP_SERVER_URL=https://<host> pnpm sync   # point the iOS app at a URL; rerun on change
@@ -69,8 +70,8 @@ scripts read the same file.
 - `services/perception` writes sightings and item snapshots itself. Its write rules (version checks,
   keyframe guards, job leases) live in `app/store.py`, tested against the generated validators.
 - Dashboard pages live under `apps/web/src/app/dashboard/*`, one folder per nav item, including the
-  newer `people` (face enrollment), `alerts` (danger/lost log), and `routines` (proactive reminders)
-  tabs from README.md "Caregiver dashboard".
+  newer `people` (face enrollment), `alerts` (danger/lost log), and `routines` (proactive reminders),
+  and `map` (the 3D room scan) tabs from README.md "Caregiver dashboard".
 - `notifications.kind` values `danger_alert` and `lost_alert` are pushed to the caregiver immediately
   over Web Push, not just queued for the normal two-second poll. Don't downgrade a new alert-like
   notification kind to poll-only without adding its push path too.
@@ -113,5 +114,13 @@ scripts read the same file.
   `allowedDevOrigins` entry. `apps/ios/ios/App/App/capacitor.config.json` is generated and ignored.
 - Answers are spoken with the browser's `speechSynthesis` until server TTS lands. iPhone only speaks
   after a tap has spoken once, so `primeSpeech()` runs inside every tap that can lead to an answer.
+- Room scan pins are per scene. `room-demo` pins are in the GLB's y-up frame and live pins are in
+  splat-slam world coordinates, so a pin never moves between scenes.
+- A live pin's depth is resolved in the caregiver's browser, by raycasting the splat. Until a Map tab
+  is open the pin stays unresolved, and the arrow is drawn along the view ray.
+- splat-slam is a separate repo and service (`../splat-slam`). This app only proxies to it at
+  `SPLAT_SLAM_URL`; without that, the live scan routes return 503 and the static scene still works.
+- Live pin rays assume a 9:16 portrait feed, because splat-slam's `cameras.json` has no aspect. Keep
+  the scan feed portrait, or make splat-slam write a per-camera `aspect`; the viewer reads it.
 - Buttons and inputs grow on `pointer-coarse`. A desktop preview reports a mouse, so check touch
   sizes on a phone.
