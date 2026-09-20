@@ -197,3 +197,7 @@ Late and replayed writes can't undo newer evidence:
 - A description reaches the item only while the item still shows the same version, sighting and keyframe revision. Otherwise it only enriches the old sighting, and the item's last resting spot if that is still the described keyframe.
 - Snapshot writes leave the item's `updatedAt` alone. It marks caregiver edits, and the web app refuses a save when it moved.
 - A worker finishes only the attempt it claimed. The job's `attempts` count is the fencing token, and `runAfter` doubles as the lease expiry.
+
+## Description worker
+
+`app/description_worker.py` runs as a background task in the same process. It claims one due job at a time, loads the keyframe from `FRAME_IMAGE_DIR`, and sends it with the box and the item's name to the vision model (`app/vision.py`, `OPENAI_API_KEY` or `VLM_API_KEY`; without a key `MockDescriptionVLM` answers `unknown`). The model returns room, surface, relation, state, the location fragment, nearby objects, and `item_visible`. A box the model cannot confirm as the named item is recorded as state `unknown`, so the wearer hears "I could not tell where" rather than a description of the wrong object.
