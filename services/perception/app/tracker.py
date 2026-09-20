@@ -15,6 +15,7 @@ database.
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -22,12 +23,13 @@ from datetime import datetime, timedelta
 from bson import ObjectId
 
 from .config import Settings
+from .keyframes import KeyframeStore, make_thumb, thumb_key
 from .protocol import Detection
-from .safety.images import LocalFrameStore
-from .store import BBox, CaptureSource, ObservationStore, OpenedSighting
+from .store import BBox, CaptureSource, ObservationStore
 
 HIGH_CONFIDENCE = 0.5
 LOW_CONFIDENCE = 0.1
+log = logging.getLogger("perception.tracker")
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,15 +269,20 @@ class SightingWriter:
         session_id: ObjectId,
         device_id: ObjectId | None,
         source: CaptureSource,
-        frame_store: LocalFrameStore | None = None,
+        keyframe_store: KeyframeStore | None = None,
+        keyframe_interval: timedelta = timedelta(seconds=10),
     ) -> None:
         self._store = store
         self._patient_id = patient_id
         self._session_id = session_id
         self._device_id = device_id
         self._source = source
-        self._frame_store = frame_store
+        self._keyframe_store = keyframe_store
+        self._keyframe_interval = keyframe_interval
         self._sightings: dict[int, ObjectId] = {}
+        self._observation_versions: dict[int, int] = {}
+        self._last_keyframe: dict[int, datetime] = {}
+        self._background: set[asyncio.Task[None]] = set()
 
     def event_id(self, track_id: int) -> str:
         # Stable per track, so a replayed open changes nothing.
@@ -302,10 +309,13 @@ class SightingWriter:
                         confidence=event.confidence,
                     )
                     self._sightings[event.track_id] = opened.sighting_id
-                    if frame_jpeg is not None and opened.created and self._frame_store is not None:
+                    self._observation_versions[event.track_id] = opened.observation_version
+                    if frame_jpeg is not None and opened.created and self._keyframe_store is not None:
                         # A replayed open reuses the earlier keyframe; only a genuinely
                         # new sighting needs one enqueued for the vision model.
-                        await self._enqueue_keyframe(self._frame_store, opened, event, frame_jpeg)
+                        self._schedule_keyframe(
+                            event, opened.sighting_id, opened.observation_version, frame_jpeg
+                        )
                 case SightingRefreshed():
                     sighting_id = self._sightings.get(event.track_id)
                     if sighting_id is not None:
@@ -318,21 +328,80 @@ class SightingWriter:
                             event.bbox,
                             event.confidence,
                         )
+                        last_keyframe = self._last_keyframe.get(event.track_id)
+                        if (
+                            frame_jpeg is not None
+                            and self._keyframe_store is not None
+                            and (
+                                last_keyframe is None
+                                or event.observed_at - last_keyframe >= self._keyframe_interval
+                            )
+                        ):
+                            self._last_keyframe[event.track_id] = event.observed_at
+                            self._schedule_keyframe(
+                                event,
+                                sighting_id,
+                                self._observation_versions[event.track_id],
+                                frame_jpeg,
+                            )
                 case SightingClosed():
                     sighting_id = self._sightings.pop(event.track_id, None)
+                    self._observation_versions.pop(event.track_id, None)
+                    self._last_keyframe.pop(event.track_id, None)
                     if sighting_id is not None:
                         await self._store.close_sighting(self._patient_id, sighting_id)
 
-    async def _enqueue_keyframe(
-        self, frame_store: LocalFrameStore, opened: OpenedSighting, event: SightingOpened, frame_jpeg: bytes
+    def _schedule_keyframe(
+        self,
+        event: SightingOpened | SightingRefreshed,
+        sighting_id: ObjectId,
+        observation_version: int,
+        frame_jpeg: bytes,
     ) -> None:
-        stored = await asyncio.to_thread(frame_store.put, self._patient_id, frame_jpeg, event.observed_at)
+        self._last_keyframe[event.track_id] = event.observed_at
+        task = asyncio.create_task(
+            self._store_and_enqueue(
+                event,
+                sighting_id,
+                observation_version,
+                frame_jpeg,
+            )
+        )
+        self._background.add(task)
+        task.add_done_callback(self._background_done)
+
+    def _background_done(self, task: asyncio.Task[None]) -> None:
+        self._background.discard(task)
+        if not task.cancelled() and (error := task.exception()) is not None:
+            log.error(
+                "Keyframe task failed",
+                exc_info=(type(error), error, error.__traceback__),
+            )
+
+    async def _store_and_enqueue(
+        self,
+        event: SightingOpened | SightingRefreshed,
+        sighting_id: ObjectId,
+        observation_version: int,
+        frame_jpeg: bytes,
+    ) -> None:
+        assert self._keyframe_store is not None
+        # The DB revision is assigned inside enqueue_description; the key carries observed time instead.
+        key = f"{self._patient_id}/{sighting_id}/{int(event.observed_at.timestamp() * 1000)}.jpg"
+        thumb = await asyncio.to_thread(make_thumb, frame_jpeg)
+        await self._keyframe_store.put(key, frame_jpeg, "image/jpeg")
+        await self._keyframe_store.put(thumb_key(key), thumb, "image/jpeg")
         await self._store.enqueue_description(
             self._patient_id,
             ObjectId(event.item_id),
-            opened.sighting_id,
-            opened.observation_version,
-            stored.key,
+            sighting_id,
+            observation_version,
+            key,
             event.bbox,
             event.observed_at,
+            thumb_key=thumb_key(key),
         )
+
+    async def drain(self) -> None:
+        while self._background:
+            await asyncio.gather(*tuple(self._background), return_exceptions=True)
