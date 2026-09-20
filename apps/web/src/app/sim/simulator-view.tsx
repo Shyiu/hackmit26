@@ -6,7 +6,7 @@ import { Circle, Mic, Pause, Play, Square } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CameraSelect } from "@/components/wearer/camera-select";
-import { Hud, ItemLabels, StallCard } from "@/components/wearer/hud";
+import { FaceLabels, Hud, ItemLabels, StallCard } from "@/components/wearer/hud";
 import { LiveVideo } from "@/components/wearer/live-video";
 import { RecordingsList } from "@/components/wearer/recordings-list";
 import { useVideoAspect } from "@/hooks/use-video-frames";
@@ -17,13 +17,22 @@ import { cn } from "@/lib/utils";
 // from the perception service, hold-to-ask, and a typed question for testing
 // without speech to text.
 export function SimulatorView() {
-  const client = useWearerClient({ turnMode: "hold" });
+  const client = useWearerClient({ turnMode: "hold", autoResumeOnReconnect: true });
   const { camera, recorder, hud, voice, perception, live, capturing } = client;
   const aspect = useVideoAspect(client.video);
   const [question, setQuestion] = useState("");
+  // Ticks the "faces last seen Ns ago" debug line below.
+  const [now, setNow] = useState(() => Date.now());
 
   const startOnMount = useEffectEvent(() => void client.start());
   useEffect(() => startOnMount(), []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const facesAge = perception.facesUpdatedAt === null ? null : Math.round((now - perception.facesUpdatedAt) / 1000);
 
   const onSpace = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== " " || event.repeat) return;
@@ -74,6 +83,7 @@ export function SimulatorView() {
       <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: aspect }}>
         <LiveVideo stream={camera.stream} onElement={client.setVideo} className="absolute inset-0 size-full object-contain" />
         <ItemLabels detections={perception.detections} />
+        <FaceLabels faces={perception.faces} />
         <Hud
           className="inset-x-[6%] text-[0.85rem] sm:text-base"
           message={hud.message}
@@ -163,6 +173,41 @@ export function SimulatorView() {
         Speech to text: {voice.engine ?? "not checked yet"} · Frames: {perception.status}
         {perception.framesSent > 0 && `, ${perception.framesSent} sent`}
       </p>
+
+      {/* Debug: the raw "faces" messages off /ws/frames (packages/shared/src/schemas/perception.ts),
+          so a wrong or missing match is visible here instead of only inferred from silence. */}
+      <div className="flex flex-col gap-1 rounded-lg border border-dashed p-3 font-mono text-xs">
+        <p className="font-sans font-medium text-muted-foreground">
+          Face debug · last message {facesAge === null ? "never" : `${facesAge}s ago`} · {perception.faces.length}{" "}
+          face{perception.faces.length === 1 ? "" : "s"} in frame
+        </p>
+        {perception.faces.length === 0 ? (
+          <p className="text-muted-foreground">No face in the current frame.</p>
+        ) : (
+          perception.faces.map((face, index) => (
+            <div key={`${face.personId ?? "unknown"}-${index}`} className="flex flex-col gap-0.5">
+              <p>
+                {face.personId ? `personId=${face.personId} name=${face.name} relation=${face.relation ?? "—"}` : "personId=null (unrecognized)"}
+                {" · detConfidence="}
+                {face.confidence.toFixed(3)}
+                {" · matchConfidence="}
+                {face.matchConfidence === null ? "null" : face.matchConfidence.toFixed(3)}
+                {" · bbox="}
+                {face.bbox.map((value) => value.toFixed(2)).join(",")}
+              </p>
+              {face.candidates.length > 0 && (
+                <p className="pl-4 text-muted-foreground">
+                  vs every enrolled face:{" "}
+                  {face.candidates
+                    .map((candidate) => `${candidate.name}=${candidate.similarity.toFixed(3)}`)
+                    .join(", ")}
+                </p>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
       <RecordingsList recordings={recorder.recordings} uploads={client.uploads} />
     </div>
   );

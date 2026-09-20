@@ -80,6 +80,9 @@ class Settings(TokenSettings):
     face_gallery_ttl_s: float = Field(default=60.0, ge=0)
     face_match_threshold: float = Field(default=0.45, ge=0, le=1)
     face_min_confidence: float = Field(default=0.6, ge=0, le=1)
+    # Once a recognized person is announced to the wearer, how long before the
+    # same person can be announced again.
+    face_announce_cooldown_s: float = Field(default=120.0, gt=0.0)
     face_embedding_key: str | None = Field(default=None, repr=False)
     vlm: Literal["mock", "openai", "off"] = "mock"
     vlm_model: str = "gpt-5.6-luna"

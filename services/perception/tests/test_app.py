@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import threading
 import time
@@ -37,6 +38,7 @@ from app.safety.adapters.mock import MockDetector, MockFaceDetector, MockFaceEmb
 from app.safety.adapters.registry import Adapters
 from app.safety.models import BBox, FaceBox
 from app.safety.models import Detection as SafetyDetection
+from app.store import ObservationStore
 from app.tokens import DeviceTokenClaims, sign_device_token
 
 FIXTURE: dict[str, Any] = json.loads(
@@ -463,9 +465,27 @@ def wearer(wearer_db: Database) -> Iterator[Database]:
         )
 
 
+@pytest.mark.parametrize("disconnect_during_write", [False, True])
 def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_frames(
-    wearer: Database, keys_item: ObjectId, sessions: Collection[dict[str, Any]]
+    wearer: Database,
+    keys_item: ObjectId,
+    sessions: Collection[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    disconnect_during_write: bool,
 ) -> None:
+    write_finished = threading.Event()
+    release_write = threading.Event()
+    original_open = ObservationStore.open_sighting
+
+    async def delayed_open(self: ObservationStore, **kwargs: Any) -> Any:
+        opened = await original_open(self, **kwargs)
+        write_finished.set()
+        # Hold the return after the DB writes, before SightingWriter records the ID.
+        await asyncio.to_thread(release_write.wait, 5)
+        return opened
+
+    if disconnect_during_write:
+        monkeypatch.setattr(ObservationStore, "open_sighting", delayed_open)
     detector = StubDetector()
     with _client(wearer.name, detector=detector) as client, client.websocket_connect("/ws/frames") as ws:
         session_id = _live_session(ws)
@@ -486,7 +506,10 @@ def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_fram
             lambda: db["items"].find_one({"_id": keys_item, "lastSighting.sightingId": sighting["_id"]})
         )
         assert item is not None
+        if disconnect_during_write:
+            assert write_finished.wait(5)
         ws.close()
+        release_write.set()
         _wait_for(lambda: db["sightings"].find_one({"_id": sighting["_id"], "status": "closed"}))
 
     # Only the active item's prompts reached the detector.

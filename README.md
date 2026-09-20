@@ -694,6 +694,23 @@ NEXT_PUBLIC_PERCEPTION_WS_URL=
 
 ## Running it
 
+### Database options
+
+The project supports two local Docker services and one hosted MongoDB option:
+
+1. **Web + perception with Docker MongoDB (development).** `pnpm start` starts the local MongoDB container from `docker-compose.yml`, initializes the schema, and runs the Next.js web app plus the perception service. This is the default when `MONGODB_URI` is empty or points at `127.0.0.1`.
+2. **Web + perception with an existing MongoDB server.** Set the same `MONGODB_URI` and `MONGODB_DB` in `apps/web/.env.local` and `services/perception/.env`, then run the services normally. The server can be a self-hosted MongoDB deployment or MongoDB Atlas.
+3. **Vercel web app with MongoDB Atlas.** Add `MONGODB_URI` and `MONGODB_DB` to the Vercel project environment variables. Vercel uses the Atlas URI; it does not start Docker. Keep the perception service deployed separately and set its public URL in `NEXT_PUBLIC_PERCEPTION_WS_URL` / `PERCEPTION_URL`.
+
+For local Docker development:
+
+```bash
+pnpm db:up
+pnpm start
+```
+
+For Vercel, copy the Atlas connection string into the project environment settings and set `MONGODB_DB=memory_glasses`. Add the Vercel egress IP range (or the project’s approved network access entry) to Atlas **Database & Network Access**. Do not commit `.env.local`, `services/perception/.env`, or credentials.
+
 One command sets up a fresh checkout and starts both servers:
 
 ```bash

@@ -31,6 +31,20 @@ class FaceBox(BaseModel):
     landmarks: list[list[float]] | None = None
 
 
+class FaceMatchCandidate(BaseModel):
+    """One enrolled person's raw similarity to a detected face, whether or not it won.
+
+    Debug-only, like name/relation below: carried to the live capture page so a
+    caregiver can see why a face did or didn't get named, never stored.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    person_id: ObjectId
+    name: str
+    relation: str | None = None
+    similarity: float = Field(ge=0, le=1)
+
+
 class FaceObservation(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     bbox: BBox
@@ -40,6 +54,8 @@ class FaceObservation(BaseModel):
     # Carried for the wearer's page, which has no people list of its own. Never stored.
     name: str | None = None
     relation: str | None = None
+    # Every enrolled person's similarity to this face, best first. Also never stored.
+    candidates: tuple[FaceMatchCandidate, ...] = ()
 
 
 class VlmConfirmation(BaseModel):

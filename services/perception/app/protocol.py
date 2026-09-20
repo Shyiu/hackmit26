@@ -96,6 +96,17 @@ class DetectionsMessage(_Strict):
     detections: list[Detection]
 
 
+class FaceCandidate(BaseModel):
+    model_config = ConfigDict(extra="ignore", allow_inf_nan=False, frozen=True)
+
+    # Debug-only: never stored, only sent for a caregiver to see why a face did
+    # or didn't get named.
+    personId: ObjectIdHex
+    name: Annotated[str, StringConstraints(max_length=200)]
+    relation: Annotated[str, StringConstraints(max_length=200)] | None
+    similarity: Annotated[Number, Field(ge=0, le=1)]
+
+
 class Face(BaseModel):
     model_config = ConfigDict(extra="ignore", allow_inf_nan=False, frozen=True)
 
@@ -107,6 +118,8 @@ class Face(BaseModel):
     # How sure the detector is that this is a face, then how close the match was.
     confidence: Annotated[Number, Field(ge=0, le=1)]
     matchConfidence: Annotated[Number, Field(ge=0, le=1)] | None
+    # Every enrolled person's similarity to this face, best first.
+    candidates: list[FaceCandidate] = Field(default_factory=list)
 
 
 class FacesMessage(_Strict):

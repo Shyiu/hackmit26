@@ -28,6 +28,7 @@ from .detector import Detector, Prompt, Prompts, build_detector
 from .protocol import (
     CaptureCommand,
     Face,
+    FaceCandidate,
     Frame,
     FrameError,
     HelloMessage,
@@ -429,7 +430,14 @@ class FrameConnection:
                     events = self.tracker.observe(
                         detections, pending.observed_at, header.seq, (header.width, header.height)
                     )
-                    await self.writer.apply(events)
+                    # A write can reach MongoDB before apply() records its sighting ID.
+                    # Finish that bookkeeping before disconnect cleanup closes the tracks.
+                    write = asyncio.create_task(self.writer.apply(events))
+                    try:
+                        await asyncio.shield(write)
+                    except asyncio.CancelledError:
+                        await write
+                        raise
             except WebSocketDisconnect:
                 return
             except Exception:
@@ -491,6 +499,15 @@ class FrameConnection:
                         bbox=(face.bbox.x, face.bbox.y, face.bbox.w, face.bbox.h),
                         confidence=face.confidence,
                         matchConfidence=face.match_confidence,
+                        candidates=[
+                            FaceCandidate(
+                                personId=str(candidate.person_id),
+                                name=candidate.name,
+                                relation=candidate.relation,
+                                similarity=candidate.similarity,
+                            )
+                            for candidate in face.candidates
+                        ],
                     )
                     for face in faces
                 ],

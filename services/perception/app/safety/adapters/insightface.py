@@ -49,6 +49,8 @@ class InsightFaceAdapter:
         # Stored with every enrollment, so a gallery built by one model is never scored by another.
         self.model = f"insightface-{model_name}"
         self.max_faces = max_faces
+        self._model_name = model_name
+        self._providers = providers
         # The model pack also ships 3D landmarks, 106-point landmarks, and age/gender. Matching
         # needs none of them, and each is a full forward pass per face.
         self.analysis = FaceAnalysis(
@@ -61,21 +63,47 @@ class InsightFaceAdapter:
             # The first inference pays for graph optimization and allocation. Pay it at boot,
             # not on the first frame with a face in it.
             self.analysis.get(np.zeros((det_size, det_size, 3), dtype=np.uint8))
+        # A fixed det_size is a deliberate latency trade for the live frame path, but it disables
+        # insightface's own multi-scale fallback (it tries 128x128 then 640x640 only when det_size
+        # is left unset), which misses faces that don't happen to survive a straight 640x640 resize
+        # -- true of most ordinary close-up photos. Enrollment is rare, not latency-sensitive, and
+        # its photos have unpredictable framing, so it gets its own instance with that fallback on.
+        self._enroll_analysis: FaceAnalysis | None = None
 
-    def _faces(self, image: np.ndarray):
+    def _enrollment_analysis(self):
+        if self._enroll_analysis is None:
+            from insightface.app import FaceAnalysis
+
+            analysis = FaceAnalysis(
+                name=self._model_name,
+                allowed_modules=["detection", "recognition"],
+                providers=resolve_providers(self._providers),
+            )
+            analysis.prepare(ctx_id=0)  # det_size left unset: insightface's own multi-scale fallback
+            self._enroll_analysis = analysis
+        return self._enroll_analysis
+
+    def _faces(self, image: np.ndarray, *, for_enrollment: bool = False):
         # The pipeline decodes to RGB. InsightFace is trained on cv2's BGR.
         bgr = np.ascontiguousarray(image[:, :, ::-1])
+        if for_enrollment:
+            return self._enrollment_analysis().get(bgr, max_num=self.max_faces)
         return self.analysis.get(bgr, max_num=self.max_faces)
 
-    def analyze(self, image: np.ndarray, *, filename: str = "") -> list[tuple[FaceBox, np.ndarray]]:
+    def analyze(
+        self, image: np.ndarray, *, filename: str = "", for_enrollment: bool = False
+    ) -> list[tuple[FaceBox, np.ndarray]]:
         """Detection and embedding in one pass. `detect` then `embed` runs the detector twice."""
-        return [(self._to_face_box(face, image.shape), self._embedding(face)) for face in self._faces(image)]
+        faces = self._faces(image, for_enrollment=for_enrollment)
+        return [(self._to_face_box(face, image.shape), self._embedding(face)) for face in faces]
 
-    def detect(self, image: np.ndarray, *, filename: str = "") -> list[FaceBox]:
-        return [box for box, _ in self.analyze(image, filename=filename)]
+    def detect(self, image: np.ndarray, *, filename: str = "", for_enrollment: bool = False) -> list[FaceBox]:
+        return [box for box, _ in self.analyze(image, filename=filename, for_enrollment=for_enrollment)]
 
-    def embed(self, image: np.ndarray, faces: list[FaceBox]) -> list[np.ndarray]:
-        found = self.analyze(image)
+    def embed(
+        self, image: np.ndarray, faces: list[FaceBox], *, for_enrollment: bool = False
+    ) -> list[np.ndarray]:
+        found = self.analyze(image, for_enrollment=for_enrollment)
         if not found:
             raise ValueError("no face found to embed")
         return [max(found, key=lambda item: _iou(face.bbox, item[0].bbox))[1] for face in faces]
