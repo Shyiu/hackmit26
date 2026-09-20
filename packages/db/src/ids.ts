@@ -24,6 +24,7 @@ export type FrameObservationId = Id<"FrameObservationId">;
 export type DangerEventId = Id<"DangerEventId">;
 export type PushSubscriptionId = Id<"PushSubscriptionId">;
 export type CaregiverPairingCodeId = Id<"CaregiverPairingCodeId">;
+export type PairingCodeId = Id<"PairingCodeId">;
 
 const OBJECT_ID_HEX = /^[0-9a-f]{24}$/i;
 

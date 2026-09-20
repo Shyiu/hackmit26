@@ -98,7 +98,7 @@ function reportPlayback(interactionId: string, outcome: SpeechOutcome, firstPlay
   }).catch(() => null);
 }
 
-// Settings the wearer page needs. A 401 means nobody has signed in on this phone.
+// Settings the wearer page needs. A 401 means this phone needs pairing or sign-in.
 function useWearerSettings() {
   const [settings, setSettings] = useState<WearerSettings | null>(null);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -116,8 +116,6 @@ function useWearerSettings() {
           window.clearInterval(timer);
           setSettings(null);
           setSignedIn(false);
-          const next = window.location.pathname + window.location.search;
-          window.location.replace(`/login?next=${encodeURIComponent(next)}`);
           return;
         }
         if (!response.ok) return;

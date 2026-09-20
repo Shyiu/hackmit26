@@ -1,12 +1,14 @@
 import { Settings } from "lucide-react";
 import { AttachPatientForm } from "@/components/dashboard/attach-patient-form";
+import { PairDeviceCard } from "@/components/dashboard/pair-device-card";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { PushToggle } from "@/components/dashboard/push-toggle";
 import { SettingsForm } from "@/components/dashboard/settings-form";
 import { dashboardTenant } from "@/lib/server/dashboard";
 
 export default async function SettingsPage() {
-  const { settings, patient } = await dashboardTenant("/dashboard/settings");
+  const { settings, patient, tenant } = await dashboardTenant("/dashboard/settings");
+  const devices = await tenant.devices.list();
   const zones = Intl.supportedValuesOf("timeZone");
   const timeZones = zones.includes(settings.timezone) ? zones : [settings.timezone, ...zones];
 
@@ -20,6 +22,16 @@ export default async function SettingsPage() {
       <PageBody width="sm">
         <PushToggle testable={process.env.NODE_ENV !== "production"} />
         <SettingsForm initial={settings} timeZones={timeZones} />
+        <PairDeviceCard
+          initialDevices={devices.map((device) => ({
+            _id: device._id.toHexString(),
+            kind: device.kind,
+            label: device.label,
+            lastSeenAt: device.lastSeenAt?.toISOString() ?? null,
+            revokedAt: device.revokedAt?.toISOString() ?? null,
+            createdAt: device.createdAt.toISOString(),
+          }))}
+        />
         <AttachPatientForm />
       </PageBody>
     </>
