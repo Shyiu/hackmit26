@@ -73,7 +73,7 @@ export default async function ItemPage({ params }: PageProps<"/dashboard/items/[
                     <li key={spot.sentence} className="flex justify-between gap-3">
                       <span className="first-letter:uppercase">{spot.sentence}</span>
                       <span className="text-muted-foreground">
-                        {Math.round(spot.share * 100)}% · {spot.samples} times
+                        {Math.round(spot.share * 100)}% · {spot.samples} {spot.samples === 1 ? "time" : "times"}
                       </span>
                     </li>
                   ))}
