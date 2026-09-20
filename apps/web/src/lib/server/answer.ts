@@ -6,6 +6,7 @@ import {
   type ItemResolution,
   type PatientSettings,
 } from "@memory-glasses/db";
+import type { LastSeenPerson } from "@/lib/server/perception";
 import { relativeTime } from "@/lib/relative-time";
 
 // The fast-path wording from README "What the wearer hears and sees": two
@@ -15,6 +16,26 @@ import { relativeTime } from "@/lib/relative-time";
 export { relativeTime };
 
 export type Answer = { template: AnswerTemplate; text: string; itemId: ItemDoc["_id"] | null };
+
+// Kept in sync with the client-side exemption in use-wearer-client.ts (WHO_IS_THIS_PATTERN)
+// -- duplicated rather than shared, since that file is a client hook and this one is
+// server-only. Asking who someone is should feel conversational, not need the call word.
+const WHO_IS_THIS_PATTERN = /\bwho(?:'s| is| are)\s+(?:this|that|you)\b/i;
+
+export function isWhoIsThisQuestion(transcript: string): boolean {
+  return WHO_IS_THIS_PATTERN.test(transcript);
+}
+
+export function composeWhoIsThisAnswer(person: LastSeenPerson | null, now: Date): Answer {
+  if (!person) {
+    return { template: "no_one_recalled", text: "I haven't recognized anyone recently.", itemId: null };
+  }
+  const when = relativeTime(new Date(person.seenAt), now);
+  const text = person.relation
+    ? `That's ${person.name}, your ${person.relation}. I saw them ${when}.`
+    : `That's ${person.name}. I saw them ${when}.`;
+  return { template: "person_recalled", text, itemId: null };
+}
 
 export function composeAnswer(resolution: ItemResolution, settings: PatientSettings, now: Date): Answer {
   switch (resolution.kind) {

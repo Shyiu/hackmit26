@@ -1,3 +1,4 @@
+import { AttachPatientForm } from "@/components/dashboard/attach-patient-form";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { SettingsForm } from "@/components/dashboard/settings-form";
 import { dashboardTenant } from "@/lib/server/dashboard";
@@ -14,6 +15,7 @@ export default async function SettingsPage() {
         description={patient ? `How the glasses speak and behave for ${patient.displayName}.` : undefined}
       />
       <SettingsForm initial={settings} timeZones={timeZones} />
+      <AttachPatientForm />
     </div>
   );
 }

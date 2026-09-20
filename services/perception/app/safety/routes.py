@@ -126,6 +126,21 @@ async def list_people(request: Request):
     return _jsonable(await _services(request).safety.store.list_people(patient_id))
 
 
+# Registered before /people/{person_id} below: Starlette matches by path template
+# first, so "last-seen" would otherwise be swallowed as {person_id} and 405 on GET
+# before ever reaching this route.
+@router.get("/people/last-seen")
+async def last_seen_person(request: Request):
+    patient_id = ObjectId(_claims(request, "api").pid)
+    services = _services(request)
+    person = await services.safety.store.latest_recognized_person(
+        patient_id, datetime.now(UTC), services.settings.person_recall_window_s
+    )
+    if person is None:
+        raise HTTPException(404, "Nobody recognized recently")
+    return _jsonable(person)
+
+
 @router.patch("/people/{person_id}")
 async def update_person(person_id: str, request: Request):
     patient_id = ObjectId(_claims(request, "api").pid)

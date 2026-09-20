@@ -129,6 +129,13 @@ export function SettingsForm({ initial, timeZones }: { initial: Settings; timeZo
           onCheckedChange={(checked) => set("recordingAllowed", checked)}
         />
         <SwitchRow
+          id="face-announce-sound"
+          label="Sound when someone is recognized"
+          hint="Off by default: recognizing a face always logs a silent notification. This only adds a short chime on top -- the wearer's phone never says the name out loud; ask “who is this” for that."
+          checked={values.faceAnnounceSoundEnabled}
+          onCheckedChange={(checked) => set("faceAnnounceSoundEnabled", checked)}
+        />
+        <SwitchRow
           id="wake-word"
           label={
             <span className="flex items-center gap-2">
