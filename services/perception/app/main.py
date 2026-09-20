@@ -24,6 +24,7 @@ from pymongo.errors import PyMongoError
 from starlette.requests import HTTPConnection
 
 from .config import Settings
+from .description_worker import DescriptionWorker
 from .detector import Detector, Prompt, Prompts, build_detector
 from .protocol import (
     CaptureCommand,
@@ -45,6 +46,7 @@ from .safety.store import SafetyStore
 from .store import CaptureSource, ItemPrompts, ObservationStore, UnknownPatientError
 from .tokens import DeviceTokenClaims, InvalidTokenError, Scope, verify_device_token
 from .tracker import SightingTracker, SightingWriter, TrackerConfig
+from .vision import build_description_vlm
 
 log = logging.getLogger("perception")
 
@@ -65,6 +67,7 @@ class Services:
     settings: Settings
     store: ObservationStore
     detector: Detector
+    frame_store: LocalFrameStore
     token_clock: Callable[[], float]
     safety: SafetyService | None = None
 
@@ -94,13 +97,14 @@ def create_app(
         )
         db = client[resolved.mongodb_db]
         store = ObservationStore(db)
+        frame_store = LocalFrameStore(resolved.frame_image_dir)
         safety = None
         if resolved.safety_enabled:
             safety = SafetyService(
                 resolved,
                 SafetyStore(db, store, resolved),
                 safety_adapters or build_adapters(resolved),
-                LocalFrameStore(resolved.frame_image_dir),
+                frame_store,
             )
             log.info(
                 "safety adapters configured",
@@ -112,11 +116,21 @@ def create_app(
                 },
             )
         app.state.services = Services(
-            resolved, store, detector or build_detector(resolved), token_clock, safety
+            resolved, store, detector or build_detector(resolved), frame_store, token_clock, safety
         )
+        description_worker = DescriptionWorker(
+            store,
+            frame_store,
+            build_description_vlm(resolved),
+            resolved.worker_id,
+            poll_interval=resolved.description_poll_interval_s,
+        )
+        description_task = asyncio.create_task(description_worker.run_forever())
         try:
             yield
         finally:
+            description_task.cancel()
+            await asyncio.gather(description_task, return_exceptions=True)
             await client.close()
 
     app = FastAPI(title="memory glasses perception", lifespan=lifespan)
@@ -216,7 +230,12 @@ async def frames_socket(ws: WebSocket) -> None:
         return
     connection = FrameConnection(ws, services, patient_id, device_id, session_id)
     connection.writer = SightingWriter(
-        services.store, patient_id=patient_id, session_id=session_id, device_id=device_id, source=source
+        services.store,
+        patient_id=patient_id,
+        session_id=session_id,
+        device_id=device_id,
+        source=source,
+        frame_store=services.frame_store,
     )
     connection.set_prompts(prompts)
     await connection.run()
@@ -410,7 +429,7 @@ class FrameConnection:
                     events = self.tracker.observe(
                         detections, pending.observed_at, header.seq, (header.width, header.height)
                     )
-                    await self.writer.apply(events)
+                    await self.writer.apply(events, pending.frame.jpeg)
                 if (
                     self.services_safety is not None
                     and header.seq % self.services_safety.settings.safety_sample_every_n_frames == 0

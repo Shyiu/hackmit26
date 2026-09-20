@@ -32,10 +32,12 @@ class Settings(TokenSettings):
     # Carries credentials on Atlas, so it stays out of reprs and logs.
     mongodb_uri: str = Field(repr=False)
     mongodb_db: str = "memory_glasses"
-    # For the description worker. Unused until M1.
+    # For the description worker.
     openai_api_key: str | None = Field(default=None, repr=False)
     # The lease owner written on claimed description jobs. The schema caps it at 100 characters.
     worker_id: str = Field(default_factory=default_worker_id, min_length=1, max_length=100)
+    # How long the description worker sleeps after finding no due job.
+    description_poll_interval_s: float = Field(default=1.0, gt=0.0)
 
     # The detector. "auto" runs YOLOE when ultralytics and the checkpoint are on
     # this machine and falls back to NullDetector otherwise, so the service boots anywhere.
