@@ -1,5 +1,5 @@
 import "server-only";
-import { type AnswerTemplate, type ItemDoc, type ItemResolution, type PatientSettings } from "@memory-glasses/db";
+import { type AnswerTemplate, type ItemDoc, type ItemResolution, type SightingsRepo } from "@memory-glasses/db";
 import type { LastSeenPerson } from "@/lib/server/perception";
 import { relativeTime } from "@/lib/relative-time";
 
@@ -45,7 +45,11 @@ export function composeWhoIsThisAnswer(person: LastSeenPerson | null, now: Date)
   return { template: "person_recalled", text, itemId: null };
 }
 
-export function composeAnswer(resolution: ItemResolution, settings: PatientSettings, now: Date): Answer {
+export async function composeAnswer(
+  resolution: ItemResolution,
+  now: Date,
+  sightings: Pick<SightingsRepo, "lastDescribed">,
+): Promise<Answer> {
   switch (resolution.kind) {
     case "none":
       // MVP fast-path miss. With a plausible item name to offer, ask to add it as a
@@ -68,7 +72,7 @@ export function composeAnswer(resolution: ItemResolution, settings: PatientSetti
       };
     }
     case "match":
-      return describeItem(resolution.item, settings, now);
+      return describeItem(resolution.item, now, sightings);
     default: {
       const _exhaustive: never = resolution;
       return _exhaustive;
@@ -85,27 +89,17 @@ export function composeItemAddedAnswer(item: ItemDoc): Answer {
   };
 }
 
-function describeItem(item: ItemDoc, settings: PatientSettings, now: Date): Answer {
-  const snapshot = item.lastSighting;
-  const wereAt = item.plural ? "they were" : "it was";
+// No location data: no motion state (held/moving/resting), no usual-spot history,
+// no staleness hint. Just the vision model's own sentence from the last sighting it
+// actually described, whether or not that's the item's latest sighting -- a newer
+// sighting still pending or failed description doesn't get spoken over an older,
+// described one.
+async function describeItem(item: ItemDoc, now: Date, sightings: Pick<SightingsRepo, "lastDescribed">): Promise<Answer> {
   const say = (template: AnswerTemplate, text: string): Answer => ({ template, text, itemId: item._id });
-  // PLAN.md "the answer": an optional second sentence suggests a known usual
-  // spot, only when history supports it (enough placements, often enough).
-  const usual = item.usualSpots[0];
-  const suggestUsual = usual && usual.share >= 0.5 && usual.samples >= 3 ? ` It's usually ${usual.sentence}.` : "";
-
-  if (!snapshot) return say("unseen", `I haven't seen your ${item.name} in my available history.${suggestUsual}`);
-  const when = relativeTime(snapshot.lastSeenAt, now);
-
-  // The answer comes from what the vision model actually saw in the keyframe
-  // (room, surface, relation to nearby objects -- see vision.py's prompt), not
-  // from the tracker's held/moving/resting motion classification. Whatever the
-  // item was doing, a described frame beats a canned status line.
-  if (snapshot.descriptionStatus === "ready" && snapshot.sentence) {
-    const stale = now.getTime() - snapshot.lastSeenAt.getTime() > settings.staleAfterMinutes * 60_000;
-    // A fresh sighting answers on its own; only a stale one gets the hint.
-    const text = `I last saw your ${item.name} ${snapshot.sentence}, ${when}.`;
-    return say(stale ? "stale" : "fresh", stale ? text + suggestUsual : text);
+  const described = await sightings.lastDescribed(item._id);
+  if (!described || !described.sentence) {
+    return say("unseen", `I haven't seen your ${item.name} in my available history.`);
   }
-  return say("unknown", `I saw your ${item.name}, but I could not tell where ${wereAt}.${suggestUsual}`);
+  const when = relativeTime(described.lastSeenAt, now);
+  return say("fresh", `I last saw your ${item.name} ${described.sentence}, ${when}.`);
 }

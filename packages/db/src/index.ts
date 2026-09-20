@@ -57,7 +57,7 @@ export type { ItemPatch, ItemResolution, NewItem } from "./repos/items";
 export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/interactions";
 export type { NewNotification } from "./repos/notifications";
 export type { PersonPatch, PublicPerson, RecognizedPerson } from "./repos/people";
-export type { SightingQuery } from "./repos/sightings";
+export type { SightingQuery, SightingsRepo } from "./repos/sightings";
 export type { ScanObservationInput, ScanPositionInput } from "./repos/scan-pins";
 
 export * from "./schema/common";

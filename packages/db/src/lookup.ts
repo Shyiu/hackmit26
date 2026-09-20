@@ -80,7 +80,7 @@ const LEADING_STOPWORDS = new Set([
 export function guessItemName(transcript: string): string | null {
   const words = normalizeLookupKey(transcript).split(" ").filter(Boolean);
   let start = 0;
-  while (start < words.length && LEADING_STOPWORDS.has(words[start])) start++;
+  while (start < words.length && LEADING_STOPWORDS.has(words[start] ?? "")) start++;
   const rest = words.slice(start, start + MAX_LOOKUP_KEY_WORDS);
   return rest.length > 0 ? rest.join(" ") : null;
 }

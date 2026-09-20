@@ -22,7 +22,7 @@ import { sightingPhrase, stateWords } from "@/lib/sighting-words";
 
 export default async function ItemPage({ params }: PageProps<"/dashboard/items/[id]">) {
   const { id } = await params;
-  const { tenant, settings } = await dashboardTenant(`/dashboard/items/${id}`);
+  const { tenant } = await dashboardTenant(`/dashboard/items/${id}`);
   const itemId = parseId<ItemId>(id);
   const item = itemId && (await tenant.items.get(itemId));
   if (!item) notFound();
@@ -30,7 +30,7 @@ export default async function ItemPage({ params }: PageProps<"/dashboard/items/[
   const pins = await tenant.scanPins.listByItem(item._id);
   const now = new Date();
   const status = locationStatus(item.lastSighting);
-  const answer = composeAnswer({ kind: "match", item, matchedKey: item.name }, settings, now);
+  const answer = await composeAnswer({ kind: "match", item, matchedKey: item.name }, now, tenant.sightings);
   const snapshot = item.lastSighting;
 
   return (

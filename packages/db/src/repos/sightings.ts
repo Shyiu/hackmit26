@@ -33,6 +33,19 @@ export function sightingsRepo(ctx: RepoContext) {
     get(id: SightingId): Promise<SightingDoc | null> {
       return sightings.findOne({ _id: id, expiresAt: { $gt: ctx.now() } });
     },
+
+    /**
+     * The item's most recent sighting the vision model actually described --
+     * not necessarily its latest sighting, which may still be pending or have
+     * failed. Uses the same `{ patientId, itemId, lastSeenAt }` index as `list`.
+     */
+    lastDescribed(itemId: ItemId): Promise<SightingDoc | null> {
+      const now = ctx.now();
+      return sightings.findOne(
+        { itemId, descriptionStatus: "ready", sentence: { $ne: null }, expiresAt: { $gt: now } },
+        { sort: { lastSeenAt: -1 } },
+      );
+    },
   };
 }
 

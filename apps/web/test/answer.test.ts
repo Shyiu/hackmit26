@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PATIENT_SETTINGS, newId, type ItemDoc, type ItemId, type PatientId } from "@memory-glasses/db";
+import { newId, type ItemDoc, type ItemId, type PatientId, type SightingDoc, type SightingId } from "@memory-glasses/db";
 import { composeAnswer, composeItemAddedAnswer, isAffirmative } from "@/lib/server/answer";
 
 const now = new Date("2026-01-10T12:00:00Z");
@@ -25,85 +25,50 @@ function item(overrides: Partial<ItemDoc> = {}): ItemDoc {
   };
 }
 
-const spot = { sentence: "on the kitchen counter", share: 0.8, samples: 4, source: "history" as const };
-
-function snapshot(overrides: Partial<NonNullable<ItemDoc["lastSighting"]>> = {}): ItemDoc["lastSighting"] {
-  return {
-    sightingId: newId(),
-    observationVersion: 1,
-    keyframeRevision: 1,
-    state: "resting",
-    descriptionStatus: "ready",
-    sentence: "on the hallway table",
-    room: "hallway",
-    lastSeenAt: new Date(now.getTime() - 60 * 60_000),
-    expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60_000),
-    thumbKey: null,
-    source: "simulator",
-    ...overrides,
-  };
+// describeItem only reads .sentence and .lastSeenAt off what lastDescribed
+// returns, so the stub only needs to be shaped like a SightingDoc, not a
+// fully valid one -- the real query is covered in packages/db/test/sightings.test.ts.
+function describedSighting(overrides: { sentence: string; lastSeenAt: Date }): SightingDoc {
+  return { _id: newId<SightingId>(), descriptionStatus: "ready", ...overrides } as SightingDoc;
 }
 
-const describe_ = (doc: ItemDoc) => composeAnswer({ kind: "match", item: doc, matchedKey: "keys" }, DEFAULT_PATIENT_SETTINGS, now);
+/** A stub sightings repo: composeAnswer only ever calls lastDescribed. */
+function sightingsStub(result: SightingDoc | null) {
+  return { lastDescribed: async () => result };
+}
 
-describe("composeAnswer usual-spot suggestion", () => {
-  it("suggests the usual spot on stale, held, uncertain, and unseen answers", () => {
-    expect(describe_(item({ usualSpots: [spot] })).text).toBe(
-      "I haven't seen your keys in my available history. It's usually on the kitchen counter.",
+describe("composeAnswer on a matched item", () => {
+  it("answers with the last sighting the vision model actually described", async () => {
+    const answer = await composeAnswer(
+      { kind: "match", item: item(), matchedKey: "keys" },
+      now,
+      sightingsStub(describedSighting({ sentence: "on the hallway table", lastSeenAt: new Date(now.getTime() - 10_000) })),
     );
-    const stale = describe_(item({ usualSpots: [spot], lastSighting: snapshot() }));
-    expect(stale.template).toBe("stale");
-    expect(stale.text).toContain("It's usually on the kitchen counter.");
-    const heldNoDescription = describe_(
-      item({ usualSpots: [spot], lastSighting: snapshot({ state: "held", descriptionStatus: "pending", sentence: null }) }),
-    );
-    expect(heldNoDescription.template).toBe("unknown");
-    expect(heldNoDescription.text).toContain("It's usually on the kitchen counter.");
-    const uncertain = describe_(
-      item({ usualSpots: [spot], lastSighting: snapshot({ descriptionStatus: "pending", sentence: null }) }),
-    );
-    expect(uncertain.template).toBe("unknown");
-    expect(uncertain.text).toContain("It's usually on the kitchen counter.");
+    expect(answer.template).toBe("fresh");
+    expect(answer.text).toBe("I last saw your keys on the hallway table, just now.");
   });
 
-  it("stays quiet on fresh answers and on weak history", () => {
-    const fresh = describe_(
-      item({ usualSpots: [spot], lastSighting: snapshot({ lastSeenAt: new Date(now.getTime() - 60_000) }) }),
+  it("says unseen when nothing has ever been described, regardless of newer undescribed sightings", async () => {
+    const answer = await composeAnswer(
+      { kind: "match", item: item({ lastSighting: null }), matchedKey: "keys" },
+      now,
+      sightingsStub(null),
     );
-    expect(fresh.template).toBe("fresh");
-    expect(fresh.text).not.toContain("usually");
-    // Below the share and sample floors.
-    const weak = describe_(
-      item({ usualSpots: [{ ...spot, share: 0.3 }], lastSighting: snapshot({ state: "held" }) }),
-    );
-    expect(weak.text).not.toContain("usually");
-    const few = describe_(
-      item({ usualSpots: [{ ...spot, samples: 2 }], lastSighting: snapshot({ state: "held" }) }),
-    );
-    expect(few.text).not.toContain("usually");
-  });
-
-  it("answers from the described frame regardless of held or moving state", () => {
-    const recent = { lastSeenAt: new Date(now.getTime() - 10_000) };
-    const held = describe_(item({ lastSighting: snapshot({ state: "held", ...recent }) }));
-    expect(held.template).toBe("fresh");
-    expect(held.text).toBe("I last saw your keys on the hallway table, just now.");
-    const moving = describe_(item({ lastSighting: snapshot({ state: "moving", ...recent }) }));
-    expect(moving.template).toBe("fresh");
-    expect(moving.text).toBe("I last saw your keys on the hallway table, just now.");
+    expect(answer.template).toBe("unseen");
+    expect(answer.text).toBe("I haven't seen your keys in my available history.");
   });
 });
 
 describe("composeAnswer on an unresolved item", () => {
-  it("offers to add it when the fast path guessed a name", () => {
-    const answer = composeAnswer({ kind: "none", candidate: "flashlight" }, DEFAULT_PATIENT_SETTINGS, now);
+  it("offers to add it when the fast path guessed a name", async () => {
+    const answer = await composeAnswer({ kind: "none", candidate: "flashlight" }, now, sightingsStub(null));
     expect(answer.template).toBe("offer_add_item");
     expect(answer.text).toBe("I haven't been tracking your flashlight. Want me to add it?");
     expect(answer.pendingItemName).toBe("flashlight");
   });
 
-  it("falls back to the generic miss with nothing to guess from", () => {
-    const answer = composeAnswer({ kind: "none", candidate: null }, DEFAULT_PATIENT_SETTINGS, now);
+  it("falls back to the generic miss with nothing to guess from", async () => {
+    const answer = await composeAnswer({ kind: "none", candidate: null }, now, sightingsStub(null));
     expect(answer.template).toBe("not_understood");
     expect(answer.text).toBe("Which thing should I look for?");
   });

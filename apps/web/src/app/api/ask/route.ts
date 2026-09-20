@@ -22,7 +22,7 @@ const PENDING_OFFER_WINDOW_MS = 2 * 60_000;
 // the answer, no LLM runs. With a TTS provider configured the body is the audio
 // stream (PCM, see pcmHeaders) and the text is polled from /api/interactions/:id.
 // Without one, the interaction comes back as JSON and the phone speaks it.
-export const POST = withTenant("any", async ({ request, principal, tenant, settings }) => {
+export const POST = withTenant("any", async ({ request, principal, tenant }) => {
   const started = performance.now();
   const body = await readBody(request, askRequestSchema);
   // Read before begin() inserts this turn's own row, so this is the previous turn.
@@ -58,7 +58,7 @@ export const POST = withTenant("any", async ({ request, principal, tenant, setti
       ? composeItemAddedAnswer(await tenant.items.create({ name: pendingItemName }))
       : isWhoIsThisQuestion(body.transcript)
         ? composeWhoIsThisAnswer(await getLastSeenPerson(tenant), new Date())
-        : composeAnswer(await tenant.items.resolve(body.transcript), settings, new Date());
+        : await composeAnswer(await tenant.items.resolve(body.transcript), new Date(), tenant.sightings);
     const lookupMs = performance.now() - lookupStarted;
     const outcome = {
       path: "fast" as const,
