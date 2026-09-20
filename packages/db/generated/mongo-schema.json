@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "78475d950d523338984b788250744198833a57110c195ab2578f52beb94f9745",
+  "fingerprint": "fe8a01e34b7b2def875a619859d48f6219efd8ab9262ed07d54497139bc77afc",
   "collections": {
     "patients": {
       "validator": {
@@ -15,6 +15,37 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 60
+            },
+            "account": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "maxLength": 254,
+                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "deviceId": {
+                  "anyOf": [
+                    {
+                      "bsonType": "objectId"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "passwordHash": {
+                  "type": "string",
+                  "minLength": 40,
+                  "maxLength": 300
+                }
+              },
+              "required": [
+                "email",
+                "deviceId",
+                "passwordHash"
+              ],
+              "additionalProperties": false
             },
             "settings": {
               "type": "object",
@@ -131,7 +162,20 @@
           "additionalProperties": false
         }
       },
-      "indexes": []
+      "indexes": [
+        {
+          "name": "account_email_unique",
+          "key": {
+            "account.email": 1
+          },
+          "unique": true,
+          "partialFilterExpression": {
+            "account.email": {
+              "$exists": true
+            }
+          }
+        }
+      ]
     },
     "caregivers": {
       "validator": {

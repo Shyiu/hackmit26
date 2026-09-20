@@ -21,12 +21,19 @@ export function LoginForm({ next }: { next: string }) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: form.get("email"), password: form.get("password") }),
     });
+    const body: unknown = await response.json().catch(() => null);
     setPending(false);
     if (response.ok) {
-      router.replace(next);
+      // A wearer's own account goes to their pages, not the dashboard `next` points at.
+      const kind = typeof body === "object" && body !== null && "kind" in body ? body.kind : null;
+      const destination =
+        kind === "wearer" && typeof body === "object" && body !== null && "next" in body && typeof body.next === "string"
+          ? body.next
+          : next;
+      router.replace(destination);
+      router.refresh();
       return;
     }
-    const body: unknown = await response.json().catch(() => null);
     setError(
       typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
         ? body.error

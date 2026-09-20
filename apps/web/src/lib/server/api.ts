@@ -127,6 +127,7 @@ export function withTenant<TParams extends Record<string, string> = Record<strin
           device: request.cookies.get(DEVICE_COOKIE)?.value,
           patient: request.cookies.get(PATIENT_COOKIE)?.value,
         },
+        access === "caregiver" ? "caregiver" : "device",
       );
       if (!principal) return problem(401, "Sign in first");
       if (access !== "any" && principal.kind !== access) return problem(403, `Only a ${access} can do this`);

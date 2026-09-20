@@ -6,6 +6,16 @@
 services:
   mongo:
     image: mongodb/mongodb-atlas-local:8.0
+    # The replica set config in the volume names this host, so without a fixed
+    # one a recreated container isn't a member of its own set and won't start.
+    hostname: mongo
+    # mongod inherits Docker's 1024 soft file limit on some hosts, and the test
+    # suite's connections and index builds take it past that, where mongod
+    # aborts with TooManyFilesOpen instead of refusing one connection.
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
     ports:
       - "27017:27017"
     volumes:

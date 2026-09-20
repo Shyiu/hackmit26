@@ -31,7 +31,17 @@ export {
 export { sweepExpired, type SweepOptions, type SweepReport } from "./retention";
 export * from "./usual-spots";
 export { TenantCollection } from "./tenant-collection";
-export { createCaregiver, createPatient, findCaregiverByEmail, listPatientsByIds, recordLogin } from "./accounts";
+export {
+  createCaregiver,
+  createPatient,
+  findCaregiverByEmail,
+  findPatientByAccountEmail,
+  findPatientById,
+  listPatientsByIds,
+  patientHasCaregiver,
+  recordLogin,
+  setWearerAccountDevice,
+} from "./accounts";
 export {
   addPatientToCaregiver,
   createCaregiverPairingCode,
