@@ -1,0 +1,25 @@
+# Render blueprint for the perception service alone: a long-lived socket server and worker, which
+# the hosted web app (Vercel) can't run. The web app keeps running on Vercel and reaches this over
+# PERCEPTION_URL / NEXT_PUBLIC_PERCEPTION_WS_URL. MongoDB stays on Atlas.
+services:
+  - type: web
+    name: memory-glasses-perception
+    runtime: docker
+    dockerfilePath: ./services/perception/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    plan: free
+    envVars:
+      # The same Atlas database the Vercel app uses.
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: memory_glasses
+      # Byte-identical to Vercel's, or the web app's device tokens are rejected here.
+      - key: DEVICE_TOKEN_SECRET
+        sync: false
+      # Stable across restarts, or enrolled face embeddings stop decrypting.
+      - key: FACE_EMBEDDING_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
