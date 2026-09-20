@@ -162,6 +162,30 @@ async def test_capture_session_counts_frames_and_ends(scene: Scene) -> None:
     assert (session["state"], session["endedAt"]) == ("ended", T0)
 
 
+async def test_touch_capture_session_only_marks_heard_from(scene: Scene) -> None:
+    store, patient, session_id = scene.store, scene.patient_id, scene.session_id
+    opened = await scene.sight("e1", 1)
+    job = await scene.enqueue(opened)
+
+    # Rewind the heartbeat field by hand so the bump is observable with the fixed clock.
+    await scene.db["capture_sessions"].update_one(
+        {"_id": session_id}, {"$set": {"updatedAt": at(-60)}}
+    )
+    assert await store.touch_capture_session(patient, session_id)
+
+    session = await scene.db["capture_sessions"].find_one({"_id": session_id})
+    assert session is not None
+    # Only updatedAt moves: the state stays paused and the frame markers are untouched.
+    assert (session["state"], session["updatedAt"]) == ("paused", T0)
+    assert (session["lastFrameAt"], session["lastSeq"], session["framesReceived"]) == (None, 0, 0)
+    # Unlike a pause, a heartbeat never cancels queued description work.
+    queued = await scene.job(job.id)
+    assert queued["status"] == "queued"
+
+    assert await store.set_capture_state(patient, session_id, "ended")
+    assert not await store.touch_capture_session(patient, session_id)
+
+
 async def test_opening_installs_the_snapshot_and_bumps_the_version(scene: Scene) -> None:
     opened = await scene.sight("e1", 1)
     assert (opened.created, opened.installed, opened.observation_version) == (True, True, 1)
