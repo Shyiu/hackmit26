@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { Bell, Mic } from "lucide-react";
-import type { Detection } from "@memory-glasses/shared";
+import type { Detection, Face } from "@memory-glasses/shared";
 import type { HudMessage } from "@/hooks/use-hud-message";
 import { cn } from "@/lib/utils";
 
@@ -75,6 +75,40 @@ export function ItemLabels({ detections }: { detections: Detection[] }) {
           >
             <span className="absolute bottom-full left-1/2 mb-1 -translate-x-1/2 rounded-md bg-black/75 px-2 py-0.5 text-sm font-medium whitespace-nowrap text-yellow-300">
               {detection.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Boxes for faces the perception service saw this frame, named where it matched
+// an enrolled person and confident enough (README "Faces, danger, and routines").
+// Debug tool for /sim: shows the raw detector/match confidence pairs, not the
+// wearer-facing wording.
+export function FaceLabels({ faces }: { faces: Face[] }) {
+  return (
+    <div className="pointer-events-none absolute inset-0">
+      {faces.map((face, index) => {
+        const [x, y, w, h] = face.bbox;
+        const matched = face.personId !== null;
+        return (
+          <div
+            key={`${face.personId ?? "unknown"}-${index}`}
+            className={cn("absolute rounded-lg border-2", matched ? "border-cyan-300" : "border-red-400")}
+            style={{ left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, height: `${h * 100}%` }}
+          >
+            <span
+              className={cn(
+                "absolute bottom-full left-1/2 mb-1 -translate-x-1/2 rounded-md bg-black/75 px-2 py-0.5 text-sm font-medium whitespace-nowrap",
+                matched ? "text-cyan-300" : "text-red-400",
+              )}
+            >
+              {matched ? face.name : "Unrecognized"}
+              {" · det "}
+              {face.confidence.toFixed(2)}
+              {face.matchConfidence !== null && ` · match ${face.matchConfidence.toFixed(2)}`}
             </span>
           </div>
         );

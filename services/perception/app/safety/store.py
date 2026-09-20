@@ -118,6 +118,33 @@ class SafetyStore:
             )
         return tuple(people)
 
+    async def queue_person_recognized_notification(
+        self, patient_id: ObjectId, name: str, relation: str | None
+    ) -> ObjectId:
+        """Tells the wearer who's with them, over the same channel a caregiver reminder uses.
+
+        Reuses the existing `reminder` kind, so the wearer's page needs no new
+        code path to speak it -- it's already generic caregiver-message/reminder
+        text, polled and read aloud as-is.
+        """
+        now = to_ms(datetime.now(UTC))
+        expires = to_ms(now + timedelta(days=await self._observations.retention_days(patient_id)))
+        text = f"{name}, your {relation}, is with you." if relation else f"{name} is with you."
+        notification = {
+            "_id": ObjectId(),
+            "patientId": patient_id,
+            "kind": "reminder",
+            "text": text[:200],
+            "createdBy": None,
+            "showAt": now,
+            "status": "queued",
+            "shownAt": None,
+            "createdAt": now,
+            "expiresAt": expires,
+        }
+        await self._notifications.insert_one(notification)
+        return notification["_id"]
+
     async def record_frame_observation(
         self,
         patient_id: ObjectId,

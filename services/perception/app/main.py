@@ -28,6 +28,7 @@ from .detector import Detector, Prompt, Prompts, build_detector
 from .protocol import (
     CaptureCommand,
     Face,
+    FaceCandidate,
     Frame,
     FrameError,
     HelloMessage,
@@ -491,6 +492,15 @@ class FrameConnection:
                         bbox=(face.bbox.x, face.bbox.y, face.bbox.w, face.bbox.h),
                         confidence=face.confidence,
                         matchConfidence=face.match_confidence,
+                        candidates=[
+                            FaceCandidate(
+                                personId=str(candidate.person_id),
+                                name=candidate.name,
+                                relation=candidate.relation,
+                                similarity=candidate.similarity,
+                            )
+                            for candidate in face.candidates
+                        ],
                     )
                     for face in faces
                 ],

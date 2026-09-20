@@ -128,8 +128,19 @@ function useWearerSettings() {
 // recording, frame upload, the question-and-answer loop, spoken caregiver
 // messages, wake lock, and the stalled-feed watchdog. The pages only differ in
 // what they draw and how a question starts: tap to ask on the chest ("auto"),
-// hold to ask on the flat page ("hold").
-export function useWearerClient({ turnMode, fullscreen = false }: { turnMode: TurnMode; fullscreen?: boolean }) {
+// hold to ask on the flat page ("hold"). `autoResumeOnReconnect` skips the
+// require-an-explicit-resume-after-a-reconnect privacy step (README "Privacy
+// and safety") -- /sim, a laptop dev/testing fallback, sets it so its stream
+// to the db never silently stops; /wear, a real wearer's chest camera, doesn't.
+export function useWearerClient({
+  turnMode,
+  fullscreen = false,
+  autoResumeOnReconnect = false,
+}: {
+  turnMode: TurnMode;
+  fullscreen?: boolean;
+  autoResumeOnReconnect?: boolean;
+}) {
   const camera = useCamera();
   const recorder = useRecorder(camera.stream);
   const hud = useHudMessage();
@@ -272,6 +283,7 @@ export function useWearerClient({ turnMode, fullscreen = false }: { turnMode: Tu
     video,
     enabled: live && signedIn === true,
     capturing,
+    autoResumeOnReconnect,
     onReconnect: () => {
       setCapturing(false);
       recorder.stop();

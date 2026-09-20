@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from io import BytesIO
@@ -16,6 +18,8 @@ from .models import FaceObservation, FrameAnalysis
 from .pipeline import detect_and_embed, find_hazards, match_faces
 from .store import SafetyStore
 
+log = logging.getLogger("perception.safety")
+
 
 class SafetyService:
     def __init__(
@@ -29,6 +33,9 @@ class SafetyService:
         self.store = store
         self.adapters = adapters
         self.frame_store = frame_store
+        # Per-process, per-(patient, person) cooldown clock. Lost on restart,
+        # which only costs one extra announcement.
+        self._last_announced: dict[tuple[ObjectId, ObjectId], float] = {}
 
     async def analyze(
         self,
@@ -51,7 +58,32 @@ class SafetyService:
         )
         if on_faces is not None and work.array is not None:
             await on_faces(list(work.analysis.faces))
+        if work.array is not None:
+            await self._announce_recognized(patient_id, work.analysis.faces)
         return await asyncio.to_thread(find_hazards, work, adapters=self.adapters, settings=self.settings)
+
+    async def _announce_recognized(self, patient_id: ObjectId, faces: list[FaceObservation]) -> None:
+        """Speaks up the instant an enrolled face is matched, cooldown permitting.
+
+        Queues a `reminder` notification -- the existing generic kind the
+        wearer's page already polls and speaks -- so no new client code path
+        is needed. Skips anyone announced within `face_announce_cooldown_s`.
+        """
+        now = time.monotonic()
+        for face in faces:
+            if face.person_id is None:
+                continue
+            key = (patient_id, face.person_id)
+            last = self._last_announced.get(key)
+            if last is not None and now - last < self.settings.face_announce_cooldown_s:
+                continue
+            self._last_announced[key] = now
+            try:
+                await self.store.queue_person_recognized_notification(
+                    patient_id, face.name or "", face.relation
+                )
+            except Exception:
+                log.exception("Failed to queue recognized-person notification for %s", face.person_id)
 
     async def persist(
         self,
@@ -112,7 +144,9 @@ class SafetyService:
             except (UnidentifiedImageError, OSError):
                 raise ValueError("each photo must be an image") from None
             array = np.asarray(image)
-            found = await asyncio.to_thread(detect_and_embed, self.adapters, array, filename=filename)
+            found = await asyncio.to_thread(
+                detect_and_embed, self.adapters, array, filename=filename, for_enrollment=True
+            )
             if len(found) != 1:
                 raise ValueError("each photo must contain exactly one face")
             embeddings.append(found[0][1])

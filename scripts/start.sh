@@ -100,6 +100,10 @@ if $perception; then
   env_set DEVICE_TOKEN_SECRET "$(env_get DEVICE_TOKEN_SECRET "$WEB_ENV")" "$PERCEPTION_ENV"
   env_set MONGODB_URI "$(env_get MONGODB_URI "$WEB_ENV")" "$PERCEPTION_ENV"
   env_set MONGODB_DB "$(env_get MONGODB_DB "$WEB_ENV")" "$PERCEPTION_ENV"
+  # Left empty, this encrypts enrolled face embeddings under a fresh random key every
+  # boot, so every enrolled person becomes silently unrecognizable the next restart.
+  # A Fernet key is 32 random bytes, url-safe base64: openssl's base64 alphabet plus tr.
+  env_default FACE_EMBEDDING_KEY "$(openssl rand -base64 32 | tr '+/' '-_')" "$PERCEPTION_ENV"
 fi
 
 mongo_uri=$(env_get MONGODB_URI "$WEB_ENV")
