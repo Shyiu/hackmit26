@@ -20,6 +20,9 @@ export function localClock(date: Date, timeZone: string): { dayKey: string; minu
 }
 
 function scheduledMinutes(routine: RoutineDoc): number | null {
+  // `leaving` routines are stored and shown but never fire yet: they need the
+  // enrolled "door" room and recent sightings of the named item (README
+  // "Proactive reminders"), neither of which exists in the pipeline so far.
   if (routine.trigger.kind !== "time") return null;
   const [hours, minutes] = routine.trigger.at.split(":").map(Number);
   return hours * 60 + minutes;
