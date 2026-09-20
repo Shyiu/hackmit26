@@ -26,9 +26,6 @@ from .protocol import Detection
 from .safety.images import LocalFrameStore
 from .store import BBox, CaptureSource, ObservationStore, OpenedSighting
 
-HIGH_CONFIDENCE = 0.5
-LOW_CONFIDENCE = 0.1
-
 
 @dataclass(frozen=True, slots=True)
 class TrackerConfig:
@@ -37,6 +34,11 @@ class TrackerConfig:
     refresh_interval: timedelta = timedelta(milliseconds=500)
     lost_after: timedelta = timedelta(seconds=3)
     match_iou: float = 0.3
+    # A detection at or above high_confidence can start a brand-new track; one
+    # between low_confidence and high_confidence can only keep an existing track
+    # alive (ByteTrack's second-stage match), never start one on its own.
+    high_confidence: float = 0.5
+    low_confidence: float = 0.1
 
     @classmethod
     def from_settings(cls, settings: Settings) -> TrackerConfig:
@@ -46,6 +48,8 @@ class TrackerConfig:
             refresh_interval=timedelta(milliseconds=settings.refresh_interval_ms),
             lost_after=timedelta(seconds=settings.track_lost_seconds),
             match_iou=settings.track_match_iou,
+            high_confidence=settings.track_high_confidence,
+            low_confidence=settings.track_low_confidence,
         )
 
 
@@ -142,7 +146,7 @@ class SightingTracker:
         events: list[SightingEvent] = []
         unmatched = self._associate(detections, observed_at, seq)
         for detection in unmatched:
-            if detection.confidence >= HIGH_CONFIDENCE:
+            if detection.confidence >= self.config.high_confidence:
                 self._tracks.append(self._start(detection, observed_at, seq))
         for track in self._tracks:
             if track.last_seq != seq:
@@ -186,8 +190,9 @@ class SightingTracker:
         return events
 
     def _associate(self, detections: list[Detection], observed_at: datetime, seq: int) -> list[Detection]:
-        high = [d for d in detections if d.confidence >= HIGH_CONFIDENCE]
-        low = [d for d in detections if LOW_CONFIDENCE <= d.confidence < HIGH_CONFIDENCE]
+        high_confidence, low_confidence = self.config.high_confidence, self.config.low_confidence
+        high = [d for d in detections if d.confidence >= high_confidence]
+        low = [d for d in detections if low_confidence <= d.confidence < high_confidence]
         free = list(self._tracks)
         # Stage one: tracks against confident detections. Stage two: what's
         # left of the tracks against the faint ones, which keeps a track alive
