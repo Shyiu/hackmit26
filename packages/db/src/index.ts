@@ -36,6 +36,7 @@ export type { ItemPatch, ItemResolution, NewItem } from "./repos/items";
 export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/interactions";
 export type { NewNotification } from "./repos/notifications";
 export { PUSH_SUBSCRIPTION_TTL_DAYS, type NewPushSubscription } from "./repos/push-subscriptions";
+export type { DangerEventQuery } from "./repos/danger-events";
 export type { SightingQuery } from "./repos/sightings";
 
 export * from "./schema/common";

@@ -62,8 +62,7 @@ export function pushAlertNotification(db: Db, notification: NotificationDoc): bo
     pushToCaregivers(db, notification.patientId, {
       title,
       body: notification.text,
-      // The alerts tab takes over this URL once it exists.
-      url: "/dashboard",
+      url: "/dashboard/alerts",
       tag: `${notification.kind}-${id}`,
     });
   // After the response on Vercel, so the function isn't frozen mid-send. Outside
@@ -90,7 +89,7 @@ export type SendPush = typeof webPush.sendNotification;
  *   await pushToCaregivers(getDb(), patientId, {
  *     title: "Possible danger",
  *     body: notification.text,
- *     url: "/dashboard",
+ *     url: "/dashboard/alerts",
  *     tag: `danger-${notification._id.toHexString()}`,
  *   });
  */

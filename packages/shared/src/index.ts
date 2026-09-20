@@ -5,6 +5,7 @@ export * from "./schemas/interaction";
 export * from "./schemas/detection";
 export * from "./schemas/notification";
 export * from "./schemas/push";
+export * from "./schemas/danger-event";
 export * from "./schemas/recording";
 export * from "./schemas/perception";
 export * from "./schemas/auth";
