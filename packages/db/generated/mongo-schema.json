@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "a4c7eaa9cbf04019b6709960aeb90341804788e4542fe5cd9dfb30d048cea4e6",
+  "fingerprint": "e33af1a82a2bca5f893f82f60e7f24f6d8702a7e561c67b9395543019536bcfa",
   "collections": {
     "patients": {
       "validator": {
@@ -1391,6 +1391,139 @@
         }
       ]
     },
+    "routines": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "active": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "trigger": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "time"
+                      ]
+                    },
+                    "at": {
+                      "type": "string",
+                      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "at"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "leaving"
+                      ]
+                    },
+                    "itemName": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    },
+                    "windowMinutes": {
+                      "minimum": 1,
+                      "maximum": 240,
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double"
+                      ],
+                      "multipleOf": 1
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "itemName",
+                    "windowMinutes"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "lastFiredAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cooldownMinutes": {
+              "minimum": 0,
+              "maximum": 1440,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "createdAt": {
+              "bsonType": "date"
+            },
+            "updatedAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "active",
+            "name",
+            "trigger",
+            "text",
+            "lastFiredAt",
+            "cooldownMinutes",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "patient_active",
+          "key": {
+            "patientId": 1,
+            "active": 1
+          },
+          "unique": false
+        }
+      ]
+    },
     "room_refs": {
       "validator": {
         "$jsonSchema": {
@@ -1478,6 +1611,7 @@
               "enum": [
                 "caregiver_message",
                 "reminder",
+                "proactive_reminder",
                 "danger_alert"
               ]
             },

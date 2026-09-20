@@ -14,6 +14,7 @@ export type ItemId = Id<"ItemId">;
 export type SightingId = Id<"SightingId">;
 export type RoomId = Id<"RoomId">;
 export type RoomRefId = Id<"RoomRefId">;
+export type RoutineId = Id<"RoutineId">;
 export type InteractionId = Id<"InteractionId">;
 export type NotificationId = Id<"NotificationId">;
 export type RecordingId = Id<"RecordingId">;

@@ -8,6 +8,7 @@ import { itemsRepo } from "./items";
 import { notificationsRepo } from "./notifications";
 import { patientRepo } from "./patients";
 import { roomsRepo } from "./rooms";
+import { routinesRepo } from "./routines";
 import { sightingsRepo } from "./sightings";
 
 export type TenantOptions = {
@@ -35,6 +36,7 @@ export function tenantRepos(db: Db, patientId: PatientId, options: TenantOptions
     sightings: sightingsRepo(ctx),
     interactions: interactionsRepo(ctx),
     rooms: roomsRepo(ctx),
+    routines: routinesRepo(ctx),
     notifications: notificationsRepo(ctx),
     devices: devicesRepo(ctx),
   };

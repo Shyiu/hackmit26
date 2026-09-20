@@ -35,6 +35,7 @@ export { tenantRepos, type TenantOptions, type TenantRepos } from "./repos";
 export type { ItemPatch, ItemResolution, NewItem } from "./repos/items";
 export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/interactions";
 export type { NewNotification } from "./repos/notifications";
+export type { NewRoutine, RoutinePatch } from "./repos/routines";
 export type { SightingQuery } from "./repos/sightings";
 
 export * from "./schema/common";
@@ -42,6 +43,7 @@ export * from "./schema/items";
 export * from "./schema/sightings";
 export * from "./schema/interactions";
 export * from "./schema/rooms";
+export * from "./schema/routines";
 export * from "./schema/notifications";
 export * from "./schema/recordings";
 export * from "./schema/perception";

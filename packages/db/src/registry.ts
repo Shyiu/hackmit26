@@ -7,6 +7,7 @@ import { notificationDocSchema } from "./schema/notifications";
 import { captureSessionDocSchema, descriptionJobDocSchema } from "./schema/perception";
 import { recordingDocSchema } from "./schema/recordings";
 import { roomDocSchema, roomRefDocSchema } from "./schema/rooms";
+import { routineDocSchema } from "./schema/routines";
 import { dangerEventDocSchema, frameObservationDocSchema, personDocSchema } from "./schema/safety";
 import { sightingDocSchema } from "./schema/sightings";
 import { caregiverDocSchema, deviceDocSchema, patientDocSchema } from "./schema/tenancy";
@@ -279,6 +280,19 @@ export const collections = {
         key: { patientId: 1, normalizedName: 1 },
         unique: true,
         purpose: "room names are unique per wearer",
+      },
+    ],
+  }),
+
+  routines: defineCollection({
+    name: "routines",
+    schema: routineDocSchema,
+    writers: ["web"],
+    indexes: [
+      {
+        name: "patient_active",
+        key: { patientId: 1, active: 1 },
+        purpose: "the evaluator's active routines for one wearer, and the dashboard list",
       },
     ],
   }),

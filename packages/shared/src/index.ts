@@ -1,6 +1,7 @@
 export * from "./schemas/item";
 export * from "./schemas/sighting";
 export * from "./schemas/room";
+export * from "./schemas/routine";
 export * from "./schemas/interaction";
 export * from "./schemas/detection";
 export * from "./schemas/notification";
