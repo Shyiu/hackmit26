@@ -17,6 +17,7 @@ import pytest
 from bson import ObjectId
 from conftest import TEST_URI, Database, Seed
 from fastapi.testclient import TestClient
+from gridfs import GridFSBucket
 from PIL import Image
 from pymongo import MongoClient
 from pymongo.collection import Collection
@@ -54,7 +55,15 @@ DEVICE = ObjectId(FIXTURE["claims"]["sub"])
 REVOKED_DEVICE = ObjectId("5eed00000000000000000d02")
 OTHER_PATIENT = ObjectId("5eed00000000000000000002")
 WRONG_SECRET = "another-secret-of-the-right-length-0123456789"
-JPEG = b"\xff\xd8\xff\xe0" + bytes(60)
+
+
+def _fixture_jpeg() -> bytes:
+    output = BytesIO()
+    Image.new("RGB", (16, 16), "white").save(output, format="JPEG")
+    return output.getvalue()
+
+
+JPEG = _fixture_jpeg()
 
 
 @pytest.fixture(scope="module")
@@ -69,13 +78,21 @@ async def wearer_db(db: Database) -> Database:
     return db
 
 
-def _client(db_name: str, uri: str = TEST_URI, detector: Detector | None = None) -> TestClient:
+def _client(
+    db_name: str,
+    uri: str = TEST_URI,
+    detector: Detector | None = None,
+    *,
+    keyframe_interval_s: float = 10.0,
+) -> TestClient:
     settings = Settings(
         mongodb_uri=uri,
         mongodb_db=db_name,
         device_token_secret=SECRET,
         # An opened sighting writes a keyframe file; give each client its own scratch directory.
         frame_image_dir=tempfile.mkdtemp(prefix="perception-frames-"),
+        keyframe_interval_s=keyframe_interval_s,
+        description_worker=False,
     )
     # The fixture token was minted for a fixed moment, so the app reads that as now.
     return TestClient(create_app(settings, detector=detector, token_clock=lambda: FIXTURE["validAt"]))
@@ -590,20 +607,55 @@ def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_fram
         )
         assert item is not None
         if disconnect_during_write:
+            # The keyframe is enqueued after open_sighting returns, so the socket goes away
+            # while the write is still held and the held write is then released.
             assert write_finished.wait(5)
-        # The description worker in the same process may already be draining this job, so its
-        # status isn't asserted here — only that a keyframe was queued and actually saved.
+            ws.close()
+            release_write.set()
         job = _wait_for(
             lambda: db["description_jobs"].find_one({"patientId": PATIENT, "sightingId": sighting["_id"]})
         )
+        sighting = db["sightings"].find_one({"_id": sighting["_id"]})
+        # After a disconnect the sighting may already be closed and the job cancelled,
+        # so its status is only asserted while the socket stays open.
+        assert disconnect_during_write or job["status"] == "queued"
         assert job["bbox"] == [0.4, 0.3, 0.2, 0.2]
-        assert Path(client.app.state.services.frame_store.directory / job["keyframeKey"]).is_file()
-        ws.close()
-        release_write.set()
+        assert sighting["keyframeKey"] == job["keyframeKey"]
+        assert sighting["thumbKey"] == job["keyframeKey"].removesuffix(".jpg") + ".thumb.jpg"
+        bucket = GridFSBucket(db, bucket_name="keyframes")
+        assert bucket.open_download_stream_by_name(sighting["keyframeKey"]).read() == JPEG
+        assert bucket.open_download_stream_by_name(sighting["thumbKey"]).read()
+        if not disconnect_during_write:
+            ws.send_bytes(_frame(session_id, 4))
+            reply = parse_server_message(ws.receive_text())
+            assert isinstance(reply, DetectionsMessage) and reply.seq == 4
+            time.sleep(0.1)
+            assert db["description_jobs"].count_documents({"sightingId": sighting["_id"]}) == 1
+            ws.close()
         _wait_for(lambda: db["sightings"].find_one({"_id": sighting["_id"], "status": "closed"}))
 
     # Only the active item's prompts reached the detector.
-    assert [[p.text for p in prompts] for _, prompts in detector.seen] == [["keys"]] * 3
+    assert [[p.text for p in prompts] for _, prompts in detector.seen] == [["keys"]] * (
+        3 if disconnect_during_write else 4
+    )
+
+
+def test_zero_keyframe_interval_enqueues_on_refresh(
+    wearer: Database, keys_item: ObjectId, sessions: Collection[dict[str, Any]]
+) -> None:
+    detector = StubDetector()
+    with (
+        _client(wearer.name, detector=detector, keyframe_interval_s=0) as client,
+        client.websocket_connect("/ws/frames") as ws,
+    ):
+        session_id = _live_session(ws)
+        for seq in (1, 2, 3, 4):
+            ws.send_bytes(_frame(session_id, seq))
+            assert isinstance(parse_server_message(ws.receive_text()), DetectionsMessage)
+        db = sessions.database
+        sighting = _wait_for(lambda: db["sightings"].find_one({"patientId": PATIENT, "status": "open"}))
+        _wait_for(lambda: db["description_jobs"].count_documents({"sightingId": sighting["_id"]}) == 2)
+        ws.close()
 
 
 def test_one_or_two_frames_write_nothing(wearer: Database, keys_item: ObjectId) -> None:

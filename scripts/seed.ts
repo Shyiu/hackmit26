@@ -59,6 +59,27 @@ async function seed(db: Db) {
   const observe = (item: typeof keys, rest: Omit<Parameters<typeof seedObservation>[1], "patientId" | "itemId" | "label">) =>
     seedObservation(db, { patientId: DEMO_PATIENT_ID, itemId: item._id, label: item.name, ...rest });
 
+  const DAY = 24 * 60 * MINUTE;
+  // History behind the usual spot: three days at the kitchen counter, one
+  // elsewhere. Each is far enough apart to count as its own placement.
+  for (const daysAgo of [1, 2, 3]) {
+    await observe(keys, {
+      lastSeenAt: new Date(now - daysAgo * DAY),
+      state: "resting",
+      description: {
+        status: "ready",
+        sentence: "on the kitchen counter, next to the coffee maker",
+        room: "kitchen",
+        surface: "counter",
+        relation: "next to the coffee maker",
+      },
+    });
+  }
+  await observe(keys, {
+    lastSeenAt: new Date(now - 4 * DAY),
+    state: "resting",
+    description: { status: "ready", sentence: "on the hallway table", room: "hallway", surface: "table" },
+  });
   await observe(keys, {
     lastSeenAt: new Date(now - 20 * MINUTE),
     state: "resting",
@@ -97,8 +118,15 @@ async function seed(db: Db) {
   });
   await tenant.notifications.create({ kind: "danger_alert", text: "The stove looks hot and nobody is nearby." });
 
+  await tenant.items.recomputeUsualSpots(keys._id);
+  await tenant.items.recomputeUsualSpots(wallet._id);
+
   for (const item of await tenant.items.list()) {
-    console.log(`${item.name.padEnd(8)} ${locationStatus(item.lastSighting)}  ${item.lastSighting?.sentence ?? ""}`);
+    const usual = item.usualSpots[0];
+    console.log(
+      `${item.name.padEnd(8)} ${locationStatus(item.lastSighting)}  ${item.lastSighting?.sentence ?? ""}` +
+        (usual ? `  | usually ${usual.sentence} (${Math.round(usual.share * 100)}%, ${usual.samples}x)` : ""),
+    );
   }
 }
 

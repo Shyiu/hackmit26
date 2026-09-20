@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import { locationStatus, parseId, type ItemId } from "@memory-glasses/db";
 import { ImageOff, Volume2 } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -67,6 +68,22 @@ export default async function ItemPage({ params }: PageProps<"/dashboard/items/[
               ) : (
                 <p className="text-sm text-muted-foreground">The camera hasn&apos;t seen it yet.</p>
               )}
+              {item.usualSpots.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-sm font-medium">Usual spots</h3>
+                  <ul className="text-sm">
+                    {item.usualSpots.map((spot) => (
+                      <li key={spot.sentence} className="flex justify-between gap-3">
+                        <span className="first-letter:uppercase">{spot.sentence}</span>
+                        <span className="text-muted-foreground">
+                          {Math.round(spot.share * 100)}% · {spot.samples}{" "}
+                          {spot.samples === 1 ? "time" : "times"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -96,10 +113,24 @@ export default async function ItemPage({ params }: PageProps<"/dashboard/items/[
                   key={sighting._id.toHexString()}
                   className="flex gap-3 px-3 py-2.5 transition-colors hover:bg-row-hover"
                 >
-                  {/* Keyframe thumbnails need signed URLs, which aren't built yet. */}
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                    <ImageOff className="size-4" aria-label="No thumbnail yet" />
-                  </div>
+                  {sighting.thumbKey || sighting.keyframeKey ? (
+                    <a
+                      href={`/api/sightings/${sighting._id.toHexString()}/keyframe`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block size-10 shrink-0 overflow-hidden rounded-md bg-muted"
+                    >
+                      <img
+                        src={`/api/sightings/${sighting._id.toHexString()}/${sighting.thumbKey ? "thumb" : "keyframe"}`}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    </a>
+                  ) : (
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                      <ImageOff className="size-4" aria-label="No thumbnail yet" />
+                    </div>
+                  )}
                   <div className="flex min-w-0 flex-col gap-0.5">
                     <p className="text-sm font-medium first-letter:uppercase">{sightingPhrase(sighting)}</p>
                     <p className="text-xs text-muted-foreground">

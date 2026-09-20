@@ -81,7 +81,12 @@ export type CaptureState = "live" | "paused" | "offline";
 
 /** Whether the chest camera is live, paused, or offline, from its newest capture session. */
 export function captureView(session: CaptureSessionDoc, now: Date) {
-  const heardFrom = session.lastFrameAt ?? session.updatedAt;
+  // The socket heartbeats updatedAt while it's open, so a paused session with no
+  // frames still counts as heard from; lastFrameAt only tells when frames flowed.
+  const heardFrom =
+    session.lastFrameAt && session.lastFrameAt > session.updatedAt
+      ? session.lastFrameAt
+      : session.updatedAt;
   const quiet = now.getTime() - heardFrom.getTime() > CAPTURE_STALE_AFTER_MS;
   const state: CaptureState = session.state === "ended" || quiet ? "offline" : session.state;
   return {

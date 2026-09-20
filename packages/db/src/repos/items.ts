@@ -9,6 +9,7 @@ import {
 } from "../lookup";
 import { itemDocSchema, type ItemDoc } from "../schema/items";
 import { withLiveSnapshots } from "../snapshot";
+import { computeUsualSpots } from "../usual-spots";
 import { bumpConfigVersion, tenantCollection, type RepoContext } from "./context";
 
 export type NewItem = {
@@ -164,6 +165,42 @@ export function itemsRepo(ctx: RepoContext) {
     /** Archiving keeps the history and frees the item's names for another item. */
     setActive(id: ItemId, active: boolean): Promise<ItemDoc | null> {
       return update(id, { active });
+    },
+
+    /**
+     * Recomputes `usualSpots` from the item's closed, described, resting
+     * sightings still inside retention. A snapshot-like write like the ones
+     * perception makes: it doesn't touch `updatedAt` or bump configVersion, so
+     * it can't turn a caregiver's open form into a conflict.
+     */
+    async recomputeUsualSpots(id: ItemId): Promise<ItemDoc | null> {
+      const samples = await tenantCollection(ctx, "sightings")
+        .find(
+          {
+            itemId: id,
+            status: "closed",
+            state: "resting",
+            descriptionStatus: "ready",
+            expiresAt: { $gt: ctx.now() },
+          },
+          {
+            projection: {
+              sentence: 1,
+              surface: 1,
+              relation: 1,
+              room: 1,
+              firstSeenAt: 1,
+              lastSeenAt: 1,
+              descriptionStatus: 1,
+              state: 1,
+            },
+          },
+        )
+        .sort({ lastSeenAt: -1 })
+        .limit(200)
+        .toArray();
+      const updated = await items.findOneAndUpdate({ _id: id }, { $set: { usualSpots: computeUsualSpots(samples) } });
+      return updated && withLiveSnapshots(updated, ctx.now());
     },
 
     /**

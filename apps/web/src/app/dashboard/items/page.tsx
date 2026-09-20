@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import { locationStatus } from "@memory-glasses/db";
 import { ChevronRight, KeyRound, Plus } from "lucide-react";
 import Link from "next/link";
@@ -69,6 +70,13 @@ export default async function ItemsPage() {
                       )}
                     >
                       <span className="flex min-w-0 items-center gap-2">
+                        {item.lastSighting?.thumbKey && (
+                          <img
+                            src={`/api/sightings/${item.lastSighting.sightingId}/thumb`}
+                            alt=""
+                            className="size-7 shrink-0 rounded-md object-cover"
+                          />
+                        )}
                         <span className="truncate font-medium capitalize">{item.name}</span>
                         {item.aliases.length > 0 && (
                           <span className="hidden truncate text-xs text-muted-foreground lg:inline">

@@ -49,6 +49,8 @@ export function SetupPanel({
   const trackSettings = track?.getSettings();
   const resolution =
     trackSettings?.width && trackSettings.height ? `, ${trackSettings.width}×${trackSettings.height}` : "";
+  const lensLabel =
+    camera.lens === "ultrawide" ? " · 0.5× ultra wide" : camera.lens === "wide" ? " · 1× wide" : "";
 
   function submitQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -199,7 +201,7 @@ export function SetupPanel({
           <h2 className="font-medium">This phone</h2>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm text-white/80">
             <dt>Camera</dt>
-            <dd className="break-words">{track ? `${track.label || "unnamed"}${resolution}` : "not open"}</dd>
+            <dd className="break-words">{track ? `${track.label || "unnamed"}${resolution}${lensLabel}` : "not open"}</dd>
             <dt>Microphone</dt>
             <dd>{voice.error ?? (voice.micAllowed ? "allowed" : "not asked yet")}</dd>
             <dt>Speech to text</dt>

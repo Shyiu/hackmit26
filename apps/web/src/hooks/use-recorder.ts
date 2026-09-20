@@ -33,7 +33,11 @@ export function useRecorder(stream: MediaStream | null) {
   const urlsRef = useRef<string[]>([]);
 
   const stop = useCallback(() => {
-    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+    // Clear the ref before the async "stop" event runs, so a same-tick
+    // stop(); start() opens a new recorder instead of silently no-op'ing.
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    if (recorder?.state === "recording") recorder.stop();
   }, []);
 
   const start = useCallback(() => {
@@ -64,7 +68,9 @@ export function useRecorder(stream: MediaStream | null) {
     recorder.addEventListener("error", () => setError("Recording failed."));
     recorder.addEventListener("stop", () => {
       window.clearTimeout(limit);
-      recorderRef.current = null;
+      // A same-tick stop(); start() may already have put a new recorder in the
+      // ref; don't clear someone else's.
+      if (recorderRef.current === recorder) recorderRef.current = null;
       setRecording(false);
       if (chunks.length === 0) return;
       const type = recorder.mimeType || mimeType || "video/mp4";
