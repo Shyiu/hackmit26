@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { frameDetectionsSchema } from "./detection";
+import { detectionSchema, frameDetectionsSchema } from "./detection";
 
 // The /ws/frames protocol between a capture page and the perception service.
 // services/perception/app/protocol.py mirrors these, and the JSON files in
@@ -112,6 +112,30 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
   facesMessageSchema,
   errorMessageSchema,
 ]);
+
+// /ws/debug only: the caregiver dashboard's Live view. A downscaled copy of a live frame
+// plus its detections, sent as JSON with a base64 JPEG rather than the binary envelope
+// /ws/frames uses. Debug-only -- never stored, and only sent while someone is watching.
+export const debugFrameMessageSchema = z
+  .object({
+    type: z.literal("debug_frame"),
+    v: z.literal(1),
+    seq: z.number().int().nonnegative(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    jpeg: z.string().min(1),
+    detections: z.array(detectionSchema),
+  })
+  .strict();
+
+export const debugServerMessageSchema = z.discriminatedUnion("type", [
+  debugFrameMessageSchema,
+  facesMessageSchema,
+  errorMessageSchema,
+]);
+
+export type DebugFrameMessage = z.infer<typeof debugFrameMessageSchema>;
+export type DebugServerMessage = z.infer<typeof debugServerMessageSchema>;
 
 // POST /config/classes on the perception service, called by the web app after a
 // caregiver edits items. The tenant comes from the token, never the body.

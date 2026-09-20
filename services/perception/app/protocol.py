@@ -154,6 +154,39 @@ _client_messages: TypeAdapter[HelloMessage | CaptureCommand] = TypeAdapter(Clien
 _server_messages: TypeAdapter[ServerMessage] = TypeAdapter(ServerMessage)
 
 
+class DebugFrameMessage(_Strict):
+    """/ws/debug only: a downscaled copy of a live frame plus its detections, for the
+    caregiver dashboard's Live view. Debug-only -- never stored, never sent to /ws/frames.
+    A plain JSON message with base64 JPEG is simpler for a browser to consume here than the
+    binary envelope /ws/frames uses, and the traffic only exists while someone is watching."""
+
+    type: Literal["debug_frame"]
+    v: Version
+    seq: Annotated[Int, Field(ge=0)]
+    width: Annotated[Int, Field(gt=0, le=4096)]
+    height: Annotated[Int, Field(gt=0, le=4096)]
+    jpeg: Annotated[str, StringConstraints(min_length=1)]
+    detections: list[Detection]
+
+
+DebugServerMessage = Annotated[
+    DebugFrameMessage | FacesMessage | ErrorMessage, Field(discriminator="type")
+]
+_debug_server_messages: TypeAdapter[DebugServerMessage] = TypeAdapter(DebugServerMessage)
+
+
+def parse_debug_message(data: str | bytes) -> DebugFrameMessage | FacesMessage | ErrorMessage:
+    return _debug_server_messages.validate_python(_loads(data))
+
+
+def debug_frame_message(
+    seq: int, width: int, height: int, jpeg_b64: str, detections: list[Detection]
+) -> DebugFrameMessage:
+    return DebugFrameMessage(
+        type="debug_frame", v=1, seq=seq, width=width, height=height, jpeg=jpeg_b64, detections=detections
+    )
+
+
 def _reject_constant(name: str) -> float:
     raise ValueError(f"{name} is not valid JSON")
 

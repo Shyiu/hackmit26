@@ -15,7 +15,13 @@ import { relativeTime } from "@/lib/relative-time";
 
 export { relativeTime };
 
-export type Answer = { template: AnswerTemplate; text: string; itemId: ItemDoc["_id"] | null };
+export type Answer = {
+  template: AnswerTemplate;
+  text: string;
+  itemId: ItemDoc["_id"] | null;
+  /** Set only on "offer_add_item", so the route can store it for the next turn's "yes". */
+  pendingItemName?: string | null;
+};
 
 // Kept in sync with the client-side exemption in use-wearer-client.ts (WHO_IS_THIS_PATTERN)
 // -- duplicated rather than shared, since that file is a client hook and this one is
@@ -24,6 +30,14 @@ const WHO_IS_THIS_PATTERN = /\bwho(?:'s| is| are)\s+(?:this|that|you)\b/i;
 
 export function isWhoIsThisQuestion(transcript: string): boolean {
   return WHO_IS_THIS_PATTERN.test(transcript);
+}
+
+// A short yes to the "want me to add it?" offer. Deliberately narrow: a
+// transcript that starts with anything else is a new question, not a reply.
+const AFFIRMATIVE_PATTERN = /^\s*(yes|yeah|yep|yup|sure|okay|ok|please|correct)\b|^\s*(please\s+)?(do|add)\s+it\b/i;
+
+export function isAffirmative(transcript: string): boolean {
+  return AFFIRMATIVE_PATTERN.test(transcript);
 }
 
 export function composeWhoIsThisAnswer(person: LastSeenPerson | null, now: Date): Answer {
@@ -40,8 +54,17 @@ export function composeWhoIsThisAnswer(person: LastSeenPerson | null, now: Date)
 export function composeAnswer(resolution: ItemResolution, settings: PatientSettings, now: Date): Answer {
   switch (resolution.kind) {
     case "none":
-      // MVP fast-path miss: ask which tracked item they mean.
-      return { template: "not_understood", text: "Which thing should I look for?", itemId: null };
+      // MVP fast-path miss. With a plausible item name to offer, ask to add it as a
+      // tracked item instead of just saying it wasn't understood; the route creates
+      // it if the wearer's next turn is a "yes" (see isAffirmative, composeItemAddedAnswer).
+      return resolution.candidate
+        ? {
+            template: "offer_add_item",
+            text: `I haven't been tracking your ${resolution.candidate}. Want me to add it?`,
+            itemId: null,
+            pendingItemName: resolution.candidate,
+          }
+        : { template: "not_understood", text: "Which thing should I look for?", itemId: null };
     case "ambiguous": {
       const [first, second] = resolution.items;
       return {
@@ -57,6 +80,15 @@ export function composeAnswer(resolution: ItemResolution, settings: PatientSetti
       return _exhaustive;
     }
   }
+}
+
+export function composeItemAddedAnswer(item: ItemDoc): Answer {
+  const them = item.plural ? "them" : "it";
+  return {
+    template: "item_added",
+    text: `Added your ${item.name}. I'll start watching for ${them}.`,
+    itemId: item._id,
+  };
 }
 
 function describeItem(item: ItemDoc, settings: PatientSettings, now: Date): Answer {

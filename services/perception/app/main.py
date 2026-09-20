@@ -6,6 +6,7 @@ Run it with `uv run uvicorn app.main:app --port 8000`.
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import logging
 import time
@@ -32,12 +33,17 @@ from .protocol import (
     CaptureCommand,
     ConfigClassesRequest,
     ConfigClassesResponse,
+    DebugFrameMessage,
+    Detection,
     Face,
     FaceCandidate,
+    FacesMessage,
     Frame,
     FrameError,
+    FrameHeader,
     HelloMessage,
     capture_time,
+    debug_frame_message,
     detections_message,
     error_message,
     faces_message,
@@ -71,6 +77,40 @@ _TOKEN_PROBLEMS = {
 }
 
 
+class DebugHub:
+    """Live subscribers of /ws/debug, one set per wearer, for the caregiver dashboard's
+    Live view. Broadcast-only and best-effort: a subscriber that errors is dropped rather
+    than slowing the frame socket down, and nothing here is ever persisted."""
+
+    def __init__(self) -> None:
+        self._subscribers: dict[ObjectId, set[WebSocket]] = {}
+
+    def subscribe(self, patient_id: ObjectId, ws: WebSocket) -> None:
+        self._subscribers.setdefault(patient_id, set()).add(ws)
+
+    def unsubscribe(self, patient_id: ObjectId, ws: WebSocket) -> None:
+        subs = self._subscribers.get(patient_id)
+        if subs is None:
+            return
+        subs.discard(ws)
+        if not subs:
+            del self._subscribers[patient_id]
+
+    def has_subscribers(self, patient_id: ObjectId) -> bool:
+        return bool(self._subscribers.get(patient_id))
+
+    async def broadcast(self, patient_id: ObjectId, message: DebugFrameMessage | FacesMessage) -> None:
+        subs = self._subscribers.get(patient_id)
+        if not subs:
+            return
+        text = message.model_dump_json()
+        for ws in list(subs):
+            try:
+                await ws.send_text(text)
+            except Exception:
+                self.unsubscribe(patient_id, ws)
+
+
 @dataclass(frozen=True, slots=True)
 class Services:
     settings: Settings
@@ -80,6 +120,7 @@ class Services:
     keyframe_store: KeyframeStore
     prompts: PromptCache
     token_clock: Callable[[], float]
+    debug_hub: DebugHub
     safety: SafetyService | None = None
 
 
@@ -135,6 +176,7 @@ def create_app(
             resolved_keyframe_store,
             prompts,
             token_clock,
+            DebugHub(),
             safety,
         )
         description_task = None
@@ -234,12 +276,25 @@ async def reload_classes(request: Request) -> JSONResponse:
 
 @router.websocket("/ws/debug")
 async def debug_socket(ws: WebSocket) -> None:
+    """The dashboard's Live view: detections and downscaled frames for one wearer, for
+    as long as this socket is open. Opt-in (a caregiver has to open the tab) and silent
+    while capture is paused, since /ws/frames only broadcasts frames it actually processes."""
     await ws.accept()
-    if await _hello(ws, "debug") is None:
+    claims = await _hello(ws, "debug")
+    if claims is None:
         return
-    # Not built yet. The dashboard live view will get detections and annotated
-    # frames here: opt-in, transient, and silent while capture is paused.
-    await ws.close(code=1000)
+    services = _services(ws)
+    patient_id = ObjectId(claims.pid)
+    services.debug_hub.subscribe(patient_id, ws)
+    try:
+        while True:
+            message = await ws.receive()
+            if message["type"] == "websocket.disconnect":
+                break
+    except WebSocketDisconnect:
+        pass
+    finally:
+        services.debug_hub.unsubscribe(patient_id, ws)
 
 
 @router.websocket("/ws/frames")
@@ -351,6 +406,7 @@ class FrameConnection:
         self.settings = services.settings
         self.services_safety = services.safety
         self.services_prompts = services.prompts
+        self.debug_hub = services.debug_hub
         self.patient_id = patient_id
         self.device_id = device_id
         self.session_id = session_id
@@ -487,6 +543,7 @@ class FrameConnection:
                     self.detector.detect, pending.frame.jpeg, header, self.prompts
                 )
                 await self._send(detections_message(header.seq, detections or []))
+                await self._broadcast_debug_frame(header, pending.frame.jpeg, detections or [])
                 await self.store.record_frame(
                     self.patient_id, self.session_id, header.seq, pending.received_at, dropped=False
                 )
@@ -553,31 +610,43 @@ class FrameConnection:
         if not faces and not self.faces_in_view:
             return
         self.faces_in_view = bool(faces)
-        await self._send(
-            faces_message(
-                seq,
-                [
-                    Face(
-                        personId=str(face.person_id) if face.person_id else None,
-                        name=face.name,
-                        relation=face.relation,
-                        bbox=(face.bbox.x, face.bbox.y, face.bbox.w, face.bbox.h),
-                        confidence=face.confidence,
-                        matchConfidence=face.match_confidence,
-                        candidates=[
-                            FaceCandidate(
-                                personId=str(candidate.person_id),
-                                name=candidate.name,
-                                relation=candidate.relation,
-                                similarity=candidate.similarity,
-                            )
-                            for candidate in face.candidates
-                        ],
-                    )
-                    for face in faces
-                ],
-            )
+        message = faces_message(
+            seq,
+            [
+                Face(
+                    personId=str(face.person_id) if face.person_id else None,
+                    name=face.name,
+                    relation=face.relation,
+                    bbox=(face.bbox.x, face.bbox.y, face.bbox.w, face.bbox.h),
+                    confidence=face.confidence,
+                    matchConfidence=face.match_confidence,
+                    candidates=[
+                        FaceCandidate(
+                            personId=str(candidate.person_id),
+                            name=candidate.name,
+                            relation=candidate.relation,
+                            similarity=candidate.similarity,
+                        )
+                        for candidate in face.candidates
+                    ],
+                )
+                for face in faces
+            ],
         )
+        await self._send(message)
+        if self.debug_hub.has_subscribers(self.patient_id):
+            await self.debug_hub.broadcast(self.patient_id, message)
+
+    async def _broadcast_debug_frame(
+        self, header: FrameHeader, jpeg: bytes, detections: list[Detection]
+    ) -> None:
+        # Skip the base64 encode entirely when nobody's watching -- this runs on the
+        # main 3fps detection path, not just when a caregiver has the Live view open.
+        if not self.debug_hub.has_subscribers(self.patient_id):
+            return
+        jpeg_b64 = base64.b64encode(jpeg).decode("ascii")
+        message = debug_frame_message(header.seq, header.width, header.height, jpeg_b64, detections)
+        await self.debug_hub.broadcast(self.patient_id, message)
 
     async def _refresh_prompts(self) -> None:
         self.prompts = (await self.services_prompts.get(self.patient_id)).prompts

@@ -118,8 +118,8 @@ describe("items", () => {
       const mug = await tenant.items.create({ name: "mug" });
       await tenant.items.setActive(mug._id, false);
 
-      expect(await tenant.items.resolve("where is my mug")).toEqual({ kind: "none" });
-      expect(await tenant.items.resolve("where is my umbrella")).toEqual({ kind: "none" });
+      expect(await tenant.items.resolve("where is my mug")).toEqual({ kind: "none", candidate: "mug" });
+      expect(await tenant.items.resolve("where is my umbrella")).toEqual({ kind: "none", candidate: "umbrella" });
     });
   });
 

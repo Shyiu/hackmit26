@@ -18,7 +18,11 @@ import { SetupPanel } from "./setup-panel";
 const ASK_KEYS = new Set([" ", "Enter", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown"]);
 
 export function WearView() {
-  const client = useWearerClient({ turnMode: "auto", fullscreen: true });
+  // autoResumeOnReconnect: true while testing over a flaky quick tunnel, which
+  // reconnects the frame socket often. PLAN.md "Privacy and safety" wants a real
+  // wearer device to require an explicit resume after every reconnect -- revert
+  // this before a real demo or deployment with an actual wearer.
+  const client = useWearerClient({ turnMode: "auto", fullscreen: true, autoResumeOnReconnect: true });
   const [panelOpen, setPanelOpen] = useState(true);
   const [textScale, setTextScale] = useStoredNumber("wear.textScale", 1);
   const { hud, voice, live, capturing, answer, stalled, recorder, camera, perception } = client;

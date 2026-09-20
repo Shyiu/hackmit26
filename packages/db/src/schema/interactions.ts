@@ -13,6 +13,8 @@ export const answerTemplate = z.enum([
   "unseen",
   "ambiguous",
   "not_understood",
+  "offer_add_item",
+  "item_added",
   "person_recalled",
   "no_one_recalled",
 ]);
@@ -50,6 +52,12 @@ export const interactionDocSchema = z.strictObject({
   itemId: idSchema<ItemId>().nullable(),
   answerTemplate: answerTemplate.nullable(),
   answerText: z.string().max(500).nullable(),
+  /**
+   * Set only on an "offer_add_item" answer: the best-guess item name offered,
+   * so a "yes" on the very next turn knows what to create without re-parsing
+   * that turn's transcript. Null on every other interaction.
+   */
+  pendingItemName: z.string().min(1).max(100).nullable(),
   timingsMs: z.strictObject(timingsShape),
   /** Client-reported, so kept apart from the server's own stages. */
   playbackOutcome: playbackOutcome.nullable(),

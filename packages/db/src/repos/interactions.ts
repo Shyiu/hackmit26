@@ -43,7 +43,7 @@ export type BeginInteraction = {
 };
 
 export type InteractionOutcome = Partial<
-  Pick<InteractionDoc, "path" | "itemId" | "answerTemplate" | "answerText" | "error">
+  Pick<InteractionDoc, "path" | "itemId" | "answerTemplate" | "answerText" | "pendingItemName" | "error">
 > & { timingsMs?: Partial<Record<TimingStage, number>> };
 
 export type StageStats = { samples: number; p50: number | null; p95: number | null };
@@ -73,6 +73,7 @@ export function interactionsRepo(ctx: RepoContext) {
         itemId: null,
         answerTemplate: null,
         answerText: null,
+        pendingItemName: null,
         timingsMs: {},
         playbackOutcome: null,
         playbackReportedAt: null,

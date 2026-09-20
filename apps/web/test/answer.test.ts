@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_PATIENT_SETTINGS, newId, type ItemDoc, type ItemId, type PatientId } from "@memory-glasses/db";
-import { composeAnswer } from "@/lib/server/answer";
+import { composeAnswer, composeItemAddedAnswer, isAffirmative } from "@/lib/server/answer";
 
 const now = new Date("2026-01-10T12:00:00Z");
 
@@ -80,5 +80,46 @@ describe("composeAnswer usual-spot suggestion", () => {
       item({ usualSpots: [{ ...spot, samples: 2 }], lastSighting: snapshot({ state: "held" }) }),
     );
     expect(few.text).not.toContain("usually");
+  });
+});
+
+describe("composeAnswer on an unresolved item", () => {
+  it("offers to add it when the fast path guessed a name", () => {
+    const answer = composeAnswer({ kind: "none", candidate: "flashlight" }, DEFAULT_PATIENT_SETTINGS, now);
+    expect(answer.template).toBe("offer_add_item");
+    expect(answer.text).toBe("I haven't been tracking your flashlight. Want me to add it?");
+    expect(answer.pendingItemName).toBe("flashlight");
+  });
+
+  it("falls back to the generic miss with nothing to guess from", () => {
+    const answer = composeAnswer({ kind: "none", candidate: null }, DEFAULT_PATIENT_SETTINGS, now);
+    expect(answer.template).toBe("not_understood");
+    expect(answer.text).toBe("Which thing should I look for?");
+  });
+});
+
+describe("composeItemAddedAnswer", () => {
+  it("confirms a singular item", () => {
+    const answer = composeItemAddedAnswer(item({ name: "flashlight", plural: false }));
+    expect(answer.text).toBe("Added your flashlight. I'll start watching for it.");
+  });
+
+  it("confirms a plural item", () => {
+    const answer = composeItemAddedAnswer(item({ name: "keys", plural: true }));
+    expect(answer.text).toBe("Added your keys. I'll start watching for them.");
+  });
+});
+
+describe("isAffirmative", () => {
+  it("accepts a short yes", () => {
+    for (const reply of ["yes", "Yeah", "yep please", "sure", "ok", "add it", "please do it"]) {
+      expect(isAffirmative(reply)).toBe(true);
+    }
+  });
+
+  it("rejects a new question", () => {
+    for (const reply of ["where are my keys", "no", "not now", "yesterday I saw my keys"]) {
+      expect(isAffirmative(reply)).toBe(false);
+    }
   });
 });

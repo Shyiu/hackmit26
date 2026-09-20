@@ -1,6 +1,7 @@
 import { ConflictError, duplicateKeyOf, InvalidInputError, parseDocument } from "../errors";
 import { newId, type ItemId } from "../ids";
 import {
+  guessItemName,
   guessPlural,
   lookupCandidates,
   MAX_LOOKUP_KEY_WORDS,
@@ -27,7 +28,9 @@ export type ItemPatch = Partial<NewItem> & {
 };
 
 export type ItemResolution =
-  | { kind: "none" }
+  // `candidate` is a best guess at the name the wearer meant, for offering to add it
+  // as a new tracked item; null when the transcript had nothing to guess from.
+  | { kind: "none"; candidate: string | null }
   | { kind: "match"; item: ItemDoc; matchedKey: string }
   | { kind: "ambiguous"; items: ItemDoc[] };
 
@@ -210,13 +213,14 @@ export function itemsRepo(ctx: RepoContext) {
      */
     async resolve(transcript: string): Promise<ItemResolution> {
       const candidates = lookupCandidates(transcript);
-      if (candidates.length === 0) return { kind: "none" };
+      const guess = guessItemName(transcript);
+      if (candidates.length === 0) return { kind: "none", candidate: guess };
       // Hinted: with a handful of items the planner would rather walk every item
       // by name, which stops being cheap as the list grows.
       const matches = await items
         .find({ active: true, lookupKeys: { $in: candidates } }, { hint: "lookup_keys_unique" })
         .toArray();
-      if (matches.length === 0) return { kind: "none" };
+      if (matches.length === 0) return { kind: "none", candidate: guess };
 
       const now = ctx.now();
       const spoken = new Set(candidates);
@@ -230,7 +234,7 @@ export function itemsRepo(ctx: RepoContext) {
         .sort((a, b) => b.words - a.words || b.matchedKey.length - a.matchedKey.length);
 
       const [best, runnerUp] = ranked;
-      if (!best) return { kind: "none" };
+      if (!best) return { kind: "none", candidate: guess };
       if (!runnerUp || best.words > runnerUp.words) {
         return { kind: "match", item: best.item, matchedKey: best.matchedKey };
       }

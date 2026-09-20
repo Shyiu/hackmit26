@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "da37f4ba6a94b606f974daff977281f1b1d59dbec563afbf8ea5f44f02a1f3e5",
+  "fingerprint": "3ef7669c4aa9beea106354982df3523f232f46dd477cd6108ce316a7b1827f36",
   "collections": {
     "patients": {
       "validator": {
@@ -1395,6 +1395,8 @@
                     "unseen",
                     "ambiguous",
                     "not_understood",
+                    "offer_add_item",
+                    "item_added",
                     "person_recalled",
                     "no_one_recalled"
                   ]
@@ -1409,6 +1411,18 @@
                 {
                   "type": "string",
                   "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "pendingItemName": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
                 },
                 {
                   "type": "null"
@@ -1525,6 +1539,7 @@
             "itemId",
             "answerTemplate",
             "answerText",
+            "pendingItemName",
             "timingsMs",
             "playbackOutcome",
             "playbackReportedAt",
