@@ -8,7 +8,7 @@ import {
   type Speech,
   type SpeechOutcome,
 } from "@/lib/client/speaker";
-import { playListeningChime, playStallTone } from "@/lib/tones";
+import { playFaceChime, playListeningChime, playStallTone } from "@/lib/tones";
 import { CAMERA_SETTING, parseCameraChoice, useCamera, type CameraChoice } from "./use-camera";
 import { useHudMessage } from "./use-hud-message";
 import { usePerception } from "./use-perception";
@@ -18,9 +18,9 @@ import { readStoredString, writeStoredString } from "./use-stored-setting";
 import { useFeedWatchdog } from "./use-video-frames";
 import { useVoiceTurn, type TurnResult } from "./use-voice-turn";
 
-type WearerSettings = { speakingRate: number; recordingAllowed: boolean };
+type WearerSettings = { speakingRate: number; recordingAllowed: boolean; faceAnnounceSoundEnabled: boolean };
 type InteractionView = { _id: string; status: string; answerText?: string };
-type NotificationView = { _id: string; text: string };
+type NotificationView = { _id: string; kind: string; text: string };
 
 export type AnswerState = "idle" | "thinking" | "speaking";
 
@@ -29,6 +29,15 @@ const TROUBLE = "I need a moment.";
 const POLL_MS = 300;
 const POLL_LIMIT_MS = 8000;
 const NOTIFICATION_POLL_MS = 5000;
+
+// Still push-to-talk, not a real always-listening wake word (that needs a hotword
+// engine like Porcupine, out of scope for now -- README frames it as optional/
+// later). The call word just has to appear in what got transcribed, so an item
+// question said by accident while holding the button doesn't get answered.
+// "Who is this" stays exempt: asking about a just-recognized face should feel
+// conversational, not require the call word first.
+const CALL_WORD_PATTERN = /^\s*hey\s+memoir[,]?\s*/i;
+const WHO_IS_THIS_PATTERN = /\bwho(?:'s| is| are)\s+(?:this|that|you)\b/i;
 
 function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -261,9 +270,24 @@ export function useWearerClient({
   const onTurnEnd = useCallback(
     (result: TurnResult) => {
       switch (result.kind) {
-        case "transcript":
-          void answerQuestion(result.text, performance.now());
+        case "transcript": {
+          const turnEndedAt = performance.now();
+          if (WHO_IS_THIS_PATTERN.test(result.text)) {
+            void answerQuestion(result.text, turnEndedAt);
+            break;
+          }
+          if (!CALL_WORD_PATTERN.test(result.text)) {
+            void say('Say "hey memoir" first.');
+            break;
+          }
+          const withoutCallWord = result.text.replace(CALL_WORD_PATTERN, "").trim();
+          if (!withoutCallWord) {
+            void say("I didn't hear a question.");
+            break;
+          }
+          void answerQuestion(withoutCallWord, turnEndedAt);
           break;
+        }
         case "empty":
           void say("I didn't hear a question.");
           break;
@@ -380,9 +404,17 @@ export function useWearerClient({
     if (!notification || notificationRef.current) return;
     notificationRef.current = notification._id;
     try {
-      const { outcome } = await say(notification.text);
-      if (outcome !== "cancelled") {
+      if (notification.kind === "person_recognized") {
+        // Silent by default: recognizing a face is logged, never spoken automatically.
+        // The wearer asks "who is this" for a spoken answer; this only adds an optional
+        // chime, never speech, so it can never be mistaken for the reminder/caption voice.
+        if (settings?.faceAnnounceSoundEnabled) playFaceChime(resumeAudio());
         await fetch(`/api/notifications/${notification._id}/shown`, { method: "POST" }).catch(() => null);
+      } else {
+        const { outcome } = await say(notification.text);
+        if (outcome !== "cancelled") {
+          await fetch(`/api/notifications/${notification._id}/shown`, { method: "POST" }).catch(() => null);
+        }
       }
     } finally {
       notificationRef.current = null;

@@ -1,4 +1,5 @@
 import { Settings } from "lucide-react";
+import { AttachPatientForm } from "@/components/dashboard/attach-patient-form";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { SettingsForm } from "@/components/dashboard/settings-form";
 import { dashboardTenant } from "@/lib/server/dashboard";
@@ -17,6 +18,7 @@ export default async function SettingsPage() {
       />
       <PageBody width="sm">
         <SettingsForm initial={settings} timeZones={timeZones} />
+        <AttachPatientForm />
       </PageBody>
     </>
   );
