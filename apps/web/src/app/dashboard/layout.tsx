@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { MobileHeader, Sidebar, TabBar } from "@/components/dashboard/nav";
+import { PushRegistration } from "@/components/dashboard/push-registration";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
@@ -12,6 +13,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </main>
       </div>
       <TabBar />
+      <PushRegistration />
     </div>
   );
 }

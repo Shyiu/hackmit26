@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "a4c7eaa9cbf04019b6709960aeb90341804788e4542fe5cd9dfb30d048cea4e6",
+  "fingerprint": "9b55dde5b5c52fff5da1c0684f2b3d6f44f34661cb11d3990f1266ad0c8b65ee",
   "collections": {
     "patients": {
       "validator": {
@@ -1549,6 +1549,112 @@
             "patientId": 1,
             "status": 1,
             "showAt": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "push_subscriptions": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "caregiverId": {
+              "bsonType": "objectId"
+            },
+            "endpoint": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "keys": {
+              "type": "object",
+              "properties": {
+                "p256dh": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "auth": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                }
+              },
+              "required": [
+                "p256dh",
+                "auth"
+              ],
+              "additionalProperties": false
+            },
+            "userAgent": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "bsonType": "date"
+            },
+            "lastUsedAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "caregiverId",
+            "endpoint",
+            "keys",
+            "userAgent",
+            "createdAt",
+            "lastUsedAt",
+            "expiresAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "endpoint_unique",
+          "key": {
+            "endpoint": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "patient_subscriptions",
+          "key": {
+            "patientId": 1,
+            "createdAt": -1
           },
           "unique": false
         },

@@ -7,6 +7,7 @@ import { interactionsRepo } from "./interactions";
 import { itemsRepo } from "./items";
 import { notificationsRepo } from "./notifications";
 import { patientRepo } from "./patients";
+import { pushSubscriptionsRepo } from "./push-subscriptions";
 import { roomsRepo } from "./rooms";
 import { sightingsRepo } from "./sightings";
 
@@ -37,6 +38,7 @@ export function tenantRepos(db: Db, patientId: PatientId, options: TenantOptions
     rooms: roomsRepo(ctx),
     notifications: notificationsRepo(ctx),
     devices: devicesRepo(ctx),
+    pushSubscriptions: pushSubscriptionsRepo(ctx),
   };
 }
 

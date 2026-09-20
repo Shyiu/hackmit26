@@ -15,7 +15,8 @@
     "db:setup": "tsx scripts/db-setup.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:sweep": "tsx scripts/db-sweep.ts",
-    "bench:tts": "tsx scripts/bench-tts.ts"
+    "bench:tts": "tsx scripts/bench-tts.ts",
+    "push:keys": "tsx scripts/push-keys.ts"
   },
   "dependencies": {
     "@memory-glasses/db": "workspace:*",

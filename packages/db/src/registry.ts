@@ -5,6 +5,7 @@ import { itemDocSchema } from "./schema/items";
 import { metaDocSchema } from "./schema/meta";
 import { notificationDocSchema } from "./schema/notifications";
 import { captureSessionDocSchema, descriptionJobDocSchema } from "./schema/perception";
+import { pushSubscriptionDocSchema } from "./schema/push";
 import { recordingDocSchema } from "./schema/recordings";
 import { roomDocSchema, roomRefDocSchema } from "./schema/rooms";
 import { dangerEventDocSchema, frameObservationDocSchema, personDocSchema } from "./schema/safety";
@@ -323,6 +324,25 @@ export const collections = {
         name: "due_for_hud",
         key: { patientId: 1, status: 1, showAt: 1 },
         purpose: "the HUD poll for the next queued message or due reminder",
+      },
+    ],
+  }),
+
+  pushSubscriptions: defineCollection({
+    name: "push_subscriptions",
+    schema: pushSubscriptionDocSchema,
+    writers: ["web"],
+    indexes: [
+      {
+        name: "endpoint_unique",
+        key: { endpoint: 1 },
+        unique: true,
+        purpose: "a browser re-subscribing updates its own record",
+      },
+      {
+        name: "patient_subscriptions",
+        key: { patientId: 1, createdAt: -1 },
+        purpose: "fan a danger or lost alert out to every caregiver device of one wearer",
       },
     ],
   }),

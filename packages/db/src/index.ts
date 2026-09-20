@@ -35,6 +35,7 @@ export { tenantRepos, type TenantOptions, type TenantRepos } from "./repos";
 export type { ItemPatch, ItemResolution, NewItem } from "./repos/items";
 export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/interactions";
 export type { NewNotification } from "./repos/notifications";
+export { PUSH_SUBSCRIPTION_TTL_DAYS, type NewPushSubscription } from "./repos/push-subscriptions";
 export type { SightingQuery } from "./repos/sightings";
 
 export * from "./schema/common";
@@ -43,6 +44,7 @@ export * from "./schema/sightings";
 export * from "./schema/interactions";
 export * from "./schema/rooms";
 export * from "./schema/notifications";
+export * from "./schema/push";
 export * from "./schema/recordings";
 export * from "./schema/perception";
 export * from "./schema/safety";

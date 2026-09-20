@@ -15,7 +15,10 @@ export type ServerEnvName =
   | "ELEVENLABS_API_KEY"
   | "OPENAI_API_KEY"
   | "NEXT_PUBLIC_PERCEPTION_WS_URL"
-  | "PERCEPTION_URL";
+  | "PERCEPTION_URL"
+  | "VAPID_PUBLIC_KEY"
+  | "VAPID_PRIVATE_KEY"
+  | "VAPID_SUBJECT";
 
 export class MissingEnvError extends Error {
   override name = "MissingEnvError";
