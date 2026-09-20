@@ -1,6 +1,6 @@
 # Speech and embedding model choices
 
-Researched on 2026-09-19 for the memory glasses plan in `README.md`. The question for each stage is which model to use today, given a one second median from end of speech to first audio.
+Researched on 2026-09-19 for the memory glasses plan in `PLAN.md`. The question for each stage is which model to use today, given a one second median from end of speech to first audio.
 
 How to read the numbers. A vendor claim is a number the vendor published about its own product. An independent number comes from someone who doesn't sell that product. I keep the two apart in every section. Four research subagents and I read pages through a fetch tool that summarises each page with a small model. I fetched the numbers behind each pick a second time myself. "What I couldn't verify" near the end lists the rest.
 

@@ -9,7 +9,7 @@ import { interactionView } from "@/lib/server/views";
 
 const round = (ms: number) => Math.round(ms * 10) / 10;
 
-// The fast path from README "What happens when the wearer asks a question":
+// The fast path from PLAN.md "What happens when the wearer asks a question":
 // one indexed query resolves the item and its latest snapshot, a template words
 // the answer, no LLM runs. With a TTS provider configured the body is the audio
 // stream (PCM, see pcmHeaders) and the text is polled from /api/interactions/:id.

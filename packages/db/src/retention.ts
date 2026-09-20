@@ -73,7 +73,7 @@ function expiredFilter<K extends ExpiringKey>(key: K, now: Date, windows: Window
 }
 
 /**
- * README "Privacy and safety": the retryable cleanup job. Deletes everything
+ * PLAN.md "Privacy and safety": the retryable cleanup job. Deletes everything
  * past its retention window across all wearers, clears item snapshots that
  * point at deleted sightings, removes queued description work for them, and
  * drops their objects from storage. Reads already ignore expired records; this

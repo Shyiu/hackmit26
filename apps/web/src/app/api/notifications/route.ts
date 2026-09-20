@@ -5,7 +5,7 @@ import { pushAlertNotification } from "@/lib/server/push";
 import { notificationView } from "@/lib/server/views";
 
 // Optional, after M3. GET: the headset polls for the one message or reminder it
-// should show next. POST: the caregiver queues one. See README "What the HUD shows".
+// should show next. POST: the caregiver queues one. See PLAN.md "What the HUD shows".
 // A danger_alert the perception service queued gets its Web Push the first time
 // the poll sees it (pushAlertNotification dedups by id); the poll doesn't wait.
 export const GET = withTenant("any", async ({ tenant }) => {

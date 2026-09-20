@@ -1,4 +1,4 @@
-// Spoken answers. Server TTS streams PCM (README "Text to speech") and
+// Spoken answers. Server TTS streams PCM (PLAN.md "Text to speech") and
 // playPcmStream schedules it chunk by chunk; when no provider is configured
 // the server sends text and speak() uses the browser's speech synthesis. The
 // rate comes from the wearer's settings, where slower than default is the point.

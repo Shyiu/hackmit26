@@ -15,7 +15,7 @@ type HudProps = {
 };
 
 // Status marks near the top, one message in the lower middle, drawn over the
-// simulator's video. See README "What the screens show".
+// simulator's video. See PLAN.md "What the screens show".
 export function Hud({
   message,
   messageVisible,
@@ -84,7 +84,7 @@ export function ItemLabels({ detections }: { detections: Detection[] }) {
 }
 
 // Boxes for faces the perception service saw this frame, named where it matched
-// an enrolled person and confident enough (README "Faces, danger, and routines").
+// an enrolled person and confident enough (PLAN.md "Faces, danger, and routines").
 // Debug tool for /sim: shows the raw detector/match confidence pairs, not the
 // wearer-facing wording.
 export function FaceLabels({ faces }: { faces: Face[] }) {

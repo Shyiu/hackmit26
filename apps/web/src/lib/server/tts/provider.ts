@@ -1,4 +1,4 @@
-// The TTS seam from README "Text to speech: ElevenLabs or Deepgram". One
+// The TTS seam from PLAN.md "Text to speech: ElevenLabs or Deepgram". One
 // provider at a time, chosen by env; the route and the bench only see this.
 //
 // Every provider hands back the same audio: raw signed 16-bit little-endian

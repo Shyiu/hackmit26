@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Circle, Square } from "lucide-react";
+import { Wordmark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CameraSelect } from "@/components/wearer/camera-select";
@@ -60,11 +61,12 @@ export function SetupPanel({
   }
 
   return (
-    <div className="absolute inset-0 z-30 overflow-y-auto overscroll-contain bg-black/95 text-white">
-      <div className="mx-auto flex max-w-xl flex-col gap-7 px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] text-base">
+    <div className="absolute inset-0 z-30 overflow-y-auto overscroll-contain bg-page text-foreground">
+      <div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] text-base">
         <header className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold">Wear setup</h1>
-          <p className="text-white/70">
+          <Wordmark />
+          <h1 className="text-2xl font-semibold tracking-tight">Wear setup</h1>
+          <p className="text-sm text-muted-foreground">
             Tap Start, resume capture, then clip the phone into the chest harness with the rear
             camera facing out. Tap anywhere on the screen to ask a question, and tap again to
             cancel. Answers are spoken, so wear earbuds.
@@ -72,10 +74,10 @@ export function SetupPanel({
         </header>
 
         {client.signedIn === false && (
-          <div className="flex flex-col gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 p-4">
+          <div className="flex flex-col gap-3 rounded-lg border border-butter-deep/30 bg-butter-soft p-4">
             <div>
               <h2 className="font-medium">Pair this phone</h2>
-              <p className="mt-1 text-sm text-white/70">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Ask the caregiver to open Dashboard → Settings → Pair a phone and read you the 6-digit code.
               </p>
             </div>
@@ -83,7 +85,7 @@ export function SetupPanel({
           </div>
         )}
 
-        <section className="flex flex-col gap-3">
+        <Panel>
           {!live ? (
             <Button size="lg" className="w-full" onClick={() => void client.start()} disabled={starting}>
               {starting ? "Starting…" : "Start"}
@@ -102,15 +104,14 @@ export function SetupPanel({
               </Button>
             </div>
           )}
-          {camera.error && <p className="text-red-400">{camera.error}</p>}
-          <p className="text-sm text-white/60">
+          {camera.error && <p className="text-sm text-destructive">{camera.error}</p>}
+          <p className="text-sm text-muted-foreground">
             Capture starts paused. While paused, no frames leave the phone and recording stops.
             Pause before leaving the demo area.
           </p>
-        </section>
+        </Panel>
 
-        <section className="flex flex-col gap-4">
-          <h2 className="font-medium">View</h2>
+        <Panel title="View">
           <CameraSelect
             cameras={camera.cameras}
             activeDeviceId={trackSettings?.deviceId}
@@ -119,7 +120,7 @@ export function SetupPanel({
           <label className="flex flex-col gap-2">
             <span className="flex justify-between gap-4">
               <span>Caption size</span>
-              <span className="text-white/60 tabular-nums">{textScale.toFixed(2)}×</span>
+              <span className="text-muted-foreground tabular-nums">{textScale.toFixed(2)}×</span>
             </span>
             <input
               type="range"
@@ -128,13 +129,12 @@ export function SetupPanel({
               step={0.05}
               value={textScale}
               onChange={(event) => onTextScaleChange(Number(event.target.value))}
-              className="h-8 accent-white"
+              className="h-8 accent-brand"
             />
           </label>
-        </section>
+        </Panel>
 
-        <section className="flex flex-col gap-3">
-          <h2 className="font-medium">Test</h2>
+        <Panel title="Test">
           <Button
             variant="outline"
             size="lg"
@@ -169,13 +169,12 @@ export function SetupPanel({
               Ask
             </Button>
           </form>
-        </section>
+        </Panel>
 
-        <section className="flex flex-col gap-3">
-          <h2 className="font-medium">Recording</h2>
+        <Panel title="Recording">
           {client.recordingAllowed ? (
             <>
-              <p className="text-white/70">Video only, no sound. It stays on this phone until you save it.</p>
+              <p className="text-sm text-muted-foreground">Video only, no sound. It stays on this phone until you save it.</p>
               <Button
                 size="lg"
                 variant={recorder.recording ? "destructive" : "outline"}
@@ -187,19 +186,20 @@ export function SetupPanel({
                 {recorder.recording ? "Stop recording" : "Start recording"}
               </Button>
               {!capturing && !recorder.recording && (
-                <p className="text-sm text-white/50">Resume capture to record.</p>
+                <p className="text-sm text-muted-foreground">Resume capture to record.</p>
               )}
             </>
           ) : (
-            <p className="text-white/70">Recording is off. A caregiver can allow it in the dashboard settings.</p>
+            <p className="text-sm text-muted-foreground">
+              Recording is off. A caregiver can allow it in the dashboard settings.
+            </p>
           )}
-          {recorder.error && <p className="text-red-400">{recorder.error}</p>}
+          {recorder.error && <p className="text-sm text-destructive">{recorder.error}</p>}
           <RecordingsList recordings={recorder.recordings} />
-        </section>
+        </Panel>
 
-        <section className="flex flex-col gap-2">
-          <h2 className="font-medium">This phone</h2>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm text-white/80">
+        <Panel title="This phone">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
             <dt>Camera</dt>
             <dd className="break-words">{track ? `${track.label || "unnamed"}${resolution}${lensLabel}` : "not open"}</dd>
             <dt>Microphone</dt>
@@ -217,12 +217,22 @@ export function SetupPanel({
             <dd>{displayMode}</dd>
           </dl>
           {perception.error && perception.status !== "connected" && (
-            <p className="text-sm text-white/50">Frames: {perception.error}</p>
+            <p className="text-sm text-muted-foreground">Frames: {perception.error}</p>
           )}
-          {client.lastError && <p className="text-sm text-red-400">Last error: {client.lastError}</p>}
-          <p className="text-sm text-white/50">Write these down with the M0 smoke test.</p>
-        </section>
+          {client.lastError && <p className="text-sm text-destructive">Last error: {client.lastError}</p>}
+          <p className="text-sm text-muted-foreground">Write these down with the M0 smoke test.</p>
+        </Panel>
       </div>
     </div>
+  );
+}
+
+// The same white card the auth pages and dashboard content sit on.
+function Panel({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-hairline bg-panel p-4 shadow-[0_1px_2px_rgb(20_45_120/0.06)]">
+      {title && <h2 className="font-medium">{title}</h2>}
+      {children}
+    </section>
   );
 }
