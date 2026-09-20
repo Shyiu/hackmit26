@@ -105,19 +105,25 @@ export async function sessionPatientIds(
   };
 }
 
+/**
+ * A browser can hold both a caregiver session and a device token (the caregiver
+ * opened /wear or paired a phone on their own browser). `prefer` picks which
+ * one answers when both verify: caregiver-only routes want the session.
+ */
 export async function principalFromRequest(
   request: Request,
   cookies: { session: string | undefined; device: string | undefined; patient?: string | undefined },
+  prefer: "device" | "caregiver" = "device",
 ): Promise<Principal | null> {
   const authorization = request.headers.get("authorization");
   if (authorization?.startsWith("Bearer ")) {
     return principalFromDeviceToken(authorization.slice("Bearer ".length));
   }
-  if (cookies.device) {
-    const principal = await principalFromDeviceToken(cookies.device);
-    if (principal) return principal;
-  }
-  return principalFromSession(cookies.session, request.headers.get("x-patient-id"), cookies.patient);
+  const fromSession = () =>
+    principalFromSession(cookies.session, request.headers.get("x-patient-id"), cookies.patient);
+  const fromDevice = () => (cookies.device ? principalFromDeviceToken(cookies.device) : Promise.resolve(null));
+  const [first, second] = prefer === "caregiver" ? [fromSession, fromDevice] : [fromDevice, fromSession];
+  return (await first()) ?? (await second());
 }
 
 export async function principalFromDeviceToken(token: string): Promise<Principal | null> {
