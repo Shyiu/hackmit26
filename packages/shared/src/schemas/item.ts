@@ -25,6 +25,8 @@ export const sightingSummarySchema = z.object({
 export const usualSpotSchema = z.object({
   sentence: z.string(),
   share: z.number().min(0).max(1),
+  samples: z.number().int().nonnegative().optional(),
+  source: z.enum(["configured", "history"]).optional(),
 });
 
 export const itemSchema = z.object({

@@ -227,6 +227,47 @@ describe("sweepExpired", () => {
     expect((await other.items.get(otherKeys._id))?.lastSighting?.sentence).toBe("in the bowl");
   });
 
+  it("recomputes usualSpots after expiring the sightings behind them", async () => {
+    const tenant = await newTenant(env.db);
+    const keys = await tenant.items.create({ name: "keys" });
+    const base = { patientId: tenant.patientId, itemId: keys._id, label: "keys" };
+    const kitchen = {
+      status: "ready" as const,
+      sentence: "on the kitchen counter",
+      room: "kitchen",
+      surface: "counter",
+    };
+    const now = Date.now();
+    // Three placements at the kitchen counter. Still live under their own
+    // 90-day expiresAt, but older than the 7-day window set below.
+    for (let i = 0; i < 3; i++) {
+      await seedObservation(env.db, {
+        ...base,
+        lastSeenAt: new Date(now - (31 + i) * DAY_MS),
+        state: "resting",
+        description: kitchen,
+        retentionDays: 90,
+      });
+    }
+    // One recent placement elsewhere stays inside retention.
+    await seedObservation(env.db, {
+      ...base,
+      lastSeenAt: new Date(now),
+      state: "resting",
+      description: { status: "ready", sentence: "on the hallway table", room: "hallway", surface: "table" },
+    });
+
+    await tenant.items.recomputeUsualSpots(keys._id);
+    expect((await tenant.items.get(keys._id))?.usualSpots[0]?.sentence).toBe(kitchen.sentence);
+
+    await tenant.patient.updateSettings({ retentionDays: 7 });
+    const report = await sweepExpired(env.db);
+    expect(report.deleted.sightings).toBe(3);
+    expect(report.recomputedUsualSpots).toBe(1);
+    // One placement left is too sparse to claim a usual spot.
+    expect((await tenant.items.get(keys._id))?.usualSpots).toEqual([]);
+  });
+
   it("sweeps every collection that carries expiresAt", async () => {
     const tenant = await newTenant(env.db);
     const now = new Date();

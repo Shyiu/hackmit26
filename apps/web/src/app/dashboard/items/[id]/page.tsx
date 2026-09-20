@@ -68,6 +68,22 @@ export default async function ItemPage({ params }: PageProps<"/dashboard/items/[
               ) : (
                 <p className="text-sm text-muted-foreground">The camera hasn&apos;t seen it yet.</p>
               )}
+              {item.usualSpots.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-sm font-medium">Usual spots</h3>
+                  <ul className="text-sm">
+                    {item.usualSpots.map((spot) => (
+                      <li key={spot.sentence} className="flex justify-between gap-3">
+                        <span className="first-letter:uppercase">{spot.sentence}</span>
+                        <span className="text-muted-foreground">
+                          {Math.round(spot.share * 100)}% · {spot.samples}{" "}
+                          {spot.samples === 1 ? "time" : "times"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
 

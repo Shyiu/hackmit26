@@ -64,23 +64,30 @@ function describeItem(item: ItemDoc, settings: PatientSettings, now: Date): Answ
   const them = item.plural ? "they" : "it";
   const wereAt = item.plural ? "they were" : "it was";
   const say = (template: AnswerTemplate, text: string): Answer => ({ template, text, itemId: item._id });
+  // README "the answer": an optional second sentence suggests a known usual
+  // spot, only when history supports it (enough placements, often enough).
+  const usual = item.usualSpots[0];
+  const suggestUsual = usual && usual.share >= 0.5 && usual.samples >= 3 ? ` It's usually ${usual.sentence}.` : "";
 
-  if (!snapshot) return say("unseen", `I haven't seen your ${item.name} in my available history.`);
+  if (!snapshot) return say("unseen", `I haven't seen your ${item.name} in my available history.${suggestUsual}`);
   const when = relativeTime(snapshot.lastSeenAt, now);
   const status = locationStatus(snapshot);
   switch (status) {
     case "observed": {
       const stale = now.getTime() - snapshot.lastSeenAt.getTime() > settings.staleAfterMinutes * 60_000;
-      return say(stale ? "stale" : "fresh", `I last saw your ${item.name} ${snapshot.sentence}, ${when}.`);
+      // A fresh sighting answers on its own; only a stale one gets the hint.
+      const text = `I last saw your ${item.name} ${snapshot.sentence}, ${when}.`;
+      return say(stale ? "stale" : "fresh", stale ? text + suggestUsual : text);
     }
     case "held":
-      return say("held", `I last saw your ${item.name} in your hand, ${when}.`);
+      return say("held", `I last saw your ${item.name} in your hand, ${when}.${suggestUsual}`);
     case "moved":
+      // Already two sentences; the usual spot would make it three.
       return say("moved", `I saw your ${item.name} being moved. I could not tell where ${them} ended up.`);
     case "uncertain":
-      return say("unknown", `I saw your ${item.name}, but I could not tell where ${wereAt}.`);
+      return say("unknown", `I saw your ${item.name}, but I could not tell where ${wereAt}.${suggestUsual}`);
     case "unseen":
-      return say("unseen", `I haven't seen your ${item.name} in my available history.`);
+      return say("unseen", `I haven't seen your ${item.name} in my available history.${suggestUsual}`);
     default: {
       const _exhaustive: never = status;
       return _exhaustive;

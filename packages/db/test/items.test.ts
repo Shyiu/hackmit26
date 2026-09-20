@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ConflictError, InvalidInputError } from "../src/errors";
+import { newId, type ItemId } from "../src/ids";
 import { seedObservation } from "../src/observations";
 import { collection } from "../src/registry";
 import { locationStatus } from "../src/snapshot";
@@ -150,6 +152,65 @@ describe("items", () => {
     const stored = await collection(env.db, "items").findOne({ _id: keys._id });
     expect(stored?.lastSighting).not.toBeNull();
     expect((await tenant.items.get(keys._id))?.lastSighting).toBeNull();
+  });
+
+  it("recomputes history-derived usualSpots on demand", async () => {
+    const tenant = await newTenant(env.db);
+    const keys = await tenant.items.create({ name: "keys" });
+    const base = { patientId: tenant.patientId, itemId: keys._id, label: "keys" };
+    const kitchen = {
+      status: "ready" as const,
+      sentence: "on the kitchen counter, next to the coffee maker",
+      room: "kitchen",
+      surface: "counter",
+      relation: "next to the coffee maker",
+    };
+    const now = Date.now();
+    // An hour apart: past the merge gap, so each is its own placement.
+    await seedObservation(env.db, { ...base, lastSeenAt: new Date(now - 3 * 3_600_000), state: "resting", description: kitchen });
+    await seedObservation(env.db, { ...base, lastSeenAt: new Date(now - 2 * 3_600_000), state: "resting", description: kitchen });
+    await seedObservation(env.db, {
+      ...base,
+      lastSeenAt: new Date(now - 3_600_000),
+      state: "resting",
+      description: { status: "ready", sentence: "on the hallway table", room: "hallway", surface: "table" },
+    });
+
+    const item = await tenant.items.recomputeUsualSpots(keys._id);
+    expect(item?.usualSpots[0]).toEqual({
+      sentence: kitchen.sentence,
+      share: expect.closeTo(2 / 3),
+      samples: 2,
+      source: "history",
+    });
+    expect(item?.usualSpots[1]).toMatchObject({ sentence: "on the hallway table", samples: 1 });
+    // A snapshot-like write: updatedAt doesn't move and no config bump.
+    expect(item?.updatedAt.getTime()).toBe(keys.updatedAt.getTime());
+    expect(await tenant.items.recomputeUsualSpots(newId<ItemId>())).toBeNull();
+  });
+
+  it("doesn't let another wearer's history into an item's usualSpots", async () => {
+    const a = await newTenant(env.db);
+    const b = await newTenant(env.db);
+    const aKeys = await a.items.create({ name: "a-keys-" + randomUUID().slice(0, 6) });
+    const bKeys = await b.items.create({ name: "b-keys-" + randomUUID().slice(0, 6) });
+    const kitchen = { status: "ready" as const, sentence: "on the counter", room: "kitchen", surface: "counter" };
+    for (let i = 3; i >= 1; i--) {
+      await seedObservation(env.db, {
+        patientId: b.patientId,
+        itemId: bKeys._id,
+        label: "keys",
+        lastSeenAt: new Date(Date.now() - i * 3_600_000),
+        state: "resting",
+        description: kitchen,
+      });
+    }
+
+    // A's item has no history of its own: B's sightings must not leak in.
+    expect((await a.items.recomputeUsualSpots(aKeys._id))?.usualSpots).toEqual([]);
+    expect((await b.items.recomputeUsualSpots(bKeys._id))?.usualSpots[0]?.samples).toBe(3);
+    // B can't recompute (or read) A's item by guessing its id.
+    expect(await b.items.recomputeUsualSpots(aKeys._id)).toBeNull();
   });
 
   it("reports held and pending evidence honestly", async () => {
