@@ -34,7 +34,7 @@ const POLL_LIMIT_MS = 8000;
 const NOTIFICATION_POLL_MS = 5000;
 
 // Still push-to-talk, not a real always-listening wake word (that needs a hotword
-// engine like Porcupine, out of scope for now -- README frames it as optional/
+// engine like Porcupine, out of scope for now -- PLAN.md frames it as optional/
 // later). The call word just has to appear in what got transcribed, so an item
 // question said by accident while holding the button doesn't get answered.
 // "Who is this" stays exempt: asking about a just-recognized face should feel
@@ -146,7 +146,7 @@ function useWearerSettings() {
 // messages, wake lock, and the stalled-feed watchdog. The pages only differ in
 // what they draw and how a question starts: tap to ask on the chest ("auto"),
 // hold to ask on the flat page ("hold"). `autoResumeOnReconnect` skips the
-// require-an-explicit-resume-after-a-reconnect privacy step (README "Privacy
+// require-an-explicit-resume-after-a-reconnect privacy step (PLAN.md "Privacy
 // and safety") -- /sim, a laptop dev/testing fallback, sets it so its stream
 // to the db never silently stops; /wear, a real wearer's chest camera, doesn't.
 export function useWearerClient({

@@ -2,7 +2,7 @@ import { DeleteObjectsCommand, S3Client } from "@aws-sdk/client-s3";
 import { requireEnv } from "./env";
 
 // Keyframes, thumbnails, enrollment frames, and recording chunks live in one
-// S3-compatible bucket (README open decision 8). The sweep is the only script
+// S3-compatible bucket (PLAN.md open decision 8). The sweep is the only script
 // that writes to it, and it only deletes.
 
 export function storageConfigured(): boolean {

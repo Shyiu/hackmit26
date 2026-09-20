@@ -1,6 +1,6 @@
 import { PCM_SAMPLE_RATE } from "./pcm-capture";
 
-// One question over Deepgram's streaming socket. README "What happens when the
+// One question over Deepgram's streaming socket. PLAN.md "What happens when the
 // wearer asks a question": finalized segments accumulate until the turn ends.
 // `is_final` alone doesn't end it. In "auto" mode the turn ends when Deepgram
 // marks `speech_final` or sends UtteranceEnd. In "hold" mode it ends when
@@ -20,7 +20,7 @@ type ResultsMessage = {
 
 type DeepgramMessage = ResultsMessage | { type: "UtteranceEnd" } | { type: string };
 
-// Initial silence window from README "Latency budget". People with dementia
+// Initial silence window from PLAN.md "Latency budget". People with dementia
 // often pause mid-sentence, so tune it with real speech before shortening it.
 const ENDPOINTING_MS = 400;
 // Deepgram's minimum. The fallback for when speech_final never comes.

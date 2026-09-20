@@ -6,7 +6,7 @@ Status: accepted
 
 ## Context
 
-Two services write to the same database. The Next.js app writes configuration and interactions; the Python perception service writes sightings, item snapshots, capture sessions, and description jobs. README "API sketch" asks for one canonical definition of each shape, so the two can't drift.
+Two services write to the same database. The Next.js app writes configuration and interactions; the Python perception service writes sightings, item snapshots, capture sessions, and description jobs. PLAN.md "API sketch" asks for one canonical definition of each shape, so the two can't drift.
 
 The hot path is one read. "Where are my keys" has to resolve the spoken name and return the latest observation in about 30 ms, and a stale or wrong answer is worse than a slow one. Late vision results and out-of-order frames must never overwrite newer evidence.
 
