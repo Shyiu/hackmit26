@@ -29,10 +29,8 @@ SCHEMA: dict[str, Any] = json.loads(
 # environment wins over that file, so the tests always get the mocks.
 os.environ.update(
     {
-        "SAFETY_DETECTOR": "mock",
         "FACE_DETECTOR": "mock",
         "FACE_EMBEDDER": "mock",
-        "VLM": "mock",
         "DETECTOR": "auto",
     }
 )

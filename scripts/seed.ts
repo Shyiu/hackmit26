@@ -1,5 +1,4 @@
-// Seeds one demo wearer, a caregiver login, three items, two open hazard
-// events for the Alerts tab, and sightings that
+// Seeds one demo wearer, a caregiver login, three items, and sightings that
 // exercise the answer wording: one item seen resting, one picked up after it
 // was put down, one still waiting for its description.
 //
@@ -26,7 +25,7 @@ import {
   type PatientId,
   type ScanPinId,
 } from "@memory-glasses/db";
-import { seedDangerEvent, seedObservation } from "@memory-glasses/db/observations";
+import { seedObservation } from "@memory-glasses/db/observations";
 import { STATIC_SCAN_SCENE_ID } from "@memory-glasses/shared";
 import { withDatabase } from "./lib/env";
 
@@ -107,25 +106,6 @@ async function seed(db: Db) {
   });
   await observe(wallet, { lastSeenAt: new Date(now - 10 * MINUTE), state: "held", description: { status: "pending" } });
   await observe(glasses, { lastSeenAt: new Date(now - 2 * MINUTE), state: "unknown", description: { status: "pending" } });
-
-  await seedDangerEvent(db, {
-    patientId: DEMO_PATIENT_ID,
-    kind: "hot_surface_visible",
-    hazardLabel: "stove burner",
-    severity: "high",
-    confidence: 0.91,
-    verification: "model_confirmed",
-    lastSeenAt: new Date(now - 6 * MINUTE),
-  });
-  await seedDangerEvent(db, {
-    patientId: DEMO_PATIENT_ID,
-    kind: "medication_or_chemical_visible",
-    hazardLabel: "pill bottle",
-    severity: "medium",
-    confidence: 0.72,
-    lastSeenAt: new Date(now - 45 * MINUTE),
-  });
-  await tenant.notifications.create({ kind: "danger_alert", text: "The stove looks hot and nobody is nearby." });
 
   await tenant.items.recomputeUsualSpots(keys._id);
   await tenant.items.recomputeUsualSpots(wallet._id);

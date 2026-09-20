@@ -1,4 +1,11 @@
-import { collection, createCaregiver, createPatient, duplicateKeyOf, findCaregiverByEmail } from "@memory-glasses/db";
+import {
+  collection,
+  createCaregiver,
+  createPatient,
+  duplicateKeyOf,
+  findCaregiverByEmail,
+  findPatientByAccountEmail,
+} from "@memory-glasses/db";
 import { signupRequestSchema } from "@memory-glasses/shared";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -15,7 +22,10 @@ export async function POST(request: NextRequest) {
   try {
     const input = await readBody(request, signupRequestSchema);
     const db = getDb();
+    // A wearer account holds the same email in another collection, where no shared
+    // unique index can rule it out, so check it here as wearer signup checks caregivers.
     if (await findCaregiverByEmail(db, input.email)) return problem(409, TAKEN);
+    if (await findPatientByAccountEmail(db, input.email)) return problem(409, TAKEN);
 
     const passwordHash = await hashPassword(input.password);
     const patient = await createPatient(db, { displayName: input.wearerName });

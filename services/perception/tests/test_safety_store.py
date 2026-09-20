@@ -5,32 +5,8 @@ import pytest
 from bson import ObjectId
 from test_safety import settings
 
-from app.safety.models import BBox, Candidate, FrameAnalysis
 from app.safety.store import SafetyStore
 from app.store import ObservationStore
-
-
-def candidate(confidence=0.9, verification="unverified"):
-    return Candidate(
-        kind="weapon_visible",
-        hazard_label="knife",
-        severity="high",
-        confidence=confidence,
-        bbox=BBox(x=0.1, y=0.1, w=0.3, h=0.3),
-        vlm_verify=True,
-        verification=verification,
-    )
-
-
-def analysis(item):
-    return FrameAnalysis(
-        width=16,
-        height=16,
-        candidates=[item],
-        detections=[],
-        hazards=[],
-        detector_name="mock",
-    )
 
 
 @pytest.fixture
@@ -54,49 +30,6 @@ async def test_enrollment_hides_and_decrypts_embeddings(safety_store, db):
 
 
 @pytest.mark.asyncio
-async def test_events_merge_and_are_tenant_scoped(safety_store, db):
-    from conftest import Seed
-
-    patient_id = await Seed(db).patient()
-    other = await Seed(db).patient()
-    first = datetime.now(UTC)
-    frame_one = ObjectId()
-    frame_two = ObjectId()
-    frame_three = ObjectId()
-    event = await safety_store.upsert_danger_events(
-        patient_id, frame_one, "frames/one.jpg", first, analysis(candidate(0.8))
-    )
-    assert len(event) == 1
-    stored = await db["danger_events"].find_one({"_id": event[0], "patientId": patient_id})
-    assert stored["notification"]["status"] == "queued"
-    notification = await db["notifications"].find_one({"dangerEventId": event[0], "patientId": patient_id})
-    assert notification["kind"] == "danger_alert"
-    assert notification["dangerEventId"] == event[0]
-    await safety_store.upsert_danger_events(
-        patient_id,
-        frame_two,
-        "frames/two.jpg",
-        first + timedelta(seconds=5),
-        analysis(candidate(0.7, "model_confirmed")),
-    )
-    merged = await db["danger_events"].find_one({"_id": event[0]})
-    assert len(merged["frameObservationIds"]) == 2
-    assert merged["lastSeenAt"] > stored["lastSeenAt"]
-    assert merged["confidence"] == 0.8
-    await safety_store.upsert_danger_events(
-        patient_id,
-        frame_three,
-        "frames/three.jpg",
-        first + timedelta(seconds=60),
-        analysis(candidate(0.6)),
-    )
-    assert await db["danger_events"].count_documents({"patientId": patient_id}) == 2
-    assert await safety_store.list_danger_events(other) == []
-    assert await safety_store.list_frame_observations(other) == []
-    assert await safety_store.update_danger_event_status(other, event[0], "acknowledged") is None
-
-
-@pytest.mark.asyncio
 async def test_person_recognized_cooldown_persists_in_mongo(safety_store, db):
     from conftest import Seed
 
@@ -109,9 +42,7 @@ async def test_person_recognized_cooldown_persists_in_mongo(safety_store, db):
     assert stored["kind"] == "person_recognized"
     # Still within the cooldown window.
     assert (
-        await safety_store.was_recently_announced(
-            patient_id, person_id, first + timedelta(seconds=30), 120.0
-        )
+        await safety_store.was_recently_announced(patient_id, person_id, first + timedelta(seconds=30), 120.0)
         is True
     )
     # A fresh SafetyStore instance sees the same cooldown -- it's in Mongo, not process memory.

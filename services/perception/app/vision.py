@@ -1,4 +1,4 @@
-"""Turns a sighting's keyframe into a location description. README "Description job".
+"""Turns a sighting's keyframe into a location description. PLAN.md "Description job".
 
 Structured output validates shape, not truth: the model is told to say "unknown"
 rather than infer a room or relation it can't see, and `DescriptionResult`
@@ -14,8 +14,18 @@ from typing import Protocol
 import httpx
 
 from .config import Settings
-from .safety.adapters.openai_vlm import image_media_type
 from .store import BBox, DescriptionResult
+
+
+def image_media_type(image_bytes: bytes) -> str:
+    if image_bytes.startswith(b"\x89PNG"):
+        return "image/png"
+    if image_bytes.startswith(b"\xff\xd8"):
+        return "image/jpeg"
+    if image_bytes.startswith(b"RIFF") and image_bytes[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/jpeg"
+
 
 SYSTEM_PROMPT = (
     "You are describing where a highlighted item is in a single frame from a body-worn camera. "

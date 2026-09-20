@@ -11,6 +11,7 @@
     "lint": "pnpm --filter web lint",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck && tsc --noEmit",
+    "perception:serve": "bash scripts/serve-perception.sh",
     "db:up": "docker compose up -d --wait mongo",
     "db:down": "docker compose down",
     "db:setup": "tsx scripts/db-setup.ts",

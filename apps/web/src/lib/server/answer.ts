@@ -9,7 +9,7 @@ import {
 import type { LastSeenPerson } from "@/lib/server/perception";
 import { relativeTime } from "@/lib/relative-time";
 
-// The fast-path wording from README "What the wearer hears and sees": two
+// The fast-path wording from PLAN.md "What the wearer hears and sees": two
 // sentences at most, location first, rounded time, never a correction. A
 // first cut; the day-part wording ("this morning") needs the wearer's time zone.
 
@@ -64,7 +64,7 @@ function describeItem(item: ItemDoc, settings: PatientSettings, now: Date): Answ
   const them = item.plural ? "they" : "it";
   const wereAt = item.plural ? "they were" : "it was";
   const say = (template: AnswerTemplate, text: string): Answer => ({ template, text, itemId: item._id });
-  // README "the answer": an optional second sentence suggests a known usual
+  // PLAN.md "the answer": an optional second sentence suggests a known usual
   // spot, only when history supports it (enough placements, often enough).
   const usual = item.usualSpots[0];
   const suggestUsual = usual && usual.share >= 0.5 && usual.samples >= 3 ? ` It's usually ${usual.sentence}.` : "";

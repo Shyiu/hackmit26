@@ -35,13 +35,10 @@ const POLL_LIMIT_MS = 8000;
 const NOTIFICATION_POLL_MS = 5000;
 
 // Still push-to-talk, not a real always-listening wake word (that needs a hotword
-// engine like Porcupine, out of scope for now -- README frames it as optional/
-// later). The call word just has to appear in what got transcribed, so an item
-// question said by accident while holding the button doesn't get answered.
-// "Who is this" stays exempt: asking about a just-recognized face should feel
-// conversational, not require the call word first.
-const CALL_WORD_PATTERN = /^\s*hey\s+memoir[,]?\s*/i;
-const WHO_IS_THIS_PATTERN = /\bwho(?:'s| is| are)\s+(?:this|that|you)\b/i;
+// engine like Porcupine, out of scope for now -- PLAN.md frames it as optional/
+// later). Saying "hey memoir" is allowed but not required: the button press is
+// the intent signal, and speech to text spells the name many ways.
+const CALL_WORD_PATTERN = /^\s*(?:hey|hi|ok|okay)?[,\s]*mem(?:oir|oire|wa|war|oi|ore)\b[,.]?\s*/i;
 
 function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -148,7 +145,7 @@ function useWearerSettings() {
 // pages only differ in what they draw and how a question starts: tap to ask on
 // the chest ("auto"), hold to ask on the flat page ("hold").
 // `autoResumeOnReconnect` skips the require-an-explicit-resume-after-a-reconnect
-// privacy step (README "Privacy and safety") -- /sim, a laptop dev/testing
+// privacy step (PLAN.md "Privacy and safety") -- /sim, a laptop dev/testing
 // fallback, sets it so its stream to the db never silently stops; /wear, a real
 // wearer's chest camera, doesn't.
 export function useWearerClient({
@@ -276,20 +273,12 @@ export function useWearerClient({
       switch (result.kind) {
         case "transcript": {
           const turnEndedAt = performance.now();
-          if (WHO_IS_THIS_PATTERN.test(result.text)) {
-            void answerQuestion(result.text, turnEndedAt);
-            break;
-          }
-          if (!CALL_WORD_PATTERN.test(result.text)) {
-            void say('Say "hey memoir" first.');
-            break;
-          }
-          const withoutCallWord = result.text.replace(CALL_WORD_PATTERN, "").trim();
-          if (!withoutCallWord) {
+          const question = result.text.replace(CALL_WORD_PATTERN, "").trim();
+          if (!question) {
             void say("I didn't hear a question.");
             break;
           }
-          void answerQuestion(withoutCallWord, turnEndedAt);
+          void answerQuestion(question, turnEndedAt);
           break;
         }
         case "empty":

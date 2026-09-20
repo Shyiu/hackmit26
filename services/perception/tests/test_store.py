@@ -168,9 +168,7 @@ async def test_touch_capture_session_only_marks_heard_from(scene: Scene) -> None
     job = await scene.enqueue(opened)
 
     # Rewind the heartbeat field by hand so the bump is observable with the fixed clock.
-    await scene.db["capture_sessions"].update_one(
-        {"_id": session_id}, {"$set": {"updatedAt": at(-60)}}
-    )
+    await scene.db["capture_sessions"].update_one({"_id": session_id}, {"$set": {"updatedAt": at(-60)}})
     assert await store.touch_capture_session(patient, session_id)
 
     session = await scene.db["capture_sessions"].find_one({"_id": session_id})
@@ -657,10 +655,20 @@ def test_compute_usual_spots_merges_fragments_and_needs_samples() -> None:
     # Six sightings at one place a minute apart are one placement, not six.
     fragments = [_sighting_doc(i * 60) for i in range(6)]
     others = [
-        _sighting_doc(7200, sentence="on the hallway table", surface="table", relation=None,
-                      room={"id": None, "name": "hallway", "confidence": 0.9}),
-        _sighting_doc(10800, sentence="on the desk", surface="desk", relation=None,
-                      room={"id": None, "name": "office", "confidence": 0.9}),
+        _sighting_doc(
+            7200,
+            sentence="on the hallway table",
+            surface="table",
+            relation=None,
+            room={"id": None, "name": "hallway", "confidence": 0.9},
+        ),
+        _sighting_doc(
+            10800,
+            sentence="on the desk",
+            surface="desk",
+            relation=None,
+            room={"id": None, "name": "office", "confidence": 0.9},
+        ),
     ]
     spots = compute_usual_spots(fragments + others, min_share=0)
     assert len(spots) == 3

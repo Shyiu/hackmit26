@@ -8,7 +8,6 @@ import {
   House,
   MapPin,
   PackageOpen,
-  ShieldAlert,
   Repeat,
   ScanFace,
   Laptop,
@@ -16,7 +15,6 @@ import {
   MessageSquareHeart,
   Search,
   Settings,
-  TriangleAlert,
   Video,
 } from "lucide-react";
 import Link from "next/link";
@@ -65,11 +63,9 @@ export default async function DashboardHomePage() {
   const DAY = 24 * 60 * 60 * 1000;
   const dayAgo = now.getTime() - DAY;
   const monthAgo = now.getTime() - 28 * DAY;
-  const [items, questions, notifications, openAlerts] = await Promise.all([
+  const [items, questions] = await Promise.all([
     tenant.items.list(),
     recentQuestions(tenant, new Date(monthAgo)),
-    tenant.notifications.listRecent({ limit: 20 }),
-    tenant.dangerEvents.countOpen(),
   ]);
 
   const needsALook = items.filter((item) => NEEDS_A_LOOK.includes(locationStatus(item.lastSighting)));
@@ -90,7 +86,6 @@ export default async function DashboardHomePage() {
   const leftBehind = items
     .filter((item) => item.lastSighting && locationStatus(item.lastSighting) === "observed")
     .sort((a, b) => (b.lastSighting?.lastSeenAt.getTime() ?? 0) - (a.lastSighting?.lastSeenAt.getTime() ?? 0))[0];
-  const alerts = notifications.filter((n) => n.kind === "danger_alert" && n.showAt.getTime() >= dayAgo);
 
   // Four weeks of lookups for a named item, oldest first. A lookup is the
   // wearer asking where something is, so it stands in for having lost it.
@@ -120,26 +115,6 @@ export default async function DashboardHomePage() {
         : `Usually ${Math.round(baseline)} a week over the last month.`;
 
   const entries: CenterEntry[] = [
-    ...(openAlerts > 0
-      ? [
-          {
-            id: "open-alerts",
-            tone: "alert" as const,
-            icon: TriangleAlert,
-            title: `${openAlerts} open ${openAlerts === 1 ? "alert" : "alerts"}`,
-            detail: "Hazards the camera raised that nobody has acknowledged.",
-            href: "/dashboard/alerts",
-          },
-        ]
-      : []),
-    ...alerts.slice(0, 3).map((alert) => ({
-      id: alert._id.toHexString(),
-      tone: "alert" as const,
-      icon: ShieldAlert,
-      title: alert.text,
-      detail: relativeTime(alert.showAt, now),
-      href: "/dashboard/alerts",
-    })),
     repeats.length > 0
       ? {
           id: "tracking",

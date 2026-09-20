@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// The caregiver-edited wearer settings, README "Caregiver dashboard" > Settings.
+// The caregiver-edited wearer settings, PLAN.md "Caregiver dashboard" > Settings.
 // packages/db re-validates the merged result against the stored schema, which
 // also checks the time zone name.
 export const updateSettingsSchema = z

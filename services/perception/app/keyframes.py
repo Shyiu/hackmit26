@@ -1,6 +1,6 @@
 """Keyframe storage and thumbnail helpers.
 
-# TODO(privacy): blur faces before put() — README "Privacy and safety" requires
+# TODO(privacy): blur faces before put() — PLAN.md "Privacy and safety" requires
 # it before any external (S3) upload; the mock describer keeps bytes on the host.
 """
 

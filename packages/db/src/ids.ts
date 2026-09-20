@@ -21,7 +21,6 @@ export type CaptureSessionId = Id<"CaptureSessionId">;
 export type DescriptionJobId = Id<"DescriptionJobId">;
 export type PersonId = Id<"PersonId">;
 export type FrameObservationId = Id<"FrameObservationId">;
-export type DangerEventId = Id<"DangerEventId">;
 export type CaregiverPairingCodeId = Id<"CaregiverPairingCodeId">;
 export type PairingCodeId = Id<"PairingCodeId">;
 export type ScanPinId = Id<"ScanPinId">;

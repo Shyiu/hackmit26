@@ -24,7 +24,7 @@ import {
 } from "./schema/tenancy";
 
 // A caregiver joining an existing wearer. Same hash/timing-safe-compare/expiry
-// shape as a device pairing code would use (see README "What /wear and /sim
+// shape as a device pairing code would use (see PLAN.md "What /wear and /sim
 // call on first run"), redeemed by a second caregiver's own account instead of
 // minting a device token.
 

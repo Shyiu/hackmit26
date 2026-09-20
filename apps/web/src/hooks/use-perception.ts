@@ -8,7 +8,7 @@ import {
 } from "@memory-glasses/shared";
 
 // Frames to the perception service over /ws/frames. See the protocol notes in
-// packages/shared/src/schemas/perception.ts and README "Frame handling".
+// packages/shared/src/schemas/perception.ts and PLAN.md "Frame handling".
 
 const FRAMES_PER_SECOND = 3;
 const FRAME_WIDTH = 1280;
@@ -63,7 +63,7 @@ export function grabJpeg(video: HTMLVideoElement, canvas: HTMLCanvasElement): Pr
 // Streams JPEG frames from `video` while `capturing`, and hands back fresh
 // detections for the labels. Capture starts paused on every connection, and a
 // reconnect calls `onReconnect` so the page can require an explicit resume
-// (README "Privacy and safety") -- unless `autoResumeOnReconnect` is set, for
+// (PLAN.md "Privacy and safety") -- unless `autoResumeOnReconnect` is set, for
 // pages (the /sim dev fallback, not a real wearer device) that want frames to
 // keep flowing across a reconnect with no manual step. `onFrame` gets every
 // frame that was sent and `onDetections` every answer, keyed by the same seq.

@@ -21,7 +21,7 @@ function isTimeZone(value: string): boolean {
 export const hudLevel = z.enum(["everything", "captions", "off"]);
 export const ttsProvider = z.enum(["elevenlabs", "deepgram"]);
 
-/** Per-wearer settings the caregiver edits. README "Caregiver dashboard" > Settings. */
+/** Per-wearer settings the caregiver edits. PLAN.md "Caregiver dashboard" > Settings. */
 export const patientSettingsSchema = z.strictObject({
   /** IANA zone. "This morning" means the wearer's morning. */
   timezone: z.string().refine(isTimeZone, "Unknown IANA time zone"),
@@ -37,7 +37,7 @@ export const patientSettingsSchema = z.strictObject({
   wakeWordEnabled: z.boolean(),
   wakeWordSensitivity: unitInterval,
   /** Off by default: a recognized face is always a silent notification; this only
-   * adds a short chime on top. Never speech -- see README "Faces, danger, and routines". */
+   * adds a short chime on top. Never speech -- see PLAN.md "Faces and routines". */
   faceAnnounceSoundEnabled: z.boolean(),
 });
 
@@ -57,11 +57,27 @@ export const DEFAULT_PATIENT_SETTINGS: PatientSettings = {
   faceAnnounceSoundEnabled: false,
 };
 
+/**
+ * The wearer's own sign-in, present when the wearer made the account themselves.
+ * A wearer a caregiver created from signup has none and reaches /wear through a
+ * device pairing code instead.
+ */
+export const wearerAccountSchema = z.strictObject({
+  email: z.email().max(254),
+  /** The one device this account signs in on, so nothing else can act as the wearer. */
+  deviceId: idSchema<DeviceId>().nullable(),
+  /** `scrypt$N$r$p$salt$hash`, base64url, like the caregiver's. Never leaves the server. */
+  passwordHash: z.string().min(40).max(300),
+});
+
+export type WearerAccount = z.infer<typeof wearerAccountSchema>;
+
 /** The wearer. Every tenant-owned document points here through `patientId`. */
 export const patientDocSchema = z.strictObject({
   _id: idSchema<PatientId>(),
   /** What the family calls them, for the dashboard. Never spoken to the wearer. */
   displayName: shortText,
+  account: wearerAccountSchema.optional(),
   settings: patientSettingsSchema,
   /** Bumped by every item, room, or settings write. Caches key on it. */
   configVersion: z.int().nonnegative(),
@@ -104,7 +120,7 @@ export const deviceDocSchema = z.strictObject({
 
 export type DeviceDoc = z.infer<typeof deviceDocSchema>;
 
-// A caregiver joining an existing wearer, README "What /wear and /sim call on
+// A caregiver joining an existing wearer, PLAN.md "What /wear and /sim call on
 // first run" adjacent: same hash/timing-safe-compare/expiry shape as a device
 // pairing code (see redeemCaregiverPairingCode in ../pairing.ts), but redeemed
 // by a second caregiver's own account instead of minting a device token.

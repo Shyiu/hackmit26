@@ -31,7 +31,17 @@ export {
 export { sweepExpired, type SweepOptions, type SweepReport } from "./retention";
 export * from "./usual-spots";
 export { TenantCollection } from "./tenant-collection";
-export { createCaregiver, createPatient, findCaregiverByEmail, listPatientsByIds, recordLogin } from "./accounts";
+export {
+  createCaregiver,
+  createPatient,
+  findCaregiverByEmail,
+  findPatientByAccountEmail,
+  findPatientById,
+  listPatientsByIds,
+  patientHasCaregiver,
+  recordLogin,
+  setWearerAccountDevice,
+} from "./accounts";
 export {
   addPatientToCaregiver,
   createCaregiverPairingCode,
@@ -46,7 +56,6 @@ export { tenantRepos, type TenantOptions, type TenantRepos } from "./repos";
 export type { ItemPatch, ItemResolution, NewItem } from "./repos/items";
 export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/interactions";
 export type { NewNotification } from "./repos/notifications";
-export type { DangerEventQuery } from "./repos/danger-events";
 export type { PersonPatch, PublicPerson, RecognizedPerson } from "./repos/people";
 export type { SightingQuery } from "./repos/sightings";
 export type { ScanObservationInput, ScanPositionInput } from "./repos/scan-pins";

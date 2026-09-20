@@ -45,7 +45,7 @@ export function WearView() {
   const showMessage = hud.visible && hud.message !== null;
 
   return (
-    <div className="dark fixed inset-0 overflow-hidden bg-black text-white select-none">
+    <div className="fixed inset-0 overflow-hidden bg-page text-foreground select-none">
       <div
         className="absolute inset-0 flex touch-none flex-col [-webkit-touch-callout:none]"
         onPointerDown={handleTap}
@@ -55,9 +55,9 @@ export function WearView() {
             className="relative"
             style={{ aspectRatio: aspect, width: `min(100%, calc(100dvh * ${aspect}))` }}
           >
-            <LiveVideo stream={camera.stream} onElement={client.setVideo} className="h-full w-full opacity-60" />
+            <LiveVideo stream={camera.stream} onElement={client.setVideo} className="h-full w-full opacity-40" />
             <ItemLabels detections={perception.detections} />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/70" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-page/80 via-page/30 to-page/85" />
           </div>
         </div>
         <header className="flex items-start justify-between gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -89,7 +89,7 @@ export function WearView() {
           <button
             type="button"
             aria-label="Setup"
-            className="flex size-12 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80"
+            className="flex size-12 shrink-0 items-center justify-center rounded-full border border-hairline bg-panel text-brand-deep shadow-[0_1px_2px_rgb(20_45_120/0.06)]"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={() => setPanelOpen(true)}
           >
@@ -104,19 +104,19 @@ export function WearView() {
         >
           {voice.listening ? (
             <div className="flex max-w-3xl flex-col items-center gap-4">
-              <span className="flex size-16 items-center justify-center rounded-full bg-white/10">
+              <span className="flex size-16 items-center justify-center rounded-full bg-brand text-white">
                 <Mic className="size-8 animate-pulse" />
               </span>
-              <p className="text-[2em] leading-snug font-medium text-white/80">
+              <p className="text-[2em] leading-snug font-medium text-brand-deep">
                 {voice.interim || "Listening…"}
               </p>
             </div>
           ) : answer === "thinking" ? (
-            <p className="animate-pulse text-[2.5em] text-white/60">…</p>
+            <p className="animate-pulse text-[2.5em] text-muted-foreground">…</p>
           ) : (
             <p
               className={cn(
-                "max-w-3xl text-[2.25em] leading-snug font-semibold text-balance transition-opacity duration-700",
+                "max-w-3xl rounded-2xl border border-hairline bg-panel/90 px-6 py-4 text-[2.25em] leading-snug font-semibold text-balance shadow-[0_1px_2px_rgb(20_45_120/0.06)] backdrop-blur transition-opacity duration-700",
                 showMessage ? "opacity-100" : "opacity-0",
               )}
             >
@@ -124,7 +124,7 @@ export function WearView() {
             </p>
           )}
           {!voice.listening && answer === "idle" && !showMessage && live && (
-            <p className="absolute text-[1.1em] text-white/25">Tap anywhere to ask</p>
+            <p className="absolute text-[1.1em] text-muted-foreground/70">Tap anywhere to ask</p>
           )}
         </main>
 
@@ -136,7 +136,9 @@ export function WearView() {
             onClick={capturing ? client.pause : client.resume}
             className={cn(
               "flex h-14 items-center gap-2 rounded-full px-6 text-lg font-semibold disabled:opacity-40",
-              capturing ? "bg-white/10 text-white" : "bg-emerald-500 text-black",
+              capturing
+                ? "border border-hairline bg-panel text-foreground shadow-[0_1px_2px_rgb(20_45_120/0.06)]"
+                : "bg-brand text-white",
             )}
           >
             {capturing ? <Pause className="size-5" /> : <Play className="size-5" />}
@@ -172,13 +174,13 @@ function StatusChip({
   children: React.ReactNode;
 }) {
   return (
-    <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
+    <span className="flex items-center gap-1.5 rounded-full border border-hairline bg-panel px-3 py-1.5 text-foreground shadow-[0_1px_2px_rgb(20_45_120/0.06)]">
       {tone !== "neutral" && (
         <span
           className={cn(
             "size-2.5 rounded-full",
-            tone === "live" && "animate-pulse bg-emerald-400",
-            tone === "paused" && "bg-amber-400",
+            tone === "live" && "animate-pulse bg-brand",
+            tone === "paused" && "bg-butter",
             tone === "recording" && "bg-red-500",
           )}
         />

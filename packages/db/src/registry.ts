@@ -7,7 +7,7 @@ import { notificationDocSchema } from "./schema/notifications";
 import { captureSessionDocSchema, descriptionJobDocSchema } from "./schema/perception";
 import { recordingDocSchema } from "./schema/recordings";
 import { roomDocSchema, roomRefDocSchema } from "./schema/rooms";
-import { dangerEventDocSchema, frameObservationDocSchema, personDocSchema } from "./schema/safety";
+import { frameObservationDocSchema, personDocSchema } from "./schema/safety";
 import { scanPinDocSchema } from "./schema/scan";
 import { sightingDocSchema } from "./schema/sightings";
 import {
@@ -134,14 +134,22 @@ export function defineCollection<TSchema extends z.ZodObject>(
 
 /**
  * Every collection, its validator schema, and its indexes. `pnpm db:setup` syncs
- * the database to this object. README "Data model" > "Indexes" explains the list.
+ * the database to this object. PLAN.md "Data model" > "Indexes" explains the list.
  */
 export const collections = {
   patients: defineCollection({
     name: "patients",
     schema: patientDocSchema,
     writers: ["web"],
-    indexes: [],
+    indexes: [
+      {
+        name: "account_email_unique",
+        key: { "account.email": 1 },
+        unique: true,
+        partialFilterExpression: { "account.email": { $exists: true } },
+        purpose: "wearer sign-in lookup, one wearer account per email",
+      },
+    ],
   }),
 
   caregivers: defineCollection({
@@ -382,19 +390,6 @@ export const collections = {
         name: "patient_frames",
         key: { patientId: 1, capturedAt: -1 },
         purpose: "recent frames for the dashboard",
-      },
-    ],
-  }),
-
-  dangerEvents: defineCollection({
-    name: "danger_events",
-    schema: dangerEventDocSchema,
-    writers: ["perception"],
-    indexes: [
-      {
-        name: "open_by_last_seen",
-        key: { patientId: 1, status: 1, lastSeenAt: -1 },
-        purpose: "open hazards, dashboard alert badge",
       },
     ],
   }),

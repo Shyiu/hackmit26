@@ -23,7 +23,10 @@ export async function apiFetch<T>(path: string, init: RequestInit & { json?: unk
     const message =
       typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
         ? body.error
-        : `Request failed with ${response.status}`;
+        : // A body too large for the host is refused before the route, with no message of its own.
+          response.status === 413
+          ? "That upload is too large. Try fewer or smaller files."
+          : `Request failed with ${response.status}`;
     throw new ApiError(response.status, message);
   }
   return body as T;

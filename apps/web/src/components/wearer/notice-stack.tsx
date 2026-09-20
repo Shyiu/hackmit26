@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, MessageSquare, TriangleAlert, UserRound, X, type LucideIcon } from "lucide-react";
+import { Bell, MessageSquare, UserRound, X, type LucideIcon } from "lucide-react";
 import type { NotificationKind } from "@memory-glasses/shared";
 import { holdTimeMs } from "@/hooks/use-hud-message";
 import type { WearerNotice } from "@/hooks/use-wearer-client";
@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 const NOTICE_KINDS: Record<NotificationKind, { icon: LucideIcon; label: string; cardClass?: string }> = {
   caregiver_message: { icon: MessageSquare, label: "Message" },
   reminder: { icon: Bell, label: "Reminder" },
-  danger_alert: { icon: TriangleAlert, label: "Alert", cardClass: "bg-red-600/80" },
   person_recognized: { icon: UserRound, label: "Recognized" },
 };
 
@@ -57,7 +56,6 @@ function NoticeCard({
   onDismiss: (id: string) => void;
 }) {
   useEffect(() => {
-    if (notice.kind === "danger_alert") return;
     const timer = window.setTimeout(() => onDismiss(notice.id), Math.max(8000, holdTimeMs(notice.text)));
     return () => window.clearTimeout(timer);
   }, [notice.id, notice.kind, notice.text, onDismiss]);

@@ -4,16 +4,7 @@ from typing import Protocol
 
 import numpy as np
 
-from ..models import Detection, FaceBox, VlmResult
-
-
-class ObjectDetector(Protocol):
-    name: str
-    model: str
-
-    def detect(
-        self, image: np.ndarray, prompts: list[str] | None = None, *, filename: str = ""
-    ) -> list[Detection]: ...
+from ..models import FaceBox
 
 
 class FaceDetector(Protocol):
@@ -27,10 +18,3 @@ class FaceEmbedder(Protocol):
     model: str
 
     def embed(self, image: np.ndarray, faces: list[FaceBox]) -> list[np.ndarray]: ...
-
-
-class VLMVerifier(Protocol):
-    name: str
-    model: str
-
-    def verify(self, image_bytes: bytes, candidate_event_types: list[str]) -> VlmResult: ...
