@@ -64,5 +64,15 @@
     },
     { "type": "faces", "v": 1, "seq": 43, "faces": [] },
     { "type": "error", "v": 1, "code": "unauthorized", "message": "Token expired" }
+  ],
+  "reloadClassesRequests": [
+    { "version": 3 }
+  ],
+  "reloadClassesResponses": [
+    {
+      "patientId": "5eed00000000000000000001",
+      "classes": ["keys", "glasses"],
+      "version": 2
+    }
   ]
 }
