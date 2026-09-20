@@ -8,7 +8,6 @@ import {
   MessagesSquare,
   ScanFace,
   Settings,
-  Video,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,11 +19,10 @@ export const PRIMARY_LINKS: NavLink[] = [
   { href: "/dashboard", label: "Home", icon: House },
   { href: "/dashboard/items", label: "Items", icon: KeyRound },
   { href: "/dashboard/questions", label: "Questions", icon: MessagesSquare },
-  { href: "/dashboard/live", label: "Live", icon: Video },
+  { href: "/dashboard/map", label: "3D Map", icon: MapIcon },
 ];
 
 export const SECONDARY_LINKS: NavLink[] = [
-  { href: "/dashboard/map", label: "Map", icon: MapIcon },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/people", label: "Faces", icon: ScanFace },
   { href: "/dashboard/recordings", label: "Recordings", icon: Clock },

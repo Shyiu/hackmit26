@@ -18,6 +18,7 @@ export type ServerEnvName =
   | "PERCEPTION_URL"
   | "SPLAT_SLAM_URL"
   | "SPLAT_SLAM_KEY"
+  | "SPLAT_SLAM_PREVIEW_TOKEN"
   | "S3_ENDPOINT"
   | "S3_BUCKET"
   | "S3_ACCESS_KEY_ID"

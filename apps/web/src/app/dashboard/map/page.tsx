@@ -6,8 +6,8 @@ import { dashboardTenant } from "@/lib/server/dashboard";
 import { cn } from "@/lib/utils";
 
 const VIEWS = [
-  { mode: "static", label: "Room scan" },
-  { mode: "live", label: "Live scan" },
+  { mode: "static", label: "Demo room" },
+  { mode: "live", label: "Live reconstruction" },
 ] as const;
 
 function first(value: string | string[] | undefined) {
@@ -32,11 +32,13 @@ export default async function MapPage({ searchParams }: PageProps<"/dashboard/ma
   return (
     <>
       <PageHeader
-        title="Map"
+        title="3D Map"
         icon={MapIcon}
-        description="A 3D scan of the room. Each arrow points at where an item was last seen."
+        description={mode === "static"
+          ? "Explore the saved demo room in mesh or splat view."
+          : "Watch the room build in 3D as the wearer’s camera captures new views."}
         action={
-          <nav aria-label="Scan" className="flex gap-0.5 rounded-md bg-muted p-0.5">
+          <nav aria-label="Reconstruction source" className="flex gap-0.5 rounded-md bg-muted p-0.5">
             {VIEWS.map((view) => (
               <Link
                 key={view.mode}
