@@ -157,6 +157,16 @@ export type Speech = {
   cancel: () => void;
 };
 
+// Some engines (iOS before priming, embedded WebViews) never fire utterance
+// events, which would leave `done` pending forever and wedge the notification
+// queue behind it. These watchdogs make `done` always settle.
+export const SPEECH_START_TIMEOUT_MS = 4_000;
+
+/** Time to wait for onend after onstart: a base plus a per-character estimate. */
+export function speechBudgetMs(text: string, rate: number): number {
+  return 8_000 + (text.length * 120) / rate;
+}
+
 export function speak(text: string, rate = 0.9): Speech {
   if (!speechAvailable()) {
     return { started: Promise.resolve(null), done: Promise.resolve("failed"), cancel() {} };
@@ -174,12 +184,37 @@ export function speak(text: string, rate = 0.9): Speech {
   let resolveStarted: (at: number | null) => void = () => {};
   const started = new Promise<number | null>((resolve) => (resolveStarted = resolve));
   const done = new Promise<SpeechOutcome>((resolve) => {
-    utterance.onstart = () => resolveStarted(performance.now());
+    let startTimer = 0;
+    let endTimer = 0;
+    const clearTimers = () => {
+      window.clearTimeout(startTimer);
+      window.clearTimeout(endTimer);
+    };
+    // onstart never fired: nothing is speaking, so report failure and let the
+    // caller move on instead of blocking the wearer pipeline forever.
+    startTimer = window.setTimeout(() => {
+      cancelled = true;
+      synth.cancel();
+      resolveStarted(null);
+      resolve("failed");
+    }, SPEECH_START_TIMEOUT_MS);
+    utterance.onstart = () => {
+      window.clearTimeout(startTimer);
+      resolveStarted(performance.now());
+      // Chrome and WebKit occasionally drop onend; the text did get spoken, so
+      // a silent engine still resolves "played" once the estimate runs out.
+      endTimer = window.setTimeout(() => {
+        synth.cancel();
+        resolve(cancelled ? "cancelled" : "played");
+      }, speechBudgetMs(text, rate));
+    };
     utterance.onend = () => {
+      clearTimers();
       resolveStarted(null);
       resolve(cancelled ? "cancelled" : "played");
     };
     utterance.onerror = (event) => {
+      clearTimers();
       resolveStarted(null);
       resolve(cancelled || event.error === "interrupted" || event.error === "canceled" ? "cancelled" : "failed");
     };
