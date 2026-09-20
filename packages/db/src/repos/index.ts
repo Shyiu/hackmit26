@@ -2,6 +2,7 @@ import type { Db } from "mongodb";
 import type { PatientId } from "../ids";
 import { DEFAULT_PATIENT_SETTINGS } from "../schema/tenancy";
 import type { RepoContext } from "./context";
+import { dangerEventsRepo } from "./danger-events";
 import { devicesRepo } from "./devices";
 import { interactionsRepo } from "./interactions";
 import { itemsRepo } from "./items";
@@ -39,6 +40,7 @@ export function tenantRepos(db: Db, patientId: PatientId, options: TenantOptions
     notifications: notificationsRepo(ctx),
     devices: devicesRepo(ctx),
     pairingCodes: pairingCodesRepo(ctx),
+    dangerEvents: dangerEventsRepo(ctx),
   };
 }
 
