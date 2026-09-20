@@ -23,6 +23,8 @@ from app.protocol import (
     capture_time,
     encode_frame,
     parse_client_message,
+    parse_config_classes_request,
+    parse_config_classes_response,
     parse_frame,
     parse_frame_header,
     parse_server_message,
@@ -34,6 +36,8 @@ PARSERS: dict[str, Callable[[str], BaseModel]] = {
     "clientMessages": parse_client_message,
     "frameHeaders": parse_frame_header,
     "serverMessages": parse_server_message,
+    "reloadClassesRequests": parse_config_classes_request,
+    "reloadClassesResponses": parse_config_classes_response,
 }
 
 

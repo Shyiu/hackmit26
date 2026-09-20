@@ -1,6 +1,7 @@
 import type { ItemId } from "@memory-glasses/db";
 import { updateItemSchema } from "@memory-glasses/shared";
 import { HttpError, readBody, readId, withTenant } from "@/lib/server/api";
+import { reloadClasses } from "@/lib/server/perception";
 import { itemView } from "@/lib/server/views";
 
 // Renames, aliases, detector prompts, and archiving (`active: false`). Send the
@@ -9,5 +10,6 @@ import { itemView } from "@/lib/server/views";
 export const PATCH = withTenant<{ id: string }>("caregiver", async ({ request, params, tenant }) => {
   const item = await tenant.items.update(readId<ItemId>(params.id), await readBody(request, updateItemSchema));
   if (!item) throw new HttpError(404, "Not found");
+  reloadClasses(tenant.patientId);
   return Response.json(itemView(item));
 });

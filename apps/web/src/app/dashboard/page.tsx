@@ -14,6 +14,7 @@ import {
   MessageSquareHeart,
   Search,
   Settings,
+  TriangleAlert,
   Video,
 } from "lucide-react";
 import Link from "next/link";
@@ -66,10 +67,11 @@ export default async function DashboardHomePage() {
   // Staleness is evaluated only while a caregiver has the dashboard open;
   // AutoRefresh refreshes this page every five seconds, with no background job.
   await checkLocationStaleness(tenant, settings, patient, now);
-  const [items, questions, notifications] = await Promise.all([
+  const [items, questions, notifications, openAlerts] = await Promise.all([
     tenant.items.list(),
     recentQuestions(tenant, new Date(monthAgo)),
     tenant.notifications.listRecent({ limit: 20 }),
+    tenant.dangerEvents.countOpen(),
   ]);
 
   const needsALook = items.filter((item) => NEEDS_A_LOOK.includes(locationStatus(item.lastSighting)));
@@ -122,13 +124,25 @@ export default async function DashboardHomePage() {
         : `Usually ${Math.round(baseline)} a week over the last month.`;
 
   const entries: CenterEntry[] = [
+    ...(openAlerts > 0
+      ? [
+          {
+            id: "open-alerts",
+            tone: "alert" as const,
+            icon: TriangleAlert,
+            title: `${openAlerts} open ${openAlerts === 1 ? "alert" : "alerts"}`,
+            detail: "Hazards the camera raised that nobody has acknowledged.",
+            href: "/dashboard/alerts",
+          },
+        ]
+      : []),
     ...alerts.slice(0, 3).map((alert) => ({
       id: alert._id.toHexString(),
       tone: alert.kind === "lost_alert" ? ("danger" as const) : ("alert" as const),
       icon: alert.kind === "lost_alert" ? MapPin : ShieldAlert,
       title: alert.text,
       detail: relativeTime(alert.showAt, now),
-      href: alert.kind === "lost_alert" ? "/dashboard/messages" : "/dashboard/questions",
+      href: alert.kind === "lost_alert" ? "/dashboard/messages" : "/dashboard/alerts",
     })),
     repeats.length > 0
       ? {

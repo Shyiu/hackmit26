@@ -20,5 +20,21 @@
     { "type": "faces", "v": 1, "seq": 1, "faces": [{ "personId": null, "name": null, "relation": null, "bbox": [0.1, 0.2, 0.3, 0.4], "confidence": 0.9, "matchConfidence": 1.5 }] },
     { "type": "faces", "v": 1, "seq": 1 },
     { "type": "error", "v": 1, "code": "teapot", "message": "no" }
+  ],
+  "reloadClassesRequests": [
+    { "version": -1 },
+    { "version": "x" },
+    { "extra": 1 }
+  ],
+  "reloadClassesResponses": [
+    {
+      "patientId": "5eed00000000000000000001",
+      "classes": ["keys"]
+    },
+    {
+      "patientId": "not-an-id",
+      "classes": ["keys"],
+      "version": 2
+    }
   ]
 }
