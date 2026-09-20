@@ -1,4 +1,5 @@
-// Seeds one demo wearer, a caregiver login, three items, and sightings that
+// Seeds one demo wearer, a caregiver login, three items, two open hazard
+// events for the Alerts tab, and sightings that
 // exercise the answer wording: one item seen resting, one picked up after it
 // was put down, one still waiting for its description.
 //
@@ -17,7 +18,7 @@ import {
   type Db,
   type PatientId,
 } from "@memory-glasses/db";
-import { seedObservation } from "@memory-glasses/db/observations";
+import { seedDangerEvent, seedObservation } from "@memory-glasses/db/observations";
 import { withDatabase } from "./lib/env";
 
 function fixedId<TId extends PatientId | CaregiverId>(hex: string): TId {
@@ -76,6 +77,25 @@ async function seed(db: Db) {
   });
   await observe(wallet, { lastSeenAt: new Date(now - 10 * MINUTE), state: "held", description: { status: "pending" } });
   await observe(glasses, { lastSeenAt: new Date(now - 2 * MINUTE), state: "unknown", description: { status: "pending" } });
+
+  await seedDangerEvent(db, {
+    patientId: DEMO_PATIENT_ID,
+    kind: "hot_surface_visible",
+    hazardLabel: "stove burner",
+    severity: "high",
+    confidence: 0.91,
+    verification: "model_confirmed",
+    lastSeenAt: new Date(now - 6 * MINUTE),
+  });
+  await seedDangerEvent(db, {
+    patientId: DEMO_PATIENT_ID,
+    kind: "medication_or_chemical_visible",
+    hazardLabel: "pill bottle",
+    severity: "medium",
+    confidence: 0.72,
+    lastSeenAt: new Date(now - 45 * MINUTE),
+  });
+  await tenant.notifications.create({ kind: "danger_alert", text: "The stove looks hot and nobody is nearby." });
 
   for (const item of await tenant.items.list()) {
     console.log(`${item.name.padEnd(8)} ${locationStatus(item.lastSighting)}  ${item.lastSighting?.sentence ?? ""}`);
