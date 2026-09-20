@@ -51,7 +51,7 @@ export function MessageForm() {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <div role="radiogroup" aria-label="Kind" className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+      <div role="radiogroup" aria-label="Kind" className="grid grid-cols-2 gap-0.5 rounded-md bg-muted p-0.5">
         {(
           [
             ["caregiver_message", "Say it now"],
@@ -65,7 +65,7 @@ export function MessageForm() {
             aria-checked={kind === value}
             onClick={() => setKind(value)}
             className={cn(
-              "min-h-11 rounded-md text-sm font-medium transition-colors",
+              "flex h-8 items-center justify-center rounded-[0.3rem] text-sm font-medium transition-colors pointer-coarse:h-10",
               kind === value ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
             )}
           >

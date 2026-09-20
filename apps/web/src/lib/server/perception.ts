@@ -111,6 +111,20 @@ export function personView(doc: PersonDoc, frames: FrameDoc[] = []): EnrolledPer
   };
 }
 
+export type LastSeenPerson = { name: string; relation: string | null; seenAt: string };
+
+/** The most recently recognized enrolled face, for "who is this" -- null when nobody's
+ * been matched within the perception service's recall window (or ever). */
+export async function getLastSeenPerson(patientId: PatientId): Promise<LastSeenPerson | null> {
+  try {
+    const response = await perceptionFetch(patientId, "/people/last-seen");
+    return (await response.json()) as LastSeenPerson;
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 404) return null;
+    throw error;
+  }
+}
+
 export async function listPeople(patientId: PatientId): Promise<EnrolledPerson[]> {
   const [people, frames] = await Promise.all([
     perceptionFetch(patientId, "/people").then((response) => response.json() as Promise<PersonDoc[]>),

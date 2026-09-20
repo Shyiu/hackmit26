@@ -96,6 +96,10 @@ class Settings(TokenSettings):
     # Once a recognized person is announced to the wearer, how long before the
     # same person can be announced again.
     face_announce_cooldown_s: float = Field(default=120.0, gt=0.0)
+    # How long a matched face stays the answer to "who is this" after being seen.
+    # Separate from face_announce_cooldown_s, which gates the proactive notification,
+    # not how long the wearer can still ask about who they just saw.
+    person_recall_window_s: float = Field(default=600.0, gt=0.0)
     face_embedding_key: str | None = Field(default=None, repr=False)
     vlm: Literal["mock", "openai", "off"] = "mock"
     vlm_model: str = "gpt-5.6-luna"
