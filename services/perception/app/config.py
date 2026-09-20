@@ -68,6 +68,10 @@ class Settings(TokenSettings):
     refresh_interval_ms: int = Field(default=500, ge=0)
     track_lost_seconds: float = Field(default=3.0, gt=0.0)
     track_match_iou: float = Field(default=0.3, gt=0.0, le=1.0)
+    # A detection at or above this can start a brand-new track. One between
+    # track_low_confidence and this can only refresh a track that already exists.
+    track_high_confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    track_low_confidence: float = Field(default=0.1, ge=0.0, le=1.0)
 
     safety_enabled: bool = True
     safety_sample_every_n_frames: int = Field(default=3, ge=1)
@@ -102,7 +106,10 @@ class Settings(TokenSettings):
     safety_hazard_labels_extra: str = ""
     safety_mock_labels: str = ""
     safety_mock_faces: int = Field(default=0, ge=0)
-    frame_image_dir: str = "./data/frames"
+    # The root LocalFrameStore writes under: it builds "frames/..." and "people/..."
+    # keys itself, so this must NOT already end in "/frames" or every keyframe write
+    # doubles the segment and every description job fails with file-not-found.
+    frame_image_dir: str = "./data"
     allow_local_path_ingest: bool = False
     ingest_allowed_dir: str | None = None
     danger_event_merge_window_s: int = Field(default=30, ge=1)
