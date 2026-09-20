@@ -444,7 +444,9 @@ Both services derive `patientId` from an authenticated caregiver session or scop
 // scanPins: where an item sits in a 3D scan, one per (patientId, itemId, sceneId)
 {
   _id, patientId, itemId, sceneId: "room-demo" | "<splat-slam scene id>",
-  position: [x, y, z] | null,           // null until the observation is raycast
+  position: [x, y, z] | null,           // null until some observation has been raycast
+  positionFrame?: "s0/000012.jpg",      // the frame position came from; a newer observation that
+                                        // never gets a pose (tracking lost) leaves position alone
   observation: { frame: "s0/000012.jpg", u, v } | null, // bbox centre on a kept frame
   source: "manual" | "slam" | "seed", seenAt, updatedAt
 }

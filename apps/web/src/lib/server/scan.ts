@@ -180,6 +180,7 @@ export async function pinViews(
         itemName,
         sceneId: doc.sceneId,
         position: doc.position,
+        positionFrame: doc.positionFrame ?? null,
         observation: doc.observation,
         source: doc.source,
         seenAt: doc.seenAt.toISOString(),

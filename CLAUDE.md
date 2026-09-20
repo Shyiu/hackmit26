@@ -117,7 +117,9 @@ scripts read the same file.
 - Room scan pins are per scene. `room-demo` pins are in the GLB's y-up frame and live pins are in
   splat-slam world coordinates, so a pin never moves between scenes.
 - A live pin's depth is resolved in the caregiver's browser, by raycasting the splat. Until a Map tab
-  is open the pin stays unresolved, and the arrow is drawn along the view ray.
+  is open the pin stays unresolved, and the arrow is drawn along the view ray. A new observation
+  never clears `position`: a frame seen while tracking is lost gets no pose, so the pin keeps its
+  last solved spot until `positionFrame` catches up with `observation.frame`.
 - splat-slam is a separate repo and service (`../splat-slam`). This app only proxies to it at
   `SPLAT_SLAM_URL`; without that, the live scan routes return 503 and the static scene still works.
 - Live pin rays assume a 9:16 portrait feed, because splat-slam's `cameras.json` has no aspect. Keep

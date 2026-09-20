@@ -12,7 +12,7 @@ const AT = "2026-09-20T12:00:00.000Z";
 
 describe("scanPinSchema", () => {
   it("accepts a placed pin and one still waiting for a pose", () => {
-    const base = { itemId: ITEM, itemName: "keys", sceneId: STATIC_SCAN_SCENE_ID, seenAt: AT, updatedAt: AT };
+    const base = { itemId: ITEM, itemName: "keys", sceneId: STATIC_SCAN_SCENE_ID, positionFrame: null, seenAt: AT, updatedAt: AT };
     expect(scanPinSchema.safeParse({ ...base, position: [0.1, 1, -2], observation: null, source: "seed" }).success).toBe(true);
     expect(
       scanPinSchema.safeParse({
@@ -25,7 +25,7 @@ describe("scanPinSchema", () => {
   });
 
   it("rejects a short vector, a non-finite number, and an off-frame observation", () => {
-    const base = { itemId: ITEM, itemName: "keys", sceneId: "abc", source: "slam", seenAt: AT, updatedAt: AT };
+    const base = { itemId: ITEM, itemName: "keys", sceneId: "abc", positionFrame: null, source: "slam", seenAt: AT, updatedAt: AT };
     expect(scanPinSchema.safeParse({ ...base, position: [0, 1], observation: null }).success).toBe(false);
     expect(scanPinSchema.safeParse({ ...base, position: [0, 1, Infinity], observation: null }).success).toBe(false);
     expect(

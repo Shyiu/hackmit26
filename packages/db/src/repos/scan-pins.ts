@@ -45,7 +45,7 @@ export function scanPinsRepo(ctx: RepoContext) {
     /**
      * Places the pin. With `frame`, the write lands only while that frame is
      * still the pin's observation, so a slow solve can't move a pin that a
-     * newer sighting already reset; null means it lost.
+     * newer sighting already replaced; null means it lost.
      */
     async setPosition(input: ScanPositionInput): Promise<ScanPinDoc | null> {
       const now = ctx.now();
@@ -57,19 +57,24 @@ export function scanPinsRepo(ctx: RepoContext) {
       });
       const key = { itemId: input.itemId, sceneId };
       if (input.frame !== undefined) {
-        return pins.findOneAndUpdate({ ...key, "observation.frame": input.frame }, { $set });
+        return pins.findOneAndUpdate(
+          { ...key, "observation.frame": input.frame },
+          { $set: { ...$set, positionFrame: input.frame } },
+        );
       }
       const { doc } = await pins.upsertOne(key, {
         $set,
+        $unset: { positionFrame: "" },
         $setOnInsert: { _id: newId<ScanPinId>(), observation: null, seenAt: now },
       });
       return doc;
     },
 
     /**
-     * Records where the item sat in a kept frame. A new frame clears the
-     * position until that frame is posed; the same frame again keeps it. An
-     * observation older than the stored one changes nothing.
+     * Records where the item sat in a kept frame. The position stays where it
+     * was last solved until this frame is posed and solved too: a frame seen
+     * while tracking is lost never gets a pose, and must not erase a good pin.
+     * An observation older than the stored one changes nothing.
      */
     async recordObservation(input: ScanObservationInput): Promise<ScanPinDoc> {
       const { sceneId, observation, seenAt, updatedAt } = parseDocument(observationWrite, {
@@ -82,12 +87,11 @@ export function scanPinsRepo(ctx: RepoContext) {
       const notNewer = { ...key, seenAt: { $lte: seenAt } };
       // A pipeline, so the frame comparison and the write are one atomic step.
       // $literal keeps a frame name that starts with "$" from reading as a field path.
-      const sameFrame = { $eq: ["$observation.frame", { $literal: input.frame }] };
       const update = [
         {
           $set: {
-            position: { $cond: [sameFrame, "$position", null] },
-            source: { $cond: [sameFrame, "$source", "slam"] },
+            position: { $ifNull: ["$position", null] },
+            source: { $ifNull: ["$source", "slam"] },
             observation: { $literal: observation },
             seenAt,
             updatedAt,

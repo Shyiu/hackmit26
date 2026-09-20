@@ -23,6 +23,8 @@ export const scanPinSchema = z.object({
   itemName: z.string(),
   sceneId,
   position: scanVec3Schema.nullable(),
+  /** The observed frame `position` was solved from; null for a pin placed by hand or not solved yet. */
+  positionFrame: z.string().nullable(),
   observation: scanObservationSchema.nullable(),
   source: scanPinSourceSchema,
   seenAt: isoTimestamp,

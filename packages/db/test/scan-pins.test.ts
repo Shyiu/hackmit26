@@ -49,7 +49,7 @@ describe("scan pins", () => {
     expect(await tenant.scanPins.listByItem(wallet._id)).toEqual([]);
   });
 
-  it("keeps the position when the same frame comes again and clears it on a new frame", async () => {
+  it("keeps the last solved position while a newer frame waits for its pose", async () => {
     const tenant = await newTenant(env.db);
     const keys = await tenant.items.create({ name: "keys" });
     const at = { itemId: keys._id, sceneId: "live-1" };
@@ -62,8 +62,15 @@ describe("scan pins", () => {
 
     const later = new Date(T0.getTime() + MINUTE);
     const next = await tenant.scanPins.recordObservation({ ...at, frame: "s0/000020.jpg", u: 0.5, v: 0.5, seenAt: later });
-    expect(next).toMatchObject({ position: null, source: "slam", observation: { frame: "s0/000020.jpg" }, seenAt: later });
+    expect(next).toMatchObject({ position: [1, 2, 3], source: "manual", observation: { frame: "s0/000020.jpg" }, seenAt: later });
+    expect(next.positionFrame).toBeUndefined();
     expect(await tenant.scanPins.setPosition({ ...at, position: [4, 5, 6], source: "slam", frame: "s0/000012.jpg" })).toBeNull();
+
+    const solved = await tenant.scanPins.setPosition({ ...at, position: [4, 5, 6], source: "slam", frame: "s0/000020.jpg" });
+    expect(solved).toMatchObject({ position: [4, 5, 6], source: "slam", positionFrame: "s0/000020.jpg" });
+    const placed = await tenant.scanPins.setPosition({ ...at, position: [7, 8, 9], source: "manual" });
+    expect(placed).toMatchObject({ position: [7, 8, 9], source: "manual" });
+    expect(placed?.positionFrame).toBeUndefined();
   });
 
   it("ignores an observation older than the stored one", async () => {

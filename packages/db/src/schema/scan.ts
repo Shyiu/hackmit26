@@ -25,8 +25,13 @@ export const scanPinDocSchema = z.strictObject({
   itemId: idSchema<ItemId>(),
   /** "room-demo" for the bundled room, else a splat-slam scene id. */
   sceneId: z.string().min(1).max(100),
-  /** Null while `observation.frame` has no camera pose yet. */
+  /**
+   * Null until some observed frame has had a camera pose. It then holds the last spot that was
+   * solved, even while a newer `observation` waits for its pose: tracking can be lost for good.
+   */
   position: scanPosition.nullable(),
+  /** The observed frame `position` was solved from. Absent for a pin placed by hand or seeded. */
+  positionFrame: z.string().min(1).max(200).optional(),
   observation: scanObservation.nullable(),
   /** Who placed `position`. */
   source: scanPinSource,

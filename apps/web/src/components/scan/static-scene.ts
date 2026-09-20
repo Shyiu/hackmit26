@@ -111,6 +111,7 @@ export async function createStaticViewer(
       itemName: item.name,
       sceneId,
       position,
+      positionFrame: null,
       observation: null,
       source: "manual",
       seenAt: pins.find((other) => other.itemId === item.id)?.seenAt ?? stamp,
