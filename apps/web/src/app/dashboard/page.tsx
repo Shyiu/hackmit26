@@ -26,6 +26,7 @@ import { SectionTitle, ShortcutStrip, Tile } from "@/components/home/tiles";
 import { STATUS_LABELS, whereLine } from "@/lib/item-status";
 import { relativeTime } from "@/lib/relative-time";
 import { dashboardTenant } from "@/lib/server/dashboard";
+import { checkLocationStaleness } from "@/lib/server/lost";
 
 export const metadata = { title: "Home" };
 
@@ -57,11 +58,14 @@ async function recentQuestions(tenant: Awaited<ReturnType<typeof dashboardTenant
 }
 
 export default async function DashboardHomePage() {
-  const { tenant, patient } = await dashboardTenant("/dashboard");
+  const { tenant, patient, settings } = await dashboardTenant("/dashboard");
   const now = new Date();
   const DAY = 24 * 60 * 60 * 1000;
   const dayAgo = now.getTime() - DAY;
   const monthAgo = now.getTime() - 28 * DAY;
+  // Staleness is evaluated only while a caregiver has the dashboard open;
+  // AutoRefresh refreshes this page every five seconds, with no background job.
+  await checkLocationStaleness(tenant, settings, patient, now);
   const [items, questions, notifications] = await Promise.all([
     tenant.items.list(),
     recentQuestions(tenant, new Date(monthAgo)),
@@ -86,7 +90,9 @@ export default async function DashboardHomePage() {
   const leftBehind = items
     .filter((item) => item.lastSighting && locationStatus(item.lastSighting) === "observed")
     .sort((a, b) => (b.lastSighting?.lastSeenAt.getTime() ?? 0) - (a.lastSighting?.lastSeenAt.getTime() ?? 0))[0];
-  const alerts = notifications.filter((n) => n.kind === "danger_alert" && n.showAt.getTime() >= dayAgo);
+  const alerts = notifications.filter(
+    (n) => ["danger_alert", "lost_alert"].includes(n.kind) && n.showAt.getTime() >= dayAgo,
+  );
 
   // Four weeks of lookups for a named item, oldest first. A lookup is the
   // wearer asking where something is, so it stands in for having lost it.
@@ -118,11 +124,11 @@ export default async function DashboardHomePage() {
   const entries: CenterEntry[] = [
     ...alerts.slice(0, 3).map((alert) => ({
       id: alert._id.toHexString(),
-      tone: "alert" as const,
-      icon: ShieldAlert,
+      tone: alert.kind === "lost_alert" ? ("danger" as const) : ("alert" as const),
+      icon: alert.kind === "lost_alert" ? MapPin : ShieldAlert,
       title: alert.text,
       detail: relativeTime(alert.showAt, now),
-      href: "/dashboard/questions",
+      href: alert.kind === "lost_alert" ? "/dashboard/messages" : "/dashboard/questions",
     })),
     repeats.length > 0
       ? {
@@ -143,14 +149,38 @@ export default async function DashboardHomePage() {
               ? "The wearer hasn't asked where anything is."
               : `${lookups} ${lookups === 1 ? "lookup" : "lookups"}, none repeated.`,
         },
-    {
-      id: "safe-area",
-      tone: "note",
-      icon: MapPin,
-      title: "Safe area not set up yet",
-      detail: "Add one in Settings to hear when they leave it.",
-      href: "/dashboard/settings",
-    },
+    settings.geofence === null
+      ? {
+          id: "safe-area",
+          tone: "note",
+          icon: MapPin,
+          title: "Safe area not set up yet",
+          detail: "Add one in Settings to hear when they leave it.",
+          href: "/dashboard/settings",
+        }
+      : patient?.lastLocation?.inside === true
+        ? {
+            id: "safe-area",
+            tone: "ok",
+            icon: MapPin,
+            title: "Inside the approved area",
+            detail: `Last location ${relativeTime(patient.lastLocation.receivedAt, now)}`,
+          }
+        : patient?.lastLocation?.inside === false
+          ? {
+              id: "safe-area",
+              tone: "alert",
+              icon: MapPin,
+              title: "Outside the approved area",
+              detail: `Last location ${relativeTime(patient.lastLocation.receivedAt, now)}`,
+            }
+          : {
+              id: "safe-area",
+              tone: "note",
+              icon: MapPin,
+              title: "Approved area set, no location yet",
+              detail: "The wear page reports position while capture is live.",
+            },
     leftBehind?.lastSighting
       ? {
           id: "left-behind",

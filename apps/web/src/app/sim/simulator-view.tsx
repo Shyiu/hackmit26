@@ -11,6 +11,7 @@ import { LiveVideo } from "@/components/wearer/live-video";
 import { RecordingsList } from "@/components/wearer/recordings-list";
 import { useVideoAspect } from "@/hooks/use-video-frames";
 import { useWearerClient } from "@/hooks/use-wearer-client";
+import { LOCATION_LABELS } from "@/hooks/use-location-report";
 import { cn } from "@/lib/utils";
 
 // Capture path A: the same client as /wear, with one video on the page, labels
@@ -18,7 +19,7 @@ import { cn } from "@/lib/utils";
 // without speech to text.
 export function SimulatorView() {
   const client = useWearerClient({ turnMode: "hold", autoResumeOnReconnect: true });
-  const { camera, recorder, hud, voice, perception, live, capturing } = client;
+  const { camera, recorder, hud, voice, perception, live, capturing, location } = client;
   const aspect = useVideoAspect(client.video);
   const [question, setQuestion] = useState("");
   // Ticks the "faces last seen Ns ago" debug line below.
@@ -164,7 +165,7 @@ export function SimulatorView() {
         <p className="text-sm text-destructive">{voice.error ?? recorder.error ?? client.lastError}</p>
       )}
       <p className="text-xs text-muted-foreground">
-        Speech to text: {voice.engine ?? "not checked yet"} · Frames: {perception.status}
+        Speech to text: {voice.engine ?? "not checked yet"} · Frames: {perception.status} · Location: {LOCATION_LABELS[location.status]}
         {perception.framesSent > 0 && `, ${perception.framesSent} sent`}
       </p>
 

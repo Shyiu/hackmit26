@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 export type CenterEntry = {
   id: string;
-  tone: "alert" | "note" | "ok";
+  tone: "alert" | "danger" | "note" | "ok";
   icon: LucideIcon;
   title: string;
   detail: string;
@@ -13,6 +13,7 @@ export type CenterEntry = {
 
 const TONES: Record<CenterEntry["tone"], string> = {
   alert: "bg-butter text-[#3a2c00]",
+  danger: "bg-red-600 text-white",
   note: "bg-brand-soft text-brand-deep",
   ok: "bg-[#e3f3fc] text-brand-deep",
 };

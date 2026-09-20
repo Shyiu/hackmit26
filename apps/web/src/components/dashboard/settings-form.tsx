@@ -30,6 +30,11 @@ export function SettingsForm({ initial, timeZones }: { initial: Settings; timeZo
   const [values, setValues] = useState(initial);
   const [staleAfter, setStaleAfter] = useState(String(initial.staleAfterMinutes));
   const [retention, setRetention] = useState(String(initial.retentionDays));
+  const [geofenceEnabled, setGeofenceEnabled] = useState(initial.geofence !== null);
+  const [geofenceLat, setGeofenceLat] = useState(String(initial.geofence?.lat ?? 0));
+  const [geofenceLng, setGeofenceLng] = useState(String(initial.geofence?.lng ?? 0));
+  const [geofenceRadius, setGeofenceRadius] = useState(String(initial.geofence?.radiusMeters ?? 200));
+  const [locationStaleAfter, setLocationStaleAfter] = useState(String(initial.locationStaleAfterMinutes));
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<{ tone: "error" | "success"; text: string } | null>(null);
 
@@ -48,6 +53,10 @@ export function SettingsForm({ initial, timeZones }: { initial: Settings; timeZo
         voiceId: values.voiceId?.trim() || null,
         staleAfterMinutes: Number(staleAfter),
         retentionDays: Number(retention),
+        locationStaleAfterMinutes: Number(locationStaleAfter),
+        geofence: geofenceEnabled
+          ? { lat: Number(geofenceLat), lng: Number(geofenceLng), radiusMeters: Number(geofenceRadius) }
+          : null,
       };
       const saved = await apiFetch<{ settings: Settings }>("/api/settings", { method: "PATCH", json: body });
       setValues(saved.settings);
@@ -158,6 +167,98 @@ export function SettingsForm({ initial, timeZones }: { initial: Settings; timeZo
             value={values.wakeWordSensitivity}
             onChange={(event) => set("wakeWordSensitivity", Number(event.target.value))}
             className={rangeClass}
+          />
+        </Field>
+      </Group>
+
+      <Group title="Approved area">
+        <SwitchRow
+          id="geofence-enabled"
+          label="Alert when the wearer leaves an area"
+          hint="The wearer sees this area on the wear page."
+          checked={geofenceEnabled}
+          onCheckedChange={(checked) => {
+            setGeofenceEnabled(checked);
+            setMessage(null);
+          }}
+        />
+        {geofenceEnabled && (
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field id="geofence-lat" label="Latitude">
+              <Input
+                id="geofence-lat"
+                type="number"
+                step="any"
+                min={-90}
+                max={90}
+                value={geofenceLat}
+                onChange={(event) => setGeofenceLat(event.target.value)}
+                required
+              />
+            </Field>
+            <Field id="geofence-lng" label="Longitude">
+              <Input
+                id="geofence-lng"
+                type="number"
+                step="any"
+                min={-180}
+                max={180}
+                value={geofenceLng}
+                onChange={(event) => setGeofenceLng(event.target.value)}
+                required
+              />
+            </Field>
+            <Field id="geofence-radius" label="Radius (m)">
+              <Input
+                id="geofence-radius"
+                type="number"
+                min={20}
+                max={50000}
+                step="any"
+                value={geofenceRadius}
+                onChange={(event) => setGeofenceRadius(event.target.value)}
+                required
+              />
+            </Field>
+          </div>
+        )}
+        {geofenceEnabled && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              if (!("geolocation" in navigator)) {
+                setMessage({ tone: "error", text: "Location is unavailable on this phone." });
+                return;
+              }
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  setGeofenceLat(String(position.coords.latitude));
+                  setGeofenceLng(String(position.coords.longitude));
+                  setMessage(null);
+                },
+                (error) => setMessage({ tone: "error", text: error.message || "Could not read your location." }),
+                { enableHighAccuracy: false, timeout: 10_000 },
+              );
+            }}
+          >
+            Use my current location
+          </Button>
+        )}
+        <Field id="location-stale-after" label="Alert when no location for (minutes)">
+          <Input
+            id="location-stale-after"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={1440}
+            step={1}
+            value={locationStaleAfter}
+            onChange={(event) => {
+              setLocationStaleAfter(event.target.value);
+              setMessage(null);
+            }}
+            required
           />
         </Field>
       </Group>

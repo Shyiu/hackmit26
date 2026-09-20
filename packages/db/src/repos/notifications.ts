@@ -41,9 +41,13 @@ export function notificationsRepo(ctx: RepoContext) {
     nextDue(): Promise<NotificationDoc | null> {
       const now = ctx.now();
       return notifications.findOne(
-        { status: "queued", showAt: { $lte: now }, expiresAt: { $gt: now } },
+        { status: "queued", kind: { $ne: "lost_alert" }, showAt: { $lte: now }, expiresAt: { $gt: now } },
         { sort: { showAt: 1 } },
       );
+    },
+
+    lastOfKind(kind: NotificationDoc["kind"], since: Date): Promise<NotificationDoc | null> {
+      return notifications.findOne({ kind, createdAt: { $gte: since } }, { sort: { createdAt: -1 } });
     },
 
     /** Queued to shown, once. A second device marking the same one gets null back. */

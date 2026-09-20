@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Caregiver messages and reminders waiting for the headset HUD. Optional, after M3.
 // Answer captions and sighting notifications are built on the client, not stored.
-export const notificationKindSchema = z.enum(["caregiver_message", "reminder", "danger_alert"]);
+export const notificationKindSchema = z.enum(["caregiver_message", "reminder", "danger_alert", "lost_alert"]);
 
 export const notificationStatusSchema = z.enum(["queued", "shown", "expired"]);
 
@@ -21,7 +21,8 @@ export const notificationSchema = z.object({
 // patientId comes from the caregiver session, never the request body. showAt
 // takes an ISO timestamp only: z.coerce.date() would read null as 1970.
 export const createNotificationSchema = notificationSchema
-  .pick({ kind: true, text: true })
+  .pick({ text: true })
+  .extend({ kind: z.enum(["caregiver_message", "reminder"]) })
   .extend({ showAt: z.string().datetime({ offset: true }).pipe(z.coerce.date()).optional() })
   .strict();
 

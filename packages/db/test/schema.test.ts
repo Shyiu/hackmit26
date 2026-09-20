@@ -5,6 +5,7 @@ import { idSchema, newId, type ItemId, type PatientId } from "../src/ids";
 import { toMongoJsonSchema } from "../src/json-schema";
 import { collection } from "../src/registry";
 import { schemaPlan, schemaStatus, syncDatabase } from "../src/setup";
+import { DEFAULT_PATIENT_SETTINGS, patientSettingsSchema } from "../src/schema/tenancy";
 import { openTestDb } from "./helpers";
 
 function keywordsIn(node: unknown, found = new Set<string>()): Set<string> {
@@ -42,6 +43,18 @@ describe("toMongoJsonSchema", () => {
   it("refuses a custom type with no bsonType", () => {
     const schema = z.strictObject({ blob: z.custom<Buffer>((value) => Buffer.isBuffer(value)) });
     expect(() => toMongoJsonSchema(schema)).toThrow(/No validation rule for \$\.blob/);
+  });
+});
+
+describe("patient settings", () => {
+  it("round-trips an approved area", () => {
+    const settings = patientSettingsSchema.parse({
+      ...DEFAULT_PATIENT_SETTINGS,
+      geofence: { lat: 42.36, lng: -71.06, radiusMeters: 200 },
+      locationStaleAfterMinutes: 20,
+    });
+    expect(settings.geofence).toEqual({ lat: 42.36, lng: -71.06, radiusMeters: 200 });
+    expect(settings.locationStaleAfterMinutes).toBe(20);
   });
 });
 

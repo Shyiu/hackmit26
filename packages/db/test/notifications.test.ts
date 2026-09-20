@@ -39,4 +39,12 @@ describe("notifications", () => {
     clock.advance(2 * DAY_MS);
     expect(await tenant.notifications.markShown(message._id)).toBeNull();
   });
+
+  it("does not return lost alerts to the wearer", async () => {
+    const tenant = await newTenant(env.db);
+    await tenant.notifications.create({ kind: "lost_alert", text: "Outside the area.", createdBy: null });
+    const message = await tenant.notifications.create({ kind: "caregiver_message", text: "Dinner at six." });
+
+    expect((await tenant.notifications.nextDue())?._id.equals(message._id)).toBe(true);
+  });
 });

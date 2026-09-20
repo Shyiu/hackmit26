@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "a4c7eaa9cbf04019b6709960aeb90341804788e4542fe5cd9dfb30d048cea4e6",
+  "fingerprint": "dd5c9a586029a492daa085294bf17bbafbeba1fb732ac0b285560f26a6ce0396",
   "collections": {
     "patients": {
       "validator": {
@@ -77,6 +77,49 @@
                   ],
                   "multipleOf": 1
                 },
+                "geofence": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "lat": {
+                          "type": "number",
+                          "minimum": -90,
+                          "maximum": 90
+                        },
+                        "lng": {
+                          "type": "number",
+                          "minimum": -180,
+                          "maximum": 180
+                        },
+                        "radiusMeters": {
+                          "type": "number",
+                          "minimum": 20,
+                          "maximum": 50000
+                        }
+                      },
+                      "required": [
+                        "lat",
+                        "lng",
+                        "radiusMeters"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "locationStaleAfterMinutes": {
+                  "minimum": 1,
+                  "maximum": 1440,
+                  "bsonType": [
+                    "int",
+                    "long",
+                    "double"
+                  ],
+                  "multipleOf": 1
+                },
                 "wakeWordEnabled": {
                   "type": "boolean"
                 },
@@ -95,6 +138,8 @@
                 "recordingAllowed",
                 "retentionDays",
                 "staleAfterMinutes",
+                "geofence",
+                "locationStaleAfterMinutes",
                 "wakeWordEnabled",
                 "wakeWordSensitivity"
               ],
@@ -108,6 +153,60 @@
                 "double"
               ],
               "multipleOf": 1
+            },
+            "lastLocation": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "lat": {
+                      "type": "number",
+                      "minimum": -90,
+                      "maximum": 90
+                    },
+                    "lng": {
+                      "type": "number",
+                      "minimum": -180,
+                      "maximum": 180
+                    },
+                    "accuracyMeters": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "capturedAt": {
+                      "bsonType": "date"
+                    },
+                    "receivedAt": {
+                      "bsonType": "date"
+                    },
+                    "inside": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "lat",
+                    "lng",
+                    "accuracyMeters",
+                    "capturedAt",
+                    "receivedAt",
+                    "inside"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "createdAt": {
               "bsonType": "date"
@@ -1478,7 +1577,8 @@
               "enum": [
                 "caregiver_message",
                 "reminder",
-                "danger_alert"
+                "danger_alert",
+                "lost_alert"
               ]
             },
             "text": {

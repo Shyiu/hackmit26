@@ -17,8 +17,13 @@ import { enterFullscreen, useWakeLock } from "./use-screen";
 import { readStoredString, writeStoredString } from "./use-stored-setting";
 import { useFeedWatchdog } from "./use-video-frames";
 import { useVoiceTurn, type TurnResult } from "./use-voice-turn";
+import { useLocationReport } from "./use-location-report";
 
-type WearerSettings = { speakingRate: number; recordingAllowed: boolean };
+type WearerSettings = {
+  speakingRate: number;
+  recordingAllowed: boolean;
+  geofence: { lat: number; lng: number; radiusMeters: number } | null;
+};
 type InteractionView = { _id: string; status: string; answerText?: string };
 type NotificationView = { _id: string; text: string };
 
@@ -297,6 +302,7 @@ export function useWearerClient({
       hud.show("notice", "Capture paused after a reconnect.");
     },
   });
+  const location = useLocationReport({ enabled: live && capturing && signedIn === true });
 
   /** The first tap: camera, mic permission, sound, and speech all need it. */
   const start = useCallback(async () => {
@@ -306,6 +312,7 @@ export function useWearerClient({
     if (fullscreen) void enterFullscreen();
     const opened = await camera.start(parseCameraChoice(readStoredString(CAMERA_SETTING)));
     await voice.prime();
+    navigator.geolocation?.getCurrentPosition(() => {}, () => {}, { enableHighAccuracy: false, timeout: 10_000 });
     return opened;
   }, [camera, fullscreen, resumeAudio, voice]);
 
@@ -402,6 +409,7 @@ export function useWearerClient({
     hud,
     voice,
     perception,
+    location,
     wakeLock,
     signedIn,
     settings,

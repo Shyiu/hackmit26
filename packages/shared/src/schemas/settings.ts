@@ -14,6 +14,15 @@ export const updateSettingsSchema = z
     recordingAllowed: z.boolean(),
     retentionDays: z.number().int().min(1).max(365),
     staleAfterMinutes: z.number().int().min(1).max(24 * 60),
+    geofence: z
+      .object({
+        lat: z.number().min(-90).max(90),
+        lng: z.number().min(-180).max(180),
+        radiusMeters: z.number().min(20).max(50_000),
+      })
+      .strict()
+      .nullable(),
+    locationStaleAfterMinutes: z.number().int().min(1).max(24 * 60),
     wakeWordEnabled: z.boolean(),
     wakeWordSensitivity: z.number().min(0).max(1),
   })

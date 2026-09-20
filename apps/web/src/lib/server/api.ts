@@ -12,6 +12,7 @@ import {
   type PatientSettings,
   type TenantRepos,
 } from "@memory-glasses/db";
+import { DEFAULT_PATIENT_SETTINGS } from "@memory-glasses/db";
 import { NextResponse, type NextRequest } from "next/server";
 import type { z } from "zod";
 import { principalFromRequest, SESSION_COOKIE, type Principal } from "./auth";
@@ -93,8 +94,9 @@ async function settingsFor(patientId: PatientId): Promise<PatientSettings | null
     settingsCache.delete(key);
     return null;
   }
-  settingsCache.set(key, { settings: patient.settings, loadedAt: Date.now() });
-  return patient.settings;
+  const settings = { ...DEFAULT_PATIENT_SETTINGS, ...patient.settings };
+  settingsCache.set(key, { settings, loadedAt: Date.now() });
+  return settings;
 }
 
 export function forgetSettings(patientId: PatientId) {

@@ -7,6 +7,7 @@ import { dayAndTime } from "@/lib/format";
 import { dashboardTenant } from "@/lib/server/dashboard";
 
 function statusBadge(notification: NotificationDoc, now: Date) {
+  if (notification.kind === "lost_alert") return <Badge variant="destructive">Lost alert</Badge>;
   if (notification.status === "shown") return <Badge variant="outline">Spoken</Badge>;
   if (notification.status === "expired") return <Badge variant="outline">Expired</Badge>;
   if (notification.showAt > now) return <Badge variant="secondary">Scheduled</Badge>;
@@ -46,7 +47,11 @@ export default async function MessagesPage() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                     <span>
-                      {notification.kind === "reminder" ? "Reminder for " : "Message, "}
+                      {notification.kind === "reminder"
+                        ? "Reminder for "
+                        : notification.kind === "lost_alert"
+                          ? "Lost alert, "
+                          : "Message, "}
                       {dayAndTime(notification.showAt, settings.timezone)}
                     </span>
                     {statusBadge(notification, now)}

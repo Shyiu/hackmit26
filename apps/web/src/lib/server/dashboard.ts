@@ -14,7 +14,7 @@ export async function dashboardTenant(path: string) {
   const principal = await principalFromSession((await cookies()).get(SESSION_COOKIE)?.value);
   if (!principal) redirect(`/login?next=${encodeURIComponent(path)}`);
   const patient = await tenantRepos(getDb(), principal.patientId).patient.get();
-  const settings = patient?.settings ?? DEFAULT_PATIENT_SETTINGS;
+  const settings = patient ? { ...DEFAULT_PATIENT_SETTINGS, ...patient.settings } : DEFAULT_PATIENT_SETTINGS;
   const tenant = tenantRepos(getDb(), principal.patientId, { retentionDays: settings.retentionDays });
   return { principal, patient, settings, tenant };
 }

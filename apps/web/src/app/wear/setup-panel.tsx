@@ -9,6 +9,7 @@ import { CameraSelect } from "@/components/wearer/camera-select";
 import { RecordingsList } from "@/components/wearer/recordings-list";
 import { useDisplayMode } from "@/hooks/use-screen";
 import type { WearerClient } from "@/hooks/use-wearer-client";
+import { LOCATION_LABELS } from "@/hooks/use-location-report";
 import { cn } from "@/lib/utils";
 
 const SAMPLE_ANSWER =
@@ -44,7 +45,7 @@ export function SetupPanel({
 }) {
   const displayMode = useDisplayMode();
   const [question, setQuestion] = useState("");
-  const { camera, recorder, voice, perception, wakeLock, live, capturing } = client;
+  const { camera, recorder, voice, perception, wakeLock, live, capturing, location, settings } = client;
   const starting = camera.status === "starting";
   const track = camera.stream?.getVideoTracks()[0];
   const trackSettings = track?.getSettings();
@@ -206,6 +207,14 @@ export function SetupPanel({
             <dd>
               {PERCEPTION_LABELS[perception.status]}
               {perception.framesSent > 0 && `, ${perception.framesSent} frames sent`}
+            </dd>
+            <dt>Location</dt>
+            <dd>{LOCATION_LABELS[location.status]}</dd>
+            <dt>Approved area</dt>
+            <dd>
+              {settings?.geofence
+                ? `within ${settings.geofence.radiusMeters} m of ${settings.geofence.lat.toFixed(4)}, ${settings.geofence.lng.toFixed(4)}`
+                : "not set"}
             </dd>
             <dt>Screen stays on</dt>
             <dd>{!wakeLock.supported ? "not supported" : wakeLock.held ? "yes" : "no"}</dd>

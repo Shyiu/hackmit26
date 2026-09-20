@@ -13,6 +13,12 @@ function isTimeZone(value: string): boolean {
 
 export const hudLevel = z.enum(["everything", "captions", "off"]);
 export const ttsProvider = z.enum(["elevenlabs", "deepgram"]);
+export const geofenceSchema = z.strictObject({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  radiusMeters: z.number().min(20).max(50_000),
+});
+export type Geofence = z.infer<typeof geofenceSchema>;
 
 /** Per-wearer settings the caregiver edits. README "Caregiver dashboard" > Settings. */
 export const patientSettingsSchema = z.strictObject({
@@ -27,6 +33,8 @@ export const patientSettingsSchema = z.strictObject({
   retentionDays: z.int().min(1).max(365),
   /** Observations older than this get the stale wording. */
   staleAfterMinutes: z.int().min(1).max(24 * 60),
+  geofence: geofenceSchema.nullable(),
+  locationStaleAfterMinutes: z.int().min(1).max(24 * 60),
   wakeWordEnabled: z.boolean(),
   wakeWordSensitivity: unitInterval,
 });
@@ -42,6 +50,8 @@ export const DEFAULT_PATIENT_SETTINGS: PatientSettings = {
   recordingAllowed: false,
   retentionDays: 30,
   staleAfterMinutes: 15,
+  geofence: null,
+  locationStaleAfterMinutes: 15,
   wakeWordEnabled: false,
   wakeWordSensitivity: 0.5,
 };
@@ -54,6 +64,17 @@ export const patientDocSchema = z.strictObject({
   settings: patientSettingsSchema,
   /** Bumped by every item, room, or settings write. Caches key on it. */
   configVersion: z.int().nonnegative(),
+  lastLocation: z
+    .strictObject({
+      lat: z.number().min(-90).max(90),
+      lng: z.number().min(-180).max(180),
+      accuracyMeters: z.number().nonnegative().nullable(),
+      capturedAt: z.date(),
+      receivedAt: z.date(),
+      inside: z.boolean().nullable(),
+    })
+    .nullable()
+    .optional(),
   ...timestamps,
 });
 
