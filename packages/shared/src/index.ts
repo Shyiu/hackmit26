@@ -12,3 +12,4 @@ export * from "./signed-token";
 export * from "./device-token";
 export * from "./schemas/settings";
 export * from "./schemas/person";
+export * from "./schemas/scan";
