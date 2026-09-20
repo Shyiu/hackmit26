@@ -1,10 +1,26 @@
 import type { Db } from "mongodb";
 import { parseDocument } from "./errors";
-import { newId, type CaptureSessionId, type DangerEventId, type ItemId, type PatientId, type SightingId } from "./ids";
+import {
+  newId,
+  type CaptureSessionId,
+  type DangerEventId,
+  type FrameObservationId,
+  type ItemId,
+  type PatientId,
+  type PersonId,
+  type SightingId,
+} from "./ids";
 import { collection } from "./registry";
 import type { CaptureSource, ObservationState } from "./schema/common";
 import type { SightingSnapshot } from "./schema/items";
-import { dangerEventDocSchema, type DangerEventDoc } from "./schema/safety";
+import {
+  dangerEventDocSchema,
+  frameObservationDocSchema,
+  personDocSchema,
+  type DangerEventDoc,
+  type FrameObservationDoc,
+  type PersonDoc,
+} from "./schema/safety";
 import { sightingDocSchema, type SightingDoc } from "./schema/sightings";
 import { DEFAULT_PATIENT_SETTINGS } from "./schema/tenancy";
 
@@ -157,4 +173,67 @@ export async function seedDangerEvent(db: Db, input: SeedDangerEvent): Promise<D
   });
   await collection(db, "dangerEvents").insertOne(event);
   return event;
+}
+
+export type SeedPerson = {
+  patientId: PatientId;
+  name: string;
+  relation?: string | null;
+  photos?: number;
+  createdAt?: Date;
+  retentionDays?: number;
+};
+
+/** Writes one enrolled person the way perception's safety/store.py leaves them. For seeds and tests only. */
+export async function seedPerson(db: Db, input: SeedPerson): Promise<PersonDoc> {
+  const createdAt = input.createdAt ?? new Date();
+  const retentionMs = (input.retentionDays ?? DEFAULT_PATIENT_SETTINGS.retentionDays) * DAY_MS;
+  const photos = input.photos ?? 1;
+  const person = parseDocument(personDocSchema, {
+    _id: newId<PersonId>(),
+    patientId: input.patientId,
+    name: input.name,
+    relation: input.relation ?? null,
+    referenceImageKeys: Array.from({ length: photos }, (_, i) => `seed/people/${newId().toHexString()}-${i}.jpg`),
+    faceEmbeddings: Array.from({ length: photos }, () => "gAAAAABseed"),
+    embeddingModel: "seed",
+    consentedAt: createdAt,
+    consentedBy: "seed",
+    createdAt,
+    expiresAt: new Date(createdAt.getTime() + retentionMs),
+  });
+  await collection(db, "people").insertOne(person);
+  return person;
+}
+
+export type SeedFrameObservation = {
+  patientId: PatientId;
+  capturedAt: Date;
+  faces?: { personId: PersonId | null; matchConfidence: number | null }[];
+  retentionDays?: number;
+};
+
+/** Writes one processed frame with the given face matches. For seeds and tests only. */
+export async function seedFrameObservation(db: Db, input: SeedFrameObservation): Promise<FrameObservationDoc> {
+  const retentionMs = (input.retentionDays ?? DEFAULT_PATIENT_SETTINGS.retentionDays) * DAY_MS;
+  const frame = parseDocument(frameObservationDocSchema, {
+    _id: newId<FrameObservationId>(),
+    patientId: input.patientId,
+    deviceId: null,
+    captureSessionId: null,
+    capturedAt: input.capturedAt,
+    imageKey: `seed/frames/${newId().toHexString()}.jpg`,
+    imageWidth: 1280,
+    imageHeight: 720,
+    caption: null,
+    detections: [],
+    faces: (input.faces ?? []).map((face) => ({ bbox: [0.4, 0.3, 0.2, 0.3], confidence: 0.9, ...face })),
+    hazards: [],
+    vlm: { status: "skipped", model: null, confidence: null, observableEvidence: [], error: null },
+    processing: { status: "complete", failedStage: null, error: null, durationMs: 40 },
+    detectorName: "seed",
+    expiresAt: new Date(input.capturedAt.getTime() + retentionMs),
+  });
+  await collection(db, "frameObservations").insertOne(frame);
+  return frame;
 }

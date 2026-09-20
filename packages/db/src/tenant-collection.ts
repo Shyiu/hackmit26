@@ -92,6 +92,10 @@ export class TenantCollection<TDoc extends { patientId: PatientId }> {
     return { doc: result.value, created: result.lastErrorObject?.updatedExisting !== true };
   }
 
+  deleteOne(filter: Filter<TDoc>): Promise<DeleteResult> {
+    return this.collection.deleteOne(this.scope(filter));
+  }
+
   deleteMany(filter: Filter<TDoc>): Promise<DeleteResult> {
     return this.collection.deleteMany(this.scope(filter));
   }
