@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from io import BytesIO
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 import boto3
 from botocore.exceptions import ClientError
@@ -16,6 +16,9 @@ from gridfs.asynchronous import AsyncGridFSBucket
 from gridfs.errors import NoFile
 from PIL import Image
 from pymongo.asynchronous.database import AsyncDatabase
+
+if TYPE_CHECKING:
+    from .config import Settings
 
 
 class KeyframeStore(Protocol):
@@ -103,10 +106,12 @@ def thumb_key(key: str) -> str:
     return f"{key[:-4]}.thumb.jpg" if key.endswith(".jpg") else f"{key}.thumb.jpg"
 
 
-def build_keyframe_store(settings: Any, db: AsyncDatabase[dict[str, Any]]) -> KeyframeStore:
-    if all(
-        getattr(settings, name, None)
-        for name in ("s3_endpoint", "s3_bucket", "s3_access_key_id", "s3_secret_access_key")
+def build_keyframe_store(settings: Settings, db: AsyncDatabase[dict[str, Any]]) -> KeyframeStore:
+    if (
+        settings.s3_endpoint
+        and settings.s3_bucket
+        and settings.s3_access_key_id
+        and settings.s3_secret_access_key
     ):
         return S3KeyframeStore(
             settings.s3_endpoint,

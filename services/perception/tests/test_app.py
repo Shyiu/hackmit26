@@ -540,7 +540,7 @@ def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_fram
         assert job["bbox"] == [0.4, 0.3, 0.2, 0.2]
         assert sighting["keyframeKey"] == job["keyframeKey"]
         assert sighting["thumbKey"] == job["keyframeKey"].removesuffix(".jpg") + ".thumb.jpg"
-        bucket = GridFSBucket(db)
+        bucket = GridFSBucket(db, bucket_name="keyframes")
         assert bucket.open_download_stream_by_name(sighting["keyframeKey"]).read() == JPEG
         assert bucket.open_download_stream_by_name(sighting["thumbKey"]).read()
         ws.send_bytes(_frame(session_id, 4))
