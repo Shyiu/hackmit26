@@ -21,7 +21,7 @@ function isTimeZone(value: string): boolean {
 export const hudLevel = z.enum(["everything", "captions", "off"]);
 export const ttsProvider = z.enum(["elevenlabs", "deepgram"]);
 
-/** Per-wearer settings the caregiver edits. README "Caregiver dashboard" > Settings. */
+/** Per-wearer settings the caregiver edits. PLAN.md "Caregiver dashboard" > Settings. */
 export const patientSettingsSchema = z.strictObject({
   /** IANA zone. "This morning" means the wearer's morning. */
   timezone: z.string().refine(isTimeZone, "Unknown IANA time zone"),
@@ -37,7 +37,7 @@ export const patientSettingsSchema = z.strictObject({
   wakeWordEnabled: z.boolean(),
   wakeWordSensitivity: unitInterval,
   /** Off by default: a recognized face is always a silent notification; this only
-   * adds a short chime on top. Never speech -- see README "Faces, danger, and routines". */
+   * adds a short chime on top. Never speech -- see PLAN.md "Faces, danger, and routines". */
   faceAnnounceSoundEnabled: z.boolean(),
 });
 
@@ -120,7 +120,7 @@ export const deviceDocSchema = z.strictObject({
 
 export type DeviceDoc = z.infer<typeof deviceDocSchema>;
 
-// A caregiver joining an existing wearer, README "What /wear and /sim call on
+// A caregiver joining an existing wearer, PLAN.md "What /wear and /sim call on
 // first run" adjacent: same hash/timing-safe-compare/expiry shape as a device
 // pairing code (see redeemCaregiverPairingCode in ../pairing.ts), but redeemed
 // by a second caregiver's own account instead of minting a device token.

@@ -21,7 +21,7 @@ export function withLiveSnapshots<TItem extends WithSnapshots>(item: TItem, now:
 }
 
 /**
- * What the latest evidence supports saying, per README "What the wearer hears
+ * What the latest evidence supports saying, per PLAN.md "What the wearer hears
  * and sees". Derived on read instead of stored, so perception can't write a
  * status that disagrees with the snapshot next to it.
  */

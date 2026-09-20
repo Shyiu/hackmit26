@@ -133,7 +133,7 @@ export function defineCollection<TSchema extends z.ZodObject>(
 
 /**
  * Every collection, its validator schema, and its indexes. `pnpm db:setup` syncs
- * the database to this object. README "Data model" > "Indexes" explains the list.
+ * the database to this object. PLAN.md "Data model" > "Indexes" explains the list.
  */
 export const collections = {
   patients: defineCollection({

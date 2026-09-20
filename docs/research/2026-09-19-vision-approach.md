@@ -1,6 +1,6 @@
 # Is YOLO the right vision approach for the memory glasses?
 
-Researched 2026-09-19 against the plan in `README.md`. Numbers come from the linked primary sources. Section 7 lists what I could not confirm.
+Researched 2026-09-19 against the plan in `PLAN.md`. Numbers come from the linked primary sources. Section 7 lists what I could not confirm.
 
 ## 1. The answer
 
@@ -321,7 +321,7 @@ Expected API cost is under $0.20 per hour of wear at 60 to 300 keyframes on gpt-
 5. Record put-down events as the primary memory, with last sighting as the fallback. HD-EPIC is the dataset to evaluate against.
 6. Measure what MemPal measured. Wrong-object rate, wrong-location rate and no-detection rate, per item, with people who have dementia.
 
-## 6. Changes to make to README.md
+## 6. Changes to make to PLAN.md
 
 1. **Goals, the MVP paragraph.** Say the three validated objects come from keys, wallet, remote, phone, eyeglasses and mug, chosen by measured recall at M0. Pill organizer, hearing aid, charger and glasses case have no training data in LVIS or Objects365 and wait for later.
 2. **Architecture, the diagram and the pieces table.** Change "YOLOE-26 + tracker" to "detector + label voting". Drop ByteTrack from `services/perception`. Change "open_clip later" to "DINOv2 crop embeddings later".

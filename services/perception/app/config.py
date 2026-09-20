@@ -65,7 +65,7 @@ class Settings(TokenSettings):
     # wearer still looks connected on the dashboard instead of going stale.
     capture_heartbeat_s: float = Field(default=5.0, gt=0.0)
 
-    # From detections to sightings. README "From detections to sightings".
+    # From detections to sightings. PLAN.md "From detections to sightings".
     confirm_frames: int = Field(default=3, ge=1)
     confirm_window_seconds: float = Field(default=2.0, gt=0.0)
     refresh_interval_ms: int = Field(default=500, ge=0)

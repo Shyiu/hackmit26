@@ -48,7 +48,7 @@ export function placeKey(sighting: UsualSpotSample): string | null {
 type Placement = { key: string; lastSeenAt: number; sentence: string };
 
 /**
- * README "usual spots": where the item keeps ending up, counted in placements
+ * PLAN.md "usual spots": where the item keeps ending up, counted in placements
  * rather than sightings so a fragmented track doesn't count twice. Only
  * finished, described, resting sightings qualify; everything else is a vote
  * for "we don't know".

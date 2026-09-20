@@ -3,7 +3,7 @@ import { readBody, withTenant } from "@/lib/server/api";
 import { notificationView } from "@/lib/server/views";
 
 // Optional, after M3. GET: the headset polls for the one message or reminder it
-// should show next. POST: the caregiver queues one. See README "What the HUD shows".
+// should show next. POST: the caregiver queues one. See PLAN.md "What the HUD shows".
 export const GET = withTenant("any", async ({ tenant }) => {
   const next = await tenant.notifications.nextDue();
   return Response.json({ notification: next && notificationView(next) });

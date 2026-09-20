@@ -35,7 +35,7 @@ const timingsShape = {
 export type TimingStage = keyof typeof timingsShape;
 export const TIMING_STAGES = Object.keys(timingsShape) as readonly TimingStage[];
 
-/** One question and its answer, with per-stage timings. README "Data model". */
+/** One question and its answer, with per-stage timings. PLAN.md "Data model". */
 export const interactionDocSchema = z.strictObject({
   _id: idSchema<InteractionId>(),
   patientId: idSchema<PatientId>(),

@@ -1,4 +1,4 @@
-"""From detections to sightings. README "From detections to sightings".
+"""From detections to sightings. PLAN.md "From detections to sightings".
 
 `SightingTracker` follows one capture session's detections across frames with
 ByteTrack's two-stage association: high-confidence detections are matched to

@@ -1,4 +1,4 @@
-"""Turns a sighting's keyframe into a location description. README "Description job".
+"""Turns a sighting's keyframe into a location description. PLAN.md "Description job".
 
 Structured output validates shape, not truth: the model is told to say "unknown"
 rather than infer a room or relation it can't see, and `DescriptionResult`
