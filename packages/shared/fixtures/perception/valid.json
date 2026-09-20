@@ -32,6 +32,30 @@
       ]
     },
     { "type": "detections", "v": 1, "seq": 43, "detections": [] },
+    {
+      "type": "faces",
+      "v": 1,
+      "seq": 42,
+      "faces": [
+        {
+          "personId": "5eed00000000000000000201",
+          "name": "Maria",
+          "relation": "daughter",
+          "bbox": [0.3, 0.2, 0.2, 0.3],
+          "confidence": 0.93,
+          "matchConfidence": 0.71
+        },
+        {
+          "personId": null,
+          "name": null,
+          "relation": null,
+          "bbox": [0.6, 0.25, 0.15, 0.2],
+          "confidence": 0.88,
+          "matchConfidence": 0.12
+        }
+      ]
+    },
+    { "type": "faces", "v": 1, "seq": 43, "faces": [] },
     { "type": "error", "v": 1, "code": "unauthorized", "message": "Token expired" }
   ]
 }

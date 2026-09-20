@@ -19,7 +19,8 @@ export type ServerEnvName =
   | "S3_ACCESS_KEY_ID"
   | "S3_SECRET_ACCESS_KEY"
   | "S3_REGION"
-  | "NEXT_PUBLIC_PERCEPTION_WS_URL";
+  | "NEXT_PUBLIC_PERCEPTION_WS_URL"
+  | "PERCEPTION_URL";
 
 export class MissingEnvError extends Error {
   override name = "MissingEnvError";

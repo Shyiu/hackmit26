@@ -69,6 +69,15 @@ class Settings(TokenSettings):
     face_detector: Literal["mock", "insightface"] = "mock"
     face_embedder: Literal["mock", "insightface"] = "mock"
     insightface_model: str = "buffalo_l"
+    # onnxruntime providers, comma separated. auto takes CUDA or CoreML when onnxruntime has one
+    # and falls back to CPU. On an M-series Mac, CoreML is about 6x faster than CPU.
+    face_providers: str = "auto"
+    # The detector's square input. 640 finds small, far faces; 320 is about 3x faster.
+    face_det_size: int = Field(default=640, ge=160, le=1280)
+    # Only the largest faces are embedded. Each one costs a recognition pass.
+    face_max_per_frame: int = Field(default=4, ge=1)
+    # How long a wearer's decrypted gallery is reused before MongoDB is asked again.
+    face_gallery_ttl_s: float = Field(default=60.0, ge=0)
     face_match_threshold: float = Field(default=0.45, ge=0, le=1)
     face_min_confidence: float = Field(default=0.6, ge=0, le=1)
     face_embedding_key: str | None = Field(default=None, repr=False)

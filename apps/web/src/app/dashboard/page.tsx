@@ -2,7 +2,7 @@ import { locationStatus, type LocationStatus } from "@memory-glasses/db";
 import {
   BarChart3,
   Clock,
-  DoorOpen,
+  ScanFace,
   Glasses,
   Hand,
   KeyRound,
@@ -70,7 +70,7 @@ export default async function DashboardHomePage() {
         <div className="grid grid-cols-3 gap-3">
           <Tile href="/dashboard/questions" title="Questions" icon={MessageCircleQuestion} tone="sky" size="small" />
           <Tile href="/dashboard/messages" title="Messages" icon={MessageSquareHeart} tone="butter" size="small" />
-          <Tile href="/dashboard/rooms" title="Rooms" icon={DoorOpen} tone="mint" size="small" />
+          <Tile href="/dashboard/people" title="Faces" icon={ScanFace} tone="mint" size="small" />
         </div>
         <ShortcutStrip shortcuts={SHORTCUTS} />
       </section>
