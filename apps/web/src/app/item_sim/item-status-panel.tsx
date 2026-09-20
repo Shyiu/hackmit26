@@ -1,21 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { Detection } from "@memory-glasses/shared";
+import type { ItemStatus } from "@/hooks/use-item-statuses";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_LABELS, STATUS_VARIANTS, whereLine } from "@/lib/item-status";
 import { relativeTime } from "@/lib/relative-time";
 import { cn } from "@/lib/utils";
-
-type ItemStatus = {
-  _id: string;
-  name: string;
-  active: boolean;
-  locationStatus: "observed" | "held" | "moved" | "uncertain" | "unseen";
-  lastSighting: { sentence: string | null; state: string; descriptionStatus: string; lastSeenAt: string } | null;
-};
-
-const POLL_MS = 1500;
 
 // Descriptions run in the background, so a fresh sighting shows here before
 // its sentence does. This turns "pending" into a live progress step instead
@@ -27,37 +17,17 @@ function descriptionLine(item: ItemStatus): string | null {
   return null;
 }
 
-/** Polls /api/items so a dev can watch a sighting go from detected to logged, without asking a question. */
-export function ItemStatusPanel({ detections }: { detections: Detection[] }) {
-  const [items, setItems] = useState<ItemStatus[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+/** Shows /api/items state so a dev can watch a sighting go from detected to logged, without asking a question. */
+export function ItemStatusPanel({
+  detections,
+  items,
+  error,
+}: {
+  detections: Detection[];
+  items: ItemStatus[] | null;
+  error: string | null;
+}) {
   const seenNow = new Set(detections.map((detection) => detection.itemId));
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const response = await fetch("/api/items", { cache: "no-store" });
-        if (cancelled) return;
-        if (!response.ok) {
-          setError(response.status === 401 ? "Sign in to see item status." : `Couldn't load items (${response.status}).`);
-          return;
-        }
-        const body = (await response.json()) as { items: ItemStatus[] };
-        if (cancelled) return;
-        setError(null);
-        setItems(body.items.filter((item) => item.active));
-      } catch {
-        if (!cancelled) setError("Couldn't reach the server.");
-      }
-    }
-    void load();
-    const timer = window.setInterval(() => void load(), POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
 
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (!items) return <p className="text-sm text-muted-foreground">Loading items…</p>;

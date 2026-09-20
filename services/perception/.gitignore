@@ -4,6 +4,8 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .env
-# Downloaded model checkpoints (YOLOE-26 etc.), not committed
+# Downloaded model checkpoints (YOLOE-26, the CLIP text encoder's mobileclip
+# weights, etc.), not committed
 *.pt
+*.ts
 data/

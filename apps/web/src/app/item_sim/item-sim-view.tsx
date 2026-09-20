@@ -6,11 +6,13 @@ import { Mic } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CameraSelect } from "@/components/wearer/camera-select";
-import { Hud, ItemLabels, StallCard } from "@/components/wearer/hud";
+import { Hud, StallCard } from "@/components/wearer/hud";
 import { LiveVideo } from "@/components/wearer/live-video";
+import { useItemStatuses } from "@/hooks/use-item-statuses";
 import { useVideoAspect } from "@/hooks/use-video-frames";
 import { useWearerClient } from "@/hooks/use-wearer-client";
 import { cn } from "@/lib/utils";
+import { DetectionLegend, DetectionOverlay } from "./detection-overlay";
 import { ItemStatusPanel } from "./item-status-panel";
 
 // A capture-path view like /sim's (see CLAUDE.md: a client feature added to
@@ -19,14 +21,23 @@ import { ItemStatusPanel } from "./item-status-panel";
 // and trims the question box down to typed-only, and adds the status panel
 // below so a dev can watch perception.detections and /api/items agree that an
 // item was actually seen and logged, without needing to ask a question.
+//
+// Unlike /wear and /sim, this is a dev tool with nobody to consent to a
+// resumed stream, so there's no pause/resume step: it starts the camera and
+// immediately turns capture on, and autoResumeOnReconnect keeps it on through
+// a socket drop instead of forcing an explicit re-resume.
 export function ItemSimView() {
-  const client = useWearerClient({ turnMode: "hold" });
+  const client = useWearerClient({ turnMode: "hold", autoResumeOnReconnect: true });
   const { camera, hud, voice, perception, live, capturing } = client;
   const aspect = useVideoAspect(client.video);
   const [question, setQuestion] = useState("");
+  const { items, error: itemsError, fetchedAt } = useItemStatuses();
 
-  const startOnMount = useEffectEvent(() => void client.start());
-  useEffect(() => startOnMount(), []);
+  const startOnMount = useEffectEvent(async () => {
+    await client.start();
+    client.resume();
+  });
+  useEffect(() => void startOnMount(), []);
 
   function submitQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,7 +67,7 @@ export function ItemSimView() {
 
       <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: aspect }}>
         <LiveVideo stream={camera.stream} onElement={client.setVideo} className="absolute inset-0 size-full object-contain" />
-        <ItemLabels detections={perception.detections} />
+        <DetectionOverlay detections={perception.detections} items={items} fetchedAt={fetchedAt} />
         <Hud
           className="inset-x-[6%] text-[0.85rem] sm:text-base"
           message={hud.message}
@@ -71,20 +82,17 @@ export function ItemSimView() {
         {client.stalled && <StallCard />}
       </div>
 
+      <DetectionLegend />
+
       <p className="min-h-6 text-sm text-muted-foreground" aria-live="polite">
         {status}
       </p>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button size="lg" variant={capturing ? "outline" : "default"} disabled={!live} onClick={capturing ? client.pause : client.resume}>
-          {capturing ? "Pause capture" : "Resume capture"}
-        </Button>
-        <CameraSelect
-          cameras={camera.cameras}
-          activeDeviceId={camera.stream?.getVideoTracks()[0]?.getSettings().deviceId}
-          onChange={client.changeCamera}
-        />
-      </div>
+      <CameraSelect
+        cameras={camera.cameras}
+        activeDeviceId={camera.stream?.getVideoTracks()[0]?.getSettings().deviceId}
+        onChange={client.changeCamera}
+      />
 
       <form onSubmit={submitQuestion} className="flex gap-2">
         <Input
@@ -108,7 +116,7 @@ export function ItemSimView() {
 
       <div>
         <h2 className="mb-2 text-lg font-semibold tracking-tight">Item status</h2>
-        <ItemStatusPanel detections={perception.detections} />
+        <ItemStatusPanel detections={perception.detections} items={items} error={itemsError} />
       </div>
     </div>
   );
