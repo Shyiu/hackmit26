@@ -25,6 +25,12 @@ export const createNotificationSchema = notificationSchema
   .extend({ showAt: z.string().datetime({ offset: true }).pipe(z.coerce.date()).optional() })
   .strict();
 
+// Alert and recognized-person kinds are written by the system, not a caregiver
+// form, so the POST route accepts only the two human-authored kinds.
+export const caregiverNotificationSchema = createNotificationSchema.extend({
+  kind: z.enum(["caregiver_message", "reminder"]),
+});
+
 export type NotificationKind = z.infer<typeof notificationKindSchema>;
 export type NotificationStatus = z.infer<typeof notificationStatusSchema>;
 export type WearerNotification = z.infer<typeof notificationSchema>;
