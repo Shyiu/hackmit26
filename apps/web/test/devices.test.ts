@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { POST as pair } from "@/app/api/devices/pair/route";
 import { POST as createPairingCode } from "@/app/api/devices/pairing-codes/route";
 import { POST as revoke } from "@/app/api/devices/[id]/revoke/route";
+import { GET as getInteraction } from "@/app/api/interactions/[id]/route";
 import { GET as getSettings } from "@/app/api/settings/route";
 import { DEVICE_COOKIE } from "@/lib/server/auth";
 import { call, newHousehold, openRouteDb } from "./helpers";
@@ -49,11 +50,16 @@ describe("device pairing", () => {
     expect(settings.status).toBe(200);
     expect((await settings.json()).settings).toMatchObject({ timezone: "America/New_York" });
 
-    const foreignSettings = await call(getSettings, {
-      path: "/api/settings",
-      auth: { deviceCookie: deviceCookie!, patientHeader: b.patient._id.toHexString() },
+    const foreignInteraction = await b.repos.interactions.begin({
+      requestId: "foreign-device-scope",
+      transcript: "where are my keys?",
     });
-    expect(foreignSettings.status).toBe(200);
+    const foreignResponse = await call(getInteraction, {
+      path: `/api/interactions/${foreignInteraction.interaction._id.toHexString()}`,
+      params: { id: foreignInteraction.interaction._id.toHexString() },
+      auth: { deviceCookie: deviceCookie! },
+    });
+    expect(foreignResponse.status).toBe(404);
     expect(await a.repos.devices.list()).toHaveLength(2);
   });
 
