@@ -7,6 +7,7 @@
     "start": "bash scripts/start.sh",
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
+    "vercel-build": "tsx scripts/db-setup.ts --if-configured && pnpm build",
     "lint": "pnpm --filter web lint",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck && tsc --noEmit",
