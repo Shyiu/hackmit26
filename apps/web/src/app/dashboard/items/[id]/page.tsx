@@ -1,6 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
 import { locationStatus, parseId, type ItemId } from "@memory-glasses/db";
-import { STATIC_SCAN_SCENE_ID } from "@memory-glasses/shared";
 import { ImageOff, Map as MapIcon, Volume2 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -20,14 +19,6 @@ import { relativeTime } from "@/lib/relative-time";
 import { composeAnswer } from "@/lib/server/answer";
 import { dashboardTenant } from "@/lib/server/dashboard";
 import { sightingPhrase, stateWords } from "@/lib/sighting-words";
-
-// The live scan wins when it saw the item after the bundled room scan did.
-function scanMode(pins: Array<{ sceneId: string; seenAt: Date }>): "static" | "live" {
-  const roomPin = pins.find((pin) => pin.sceneId === STATIC_SCAN_SCENE_ID);
-  return pins.some((pin) => pin.sceneId !== STATIC_SCAN_SCENE_ID && (!roomPin || pin.seenAt > roomPin.seenAt))
-    ? "live"
-    : "static";
-}
 
 export default async function ItemPage({ params }: PageProps<"/dashboard/items/[id]">) {
   const { id } = await params;
@@ -133,7 +124,7 @@ export default async function ItemPage({ params }: PageProps<"/dashboard/items/[
           )}
           <ScanPanel
             compact
-            mode={scanMode(pins)}
+            mode="auto"
             focusItemId={item._id.toHexString()}
             className="aspect-[4/5] max-w-3xl sm:aspect-[16/10]"
           />
