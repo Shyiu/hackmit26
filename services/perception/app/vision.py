@@ -70,10 +70,16 @@ class DescriptionVLM(Protocol):
 
 
 class MockDescriptionVLM:
-    """No OpenAI key configured. An honest "I don't know" beats a made-up room."""
+    """No OpenAI key configured. An honest description beats a made-up room."""
 
     def describe(self, image: bytes, bbox: BBox, label: str | None) -> DescriptionResult:
-        return DescriptionResult(state="unknown", sentence="I saw it, but I could not tell where it was.")
+        return DescriptionResult(
+            state="unknown",
+            sentence=(
+                f"in view of the camera (mock description of your {label or 'item'}; "
+                "no vision model configured)"
+            ),
+        )
 
 
 class OpenAIDescriptionVLM:

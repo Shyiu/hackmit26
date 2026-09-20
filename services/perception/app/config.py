@@ -38,6 +38,13 @@ class Settings(TokenSettings):
     worker_id: str = Field(default_factory=default_worker_id, min_length=1, max_length=100)
     # How long the description worker sleeps after finding no due job.
     description_poll_interval_s: float = Field(default=1.0, gt=0.0)
+    s3_endpoint: str | None = None
+    s3_bucket: str | None = None
+    s3_access_key_id: str | None = Field(default=None, repr=False)
+    s3_secret_access_key: str | None = Field(default=None, repr=False)
+    s3_region: str = "us-east-1"
+    keyframe_interval_s: float = Field(default=10.0, ge=0.0)
+    description_worker: bool = True
 
     # The detector. "auto" runs YOLOE when ultralytics and the checkpoint are on
     # this machine and falls back to NullDetector otherwise, so the service boots anywhere.

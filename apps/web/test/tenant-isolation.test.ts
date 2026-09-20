@@ -1,4 +1,6 @@
 import { seedDangerEvent, seedObservation } from "@memory-glasses/db/observations";
+import { ObjectId } from "@memory-glasses/db";
+import { GridFSBucket } from "mongodb";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { GET as getCapture } from "@/app/api/capture/route";
 import { POST as postAcknowledged } from "@/app/api/danger-events/[id]/acknowledged/route";
@@ -15,6 +17,8 @@ import { PATCH as patchRoom } from "@/app/api/rooms/[id]/route";
 import { GET as listRooms } from "@/app/api/rooms/route";
 import { GET as getSettings, PATCH as patchSettings } from "@/app/api/settings/route";
 import { GET as listSightings } from "@/app/api/sightings/route";
+import { GET as getKeyframe } from "@/app/api/sightings/[id]/keyframe/route";
+import { GET as getThumb } from "@/app/api/sightings/[id]/thumb/route";
 import { call, newHousehold, openRouteDb } from "./helpers";
 
 // Two households, A and B. Everything B's caregiver or device tries against A's
@@ -38,6 +42,24 @@ describe("API tenant isolation", () => {
       state: "resting",
       description: { status: "ready", sentence: "on the hook", room: "hall" },
     });
+    const keyframeKey = `test/${sighting._id.toHexString()}.jpg`;
+    const thumbKey = `test/${sighting._id.toHexString()}.thumb.jpg`;
+    await env.db.collection("sightings").updateOne(
+      { _id: sighting._id },
+      { $set: { keyframeKey, thumbKey } },
+    );
+    const bucket = new GridFSBucket(env.db, { bucketName: "keyframes" });
+    for (const [key, bytes] of [
+      [keyframeKey, Buffer.from("keyframe bytes")],
+      [thumbKey, Buffer.from("thumb bytes")],
+    ] as const) {
+      const upload = bucket.openUploadStream(key);
+      await new Promise<void>((resolve, reject) => {
+        upload.once("error", reject);
+        upload.once("finish", () => resolve());
+        upload.end(bytes);
+      });
+    }
     const { interaction } = await a.repos.interactions.begin({ requestId: "a-1", transcript: "where are my keys" });
     const notification = await a.repos.notifications.create({ kind: "caregiver_message", text: "Lunch is ready" });
     const room = await a.repos.rooms.create({ name: "Kitchen" });
@@ -58,6 +80,58 @@ describe("API tenant isolation", () => {
   afterAll(() => env.close());
 
   const asB = () => ({ cookie: b.cookie });
+  const asA = () => ({ cookie: a.cookie });
+
+  it("serves keyframes only to the sighting's caregiver", async () => {
+    const foreignKeyframe = await call(getKeyframe, {
+      path: `/api/sightings/${ids.sighting}/keyframe`,
+      params: { id: ids.sighting },
+      auth: asB(),
+    });
+    expect(foreignKeyframe.status).toBe(404);
+    const foreignThumb = await call(getThumb, {
+      path: `/api/sightings/${ids.sighting}/thumb`,
+      params: { id: ids.sighting },
+      auth: asB(),
+    });
+    expect(foreignThumb.status).toBe(404);
+
+    const keyframe = await call(getKeyframe, {
+      path: `/api/sightings/${ids.sighting}/keyframe`,
+      params: { id: ids.sighting },
+      auth: asA(),
+    });
+    expect(keyframe.status).toBe(200);
+    expect(keyframe.headers.get("content-type")).toContain("image/jpeg");
+    expect(Buffer.from(await keyframe.arrayBuffer()).toString()).toBe("keyframe bytes");
+
+    const thumb = await call(getThumb, {
+      path: `/api/sightings/${ids.sighting}/thumb`,
+      params: { id: ids.sighting },
+      auth: asA(),
+    });
+    expect(thumb.status).toBe(200);
+    expect(Buffer.from(await thumb.arrayBuffer()).toString()).toBe("thumb bytes");
+
+    await env.db.collection("sightings").updateOne(
+      { _id: new ObjectId(ids.sighting) },
+      { $set: { keyframeKey: null, thumbKey: null } },
+    );
+    expect(
+      (await call(getKeyframe, {
+        path: `/api/sightings/${ids.sighting}/keyframe`,
+        params: { id: ids.sighting },
+        auth: asA(),
+      })).status,
+    ).toBe(404);
+    expect(
+      (await call(getThumb, {
+        path: `/api/sightings/${ids.sighting}/thumb`,
+        params: { id: ids.sighting },
+        auth: asA(),
+      })).status,
+    ).toBe(404);
+  });
 
   it("lists show only the caller's own records", async () => {
     const items = await (await call(listItems, { path: "/api/items", auth: asB() })).json();

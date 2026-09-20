@@ -14,7 +14,7 @@ import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from .safety.images import LocalFrameStore
+from .keyframes import KeyframeStore
 from .store import ObservationStore
 from .vision import DescriptionVLM
 
@@ -25,7 +25,7 @@ class DescriptionWorker:
     def __init__(
         self,
         store: ObservationStore,
-        frame_store: LocalFrameStore,
+        keyframes: KeyframeStore,
         vlm: DescriptionVLM,
         worker_id: str,
         *,
@@ -33,7 +33,7 @@ class DescriptionWorker:
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._store = store
-        self._frame_store = frame_store
+        self._keyframes = keyframes
         self._vlm = vlm
         self._worker_id = worker_id
         self._poll_interval = poll_interval
@@ -59,7 +59,7 @@ class DescriptionWorker:
             return False
         try:
             label = await self._store.item_name(job.patient_id, job.item_id)
-            image = await asyncio.to_thread(self._frame_store.get, job.keyframe_key)
+            image = await self._keyframes.get(job.keyframe_key)
             result = await asyncio.to_thread(self._vlm.describe, image, job.bbox, label)
         except Exception as error:
             outcome = await self._store.fail_job(job, self._worker_id, str(error), self._clock())

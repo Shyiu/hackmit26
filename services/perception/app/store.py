@@ -511,6 +511,8 @@ class ObservationStore:
         keyframe_key: str,
         bbox: BBox,
         now: datetime,
+        *,
+        thumb_key: str | None = None,
     ) -> DescriptionJob | None:
         """Queues a keyframe for the vision model. None if the wearer's queue is full or the sighting is gone.
 
@@ -526,7 +528,10 @@ class ObservationStore:
             return None
         sighting = await self._sightings.find_one_and_update(
             {"_id": sighting_id, "patientId": patient_id, "itemId": item_id},
-            {"$inc": {"keyframeRevision": 1}, "$set": {"keyframeKey": keyframe_key}},
+            {
+                "$inc": {"keyframeRevision": 1},
+                "$set": {"keyframeKey": keyframe_key, "thumbKey": thumb_key},
+            },
             projection={"keyframeRevision": 1, "expiresAt": 1},
             return_document=ReturnDocument.AFTER,
         )
@@ -537,7 +542,10 @@ class ObservationStore:
         for field in ("lastSighting", "lastRestingSighting"):
             await self._items.update_one(
                 {"_id": item_id, "patientId": patient_id, f"{field}.sightingId": sighting_id},
-                {"$max": {f"{field}.keyframeRevision": revision}},
+                {
+                    "$max": {f"{field}.keyframeRevision": revision},
+                    "$set": {f"{field}.thumbKey": thumb_key},
+                },
             )
         await self._jobs.update_many(
             {

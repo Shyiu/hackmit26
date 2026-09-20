@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import { locationStatus, parseId, type ItemId } from "@memory-glasses/db";
 import { ImageOff, Volume2 } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -96,10 +97,24 @@ export default async function ItemPage({ params }: PageProps<"/dashboard/items/[
                   key={sighting._id.toHexString()}
                   className="flex gap-3 px-3 py-2.5 transition-colors hover:bg-row-hover"
                 >
-                  {/* Keyframe thumbnails need signed URLs, which aren't built yet. */}
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                    <ImageOff className="size-4" aria-label="No thumbnail yet" />
-                  </div>
+                  {sighting.thumbKey || sighting.keyframeKey ? (
+                    <a
+                      href={`/api/sightings/${sighting._id.toHexString()}/keyframe`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block size-10 shrink-0 overflow-hidden rounded-md bg-muted"
+                    >
+                      <img
+                        src={`/api/sightings/${sighting._id.toHexString()}/${sighting.thumbKey ? "thumb" : "keyframe"}`}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    </a>
+                  ) : (
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                      <ImageOff className="size-4" aria-label="No thumbnail yet" />
+                    </div>
+                  )}
                   <div className="flex min-w-0 flex-col gap-0.5">
                     <p className="text-sm font-medium first-letter:uppercase">{sightingPhrase(sighting)}</p>
                     <p className="text-xs text-muted-foreground">

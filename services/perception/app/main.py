@@ -12,7 +12,7 @@ import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from bson import ObjectId
@@ -26,6 +26,7 @@ from starlette.requests import HTTPConnection
 from .config import Settings
 from .description_worker import DescriptionWorker
 from .detector import Detector, Prompts, build_detector
+from .keyframes import KeyframeStore, build_keyframe_store
 from .prompts import PromptCache
 from .protocol import (
     CaptureCommand,
@@ -76,6 +77,7 @@ class Services:
     store: ObservationStore
     detector: Detector
     frame_store: LocalFrameStore
+    keyframe_store: KeyframeStore
     prompts: PromptCache
     token_clock: Callable[[], float]
     safety: SafetyService | None = None
@@ -91,6 +93,7 @@ def create_app(
     *,
     detector: Detector | None = None,
     safety_adapters: Adapters | None = None,
+    keyframe_store: KeyframeStore | None = None,
     token_clock: Callable[[], float] = time.time,
 ) -> FastAPI:
     """Settings default to the environment. Tests pass their own, and a clock for token expiry."""
@@ -107,6 +110,7 @@ def create_app(
         db = client[resolved.mongodb_db]
         store = ObservationStore(db)
         frame_store = LocalFrameStore(resolved.frame_image_dir)
+        resolved_keyframe_store = keyframe_store or build_keyframe_store(resolved, db)
         prompts = PromptCache(store, resolved.prompt_refresh_seconds)
         safety = None
         if resolved.safety_enabled:
@@ -126,21 +130,31 @@ def create_app(
                 },
             )
         app.state.services = Services(
-            resolved, store, detector or build_detector(resolved), frame_store, prompts, token_clock, safety
-        )
-        description_worker = DescriptionWorker(
+            resolved,
             store,
+            detector or build_detector(resolved),
             frame_store,
-            build_description_vlm(resolved),
-            resolved.worker_id,
-            poll_interval=resolved.description_poll_interval_s,
+            resolved_keyframe_store,
+            prompts,
+            token_clock,
+            safety,
         )
-        description_task = asyncio.create_task(description_worker.run_forever())
+        description_task = None
+        if resolved.description_worker:
+            description_worker = DescriptionWorker(
+                store,
+                resolved_keyframe_store,
+                build_description_vlm(resolved),
+                resolved.worker_id,
+                poll_interval=resolved.description_poll_interval_s,
+            )
+            description_task = asyncio.create_task(description_worker.run_forever())
         try:
             yield
         finally:
-            description_task.cancel()
-            await asyncio.gather(description_task, return_exceptions=True)
+            if description_task is not None:
+                description_task.cancel()
+                await asyncio.gather(description_task, return_exceptions=True)
             await client.close()
 
     app = FastAPI(title="memory glasses perception", lifespan=lifespan)
@@ -267,7 +281,8 @@ async def frames_socket(ws: WebSocket) -> None:
         session_id=session_id,
         device_id=device_id,
         source=source,
-        frame_store=services.frame_store,
+        keyframe_store=services.keyframe_store,
+        keyframe_interval=timedelta(seconds=services.settings.keyframe_interval_s),
     )
     connection.prompts = prompts
     await connection.run()
@@ -389,6 +404,7 @@ class FrameConnection:
             await asyncio.gather(worker, return_exceptions=True)
             try:
                 if self.writer is not None:
+                    await self.writer.drain()
                     await self.writer.apply(self.tracker.close_all())
                 # Ending cancels the wearer's queued description work, the same as a pause.
                 await self.store.set_capture_state(self.patient_id, self.session_id, "ended")
