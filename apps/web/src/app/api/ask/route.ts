@@ -36,7 +36,7 @@ export const POST = withTenant("any", async ({ request, principal, tenant, setti
     // "Who is this" is about the most recently recognized face, not an item -- skip
     // the item-lookup index entirely rather than resolving it and discarding the result.
     const answer = isWhoIsThisQuestion(body.transcript)
-      ? composeWhoIsThisAnswer(await getLastSeenPerson(principal.patientId), new Date())
+      ? composeWhoIsThisAnswer(await getLastSeenPerson(tenant), new Date())
       : composeAnswer(await tenant.items.resolve(body.transcript), settings, new Date());
     const lookupMs = performance.now() - lookupStarted;
     const outcome = { path: "fast" as const, itemId: answer.itemId, answerTemplate: answer.template, answerText: answer.text };

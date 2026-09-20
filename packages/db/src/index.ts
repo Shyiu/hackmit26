@@ -43,6 +43,7 @@ export type { ItemPatch, ItemResolution, NewItem } from "./repos/items";
 export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/interactions";
 export type { NewNotification } from "./repos/notifications";
 export type { DangerEventQuery } from "./repos/danger-events";
+export type { PersonPatch, PublicPerson, RecognizedPerson } from "./repos/people";
 export type { SightingQuery } from "./repos/sightings";
 
 export * from "./schema/common";
