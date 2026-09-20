@@ -1,4 +1,4 @@
-# Memory glasses (working title)
+# Memoir (working title)
 
 A wearable camera that remembers where things are, notices when someone's about to forget something, and watches for danger, for people living with dementia.
 
@@ -6,7 +6,7 @@ The wearer asks out loud, "Where are my keys?" About a second later they hear, "
 
 The product belongs on glasses, and Ray-Ban Meta was the platform we planned around. We can't get a pair for the hackathon, and a 3D-printed VR headset was tried on paper and dropped. So this build runs on a phone worn on the chest. Its rear camera faces forward and streams what's in front of the wearer, the phone records that view, and answers come back as speech in the wearer's ear. Item labels draw on the wearer's own screen; the caregiver dashboard gets no camera stream. Ray-Ban Meta stays in the plan as a second client on the same contract, for when we have the hardware.
 
-**Status: early build.** The database is built: `packages/db` holds the MongoDB schemas, validators, indexes, and repositories, tested against a real MongoDB. The API routes read and write through it behind a caregiver login and device tokens. `/wear` is the chest page: a dim screen where a tap anywhere asks a question. Speech to text runs on Deepgram when `DEEPGRAM_API_KEY` is set and falls back to the browser's recognizer when it isn't. `POST /api/ask` answers from the item snapshots, the answer is spoken with the browser's speech synthesis at the wearer's rate and shown as a caption, and playback timing goes back to the server. Server TTS (ElevenLabs PCM streaming) isn't built. The page streams 1280 px JPEG frames to the perception socket at 3 fps when capture is resumed, and speaks queued caregiver messages. `/sim` runs the same client on a flat page with hold-to-ask and a typed question. The caregiver dashboard is built for phones and desktops: items, item detail and editing, questions, capture status, messages, rooms, latency, settings. It carries no camera stream ([ADR 0005](docs/decisions/0005-no-live-camera-stream-on-the-caregiver-dashboard.md)). `apps/ios` is a Capacitor shell that loads the deployed web app ([ADR 0004](docs/decisions/0004-ios-shell-with-capacitor.md)). `services/perception` is a skeleton: its frame socket authenticates and answers each frame with empty detections, and its database write path is built and tested, but no detector runs, so the capture page has no labels to draw yet. Face matching, danger detection, geofencing, and the routine/reminder engine described below are freshly scoped for this MVP and nothing for them is built yet. This README is still the build plan, so edit it freely.
+**Status: early build.** The database is built: `packages/db` holds the MongoDB schemas, validators, indexes, and repositories, tested against a real MongoDB. The API routes read and write through it behind caregiver sessions and device tokens. Caregivers sign up at `/signup`, which creates their account (scrypt password hash) and one wearer for their family; the seeded demo caregiver still signs in with `CAREGIVER_EMAIL` and `CAREGIVER_PASSWORD`. `/wear` is the chest page: a dim screen where a tap anywhere asks a question. Speech to text runs on Deepgram when `DEEPGRAM_API_KEY` is set and falls back to the browser's recognizer when it isn't. `POST /api/ask` answers from the item snapshots. With `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` set, the answer streams back as 24 kHz PCM from ElevenLabs Flash v2.5 behind the `TTSProvider` seam in `apps/web/src/lib/server/tts/`, the phone plays it chunk by chunk and polls the interaction for the caption, and `pnpm bench:tts` measures time to first audio; without a key the route returns JSON and the browser's speech synthesis speaks it at the wearer's rate. Either way the answer is shown as a caption and playback timing goes back to the server. The page streams 1280 px JPEG frames to the perception socket at 3 fps when capture is resumed, and speaks queued caregiver messages. `/sim` runs the same client on a flat page with hold-to-ask and a typed question. The caregiver dashboard is built for phones and desktops: items, item detail and editing, questions, capture status, messages, faces, alerts, latency, settings. The Faces page (`/dashboard/people`) enrolls people from photos through `/api/people`, which proxies to the perception service, and shows when the camera last matched each one; it took the Rooms slot in the nav for testing, and the rooms page is still at `/dashboard/rooms`. `apps/ios` is a Capacitor shell that loads the deployed web app ([ADR 0004](docs/decisions/0004-ios-shell-with-capacitor.md)). `services/perception` runs YOLOE-26 on each frame with the wearer's item names as prompts when its model assets are on disk (`NullDetector` otherwise), tracks detections across frames, and writes sightings. The caregiver side carries no camera stream ([ADR 0005](docs/decisions/0005-no-live-camera-stream-on-the-caregiver-dashboard.md)): `/dashboard/live` is a 3D render of the house built from stored sightings, and item labels draw on the wearer's own screen. The same service has face enrollment and matching and single-frame hazard events (`people`, `danger_events`) behind mock adapters by default. Geofencing and the routine/reminder engine described below are freshly scoped for this MVP and nothing for them is built yet. This README is still the build plan, so edit it freely.
 
 ## The problem
 
@@ -139,7 +139,7 @@ Two deployable pieces for the hackathon, and a third later:
 | Piece | Stack | Job |
 |---|---|---|
 | `apps/web` | Next.js App Router, TypeScript, Tailwind, shadcn/ui, MongoDB Node driver | The `/wear` chest page, the flat `/sim` fallback, the caregiver dashboard, the REST API, the `/api/ask` voice endpoint, the routine evaluator, and Web Push for danger/lost alerts |
-| `services/perception` | Python, FastAPI, Ultralytics YOLOE-26, ByteTrack, pymongo, a face embedding model | Takes frames, detects and tracks items, matches faces against enrolled people, checks hand/hazard overlap, sends detections back to the capture page, writes sightings and danger events, requests scene descriptions |
+| `services/perception` | Python, FastAPI, pymongo, optional detector/face/VLM adapters | Takes frames, detects and tracks items, matches faces against enrolled people, writes sightings, frame observations, and conservative danger events |
 | `apps/ios` | Capacitor 8 (Swift Package Manager), later Swift, ARKit, Meta DAT, AVAudioEngine | Today a WKWebView that loads the deployed web app from `CAP_SERVER_URL`, grants the camera and mic to that origin only, and keeps the screen on. Native capture with the screen locked, hardware-button push-to-talk, a local wake word, and the Ray-Ban Meta client get added here in Swift. See ADR 0004 |
 
 One design rule makes the latency goal reachable. **Do the expensive work when an item is seen, not when it's asked about.** Vision descriptions and optional room classification/embeddings happen at write time in the background. Once enrichment finishes, the answer is one indexed read away. Earlier questions get a conservative pending-description answer.
@@ -428,6 +428,7 @@ The built schemas live in `packages/db/src/schema/`, one zod schema per collecti
 - Three collections the sketch leaves out: `capture_sessions`, one per frame socket connection, paused or live, for the dashboard badge; `description_jobs`, the keyframe queue with leases, retries, and supersession; and `meta`, the schema fingerprint `db:setup` last applied.
 - `caregivers` is one row per real account. A caregiver owns exactly one `patientId` in the MVP; a `caregiver_patients` join table for multiple caregivers per wearer, or one caregiver watching several wearers, is a follow-on and not required for the demo. There's no cross-pair sharing anywhere in the schema: every query, index, and background job is keyed on `patientId`, so a second family's data is structurally unreachable from the first family's session or device token, not just filtered out by convention.
 - `devices` rows are created by redeeming a short-lived pairing code the caregiver generates on the dashboard, not by sharing the caregiver's login. `/wear` and `/sim` prompt for that code once, on first run, and store the resulting device token the same way they already store the camera choice.
+- The perception safety MVP adds `frame_observations`, encrypted `people.faceEmbeddings`, conservative `danger_events` fields, and `notifications.dangerEventId`; these are single-frame evidence records rather than proof of an emergency.
 
 Indexes, as declared in `packages/db/src/registry.ts`:
 
@@ -443,6 +444,7 @@ Indexes, as declared in `packages/db/src/registry.ts`:
 | `sightings` | Atlas Search on `searchText` | the text half of `$rankFusion`, optional |
 | `room_refs` | vector on `embedding`, filter `patientId` | room classification, optional |
 | `room_refs` | `{ patientId: 1, roomId: 1 }` | a room's reference frames |
+| `frame_observations` | `{ patientId: 1, capturedAt: -1 }` | recent frame observations |
 | `interactions` | unique `{ patientId: 1, requestId: 1 }` | request deduplication |
 | `interactions` | `{ patientId: 1, askedAt: -1 }` | question log, latency percentiles |
 | `description_jobs` | `{ status: 1, runAfter: 1 }` | claiming due jobs and expired leases |
@@ -548,7 +550,7 @@ Next.js:
 
 | Route | Does |
 |---|---|
-| `POST /api/ask` | Takes `{ transcript, requestId }`, returns `X-Interaction-Id` before streaming audio; deduplicates by wearer and request ID. Until TTS lands it returns the interaction as JSON |
+| `POST /api/ask` | Takes `{ transcript, requestId }`, returns `X-Interaction-Id` and `Server-Timing` before the body; deduplicates by wearer and request ID. With a TTS provider configured the body is streamed `audio/pcm` (s16le, mono, 24 kHz, declared in `X-Audio-*` headers) and the text is polled from `GET /api/interactions/:id`; with none, or when the provider refuses the request, it returns the interaction as JSON |
 | `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout` | Real caregiver accounts. Signup creates the caregiver and their patient profile together; login sets a signed session cookie scoped to that `patientId` |
 | `POST /api/devices/pair` | Redeems a caregiver-generated pairing code for a device token scoped to the caregiver's `patientId`. What `/wear` and `/sim` call on first run instead of sharing the caregiver's login |
 | `GET /api/health` | Unauthenticated. Whether the database answers and its validators are current |
@@ -558,6 +560,7 @@ Next.js:
 | `GET /api/perception/token` | Mints a short-lived token for the frame socket. A browser can't set headers on a WebSocket, so the page sends it as the first message |
 | `GET, POST /api/items`, `PATCH /api/items/:id` | Item CRUD and photo enrollment |
 | `GET /api/sightings` | Filter by item and time range |
+| `GET, POST /api/people`, `DELETE /api/people/:id` | Face enrollment. Multipart `name`, `relation`, `consent=yes`, and one to five `photos`, proxied to the perception service with an `api`-scope token. The list carries each person's last match time and confidence |
 | `GET, POST /api/rooms`, `PATCH /api/rooms/:id` | Room CRUD, the private flag, and later enrollment |
 | `GET, POST /api/people`, `PATCH /api/people/:id` | Face enrollment CRUD: name, relation, reference photos; saving pushes new embeddings to the perception service |
 | `GET /api/danger-events`, `POST /api/danger-events/:id/acknowledged` | List open/closed hazard events; the caregiver acknowledges one from the dashboard |
@@ -574,7 +577,7 @@ Perception service:
 
 | Route | Does |
 |---|---|
-| `WS /ws/frames` | Binary JPEG frames in, with the versioned session/sequence/timestamp envelope. JSON out per frame: `{ seq, detections: [{ itemId, label, bbox, confidence }] }` with boxes normalized to the frame |
+| `WS /ws/frames` | Binary JPEG frames in, with the versioned session/sequence/timestamp envelope. JSON out per frame: `{ seq, detections: [{ itemId, label, bbox, confidence }] }` with boxes normalized to the frame. While a face is in view it also sends `{ type: "faces", seq, faces: [{ personId, name, relation, bbox, confidence, matchConfidence }] }`, matched only against that wearer's enrolled people, and one empty list when the last face leaves |
 | `POST /config/classes` | Reloads the prompt list after a caregiver edits items |
 | `GET /health` | Model loaded, current fps, queue depth |
 
@@ -623,9 +626,9 @@ hackmit26/
   CLAUDE.md                  repo layout, commands, gotchas
   apps/
     web/                     Next.js dashboard, API, /wear, /sim
-    ios/                     Capacitor shell that loads the web app; native features and the Ray-Ban DAT client later
+    ios/                     later: native chest-phone shell, and the Ray-Ban DAT client
   services/
-    perception/              FastAPI, YOLOE-26, tracker, description jobs
+    perception/              FastAPI, tracked items, face enrollment/matching, single-frame safety, description jobs
   packages/
     shared/                  wire contract: API bodies, the frame socket protocol, signed tokens
     db/                      stored-document schemas, collection registry, repositories, retention
@@ -688,6 +691,37 @@ NEXT_PUBLIC_PERCEPTION_WS_URL=
 ```
 
 ## Running it
+
+### Database options
+
+The project supports two local Docker services and one hosted MongoDB option:
+
+1. **Web + perception with Docker MongoDB (development).** `pnpm start` starts the local MongoDB container from `docker-compose.yml`, initializes the schema, and runs the Next.js web app plus the perception service. This is the default when `MONGODB_URI` is empty or points at `127.0.0.1`.
+2. **Web + perception with an existing MongoDB server.** Set the same `MONGODB_URI` and `MONGODB_DB` in `apps/web/.env.local` and `services/perception/.env`, then run the services normally. The server can be a self-hosted MongoDB deployment or MongoDB Atlas.
+3. **Vercel web app with MongoDB Atlas.** Add `MONGODB_URI` and `MONGODB_DB` to the Vercel project environment variables. Vercel uses the Atlas URI; it does not start Docker. Keep the perception service deployed separately and set its public URL in `NEXT_PUBLIC_PERCEPTION_WS_URL` / `PERCEPTION_URL`.
+
+For local Docker development:
+
+```bash
+pnpm db:up
+pnpm start
+```
+
+For Vercel, copy the Atlas connection string into the project environment settings and set `MONGODB_DB=memory_glasses`. Add the Vercel egress IP range (or the project’s approved network access entry) to Atlas **Database & Network Access**. Do not commit `.env.local`, `services/perception/.env`, or credentials.
+
+One command sets up a fresh checkout and starts both servers:
+
+```bash
+pnpm start                       # install, env files, MongoDB, setup, seed, then :3000 and :8000
+pnpm start --setup-only          # stop before starting the servers
+pnpm start --tunnel              # also open public https tunnels and print the phone URL
+pnpm start --reset               # reseed the demo wearer
+PORT=3100 PERCEPTION_PORT=8100 pnpm start   # when another checkout holds the default ports
+```
+
+`scripts/start.sh` creates `apps/web/.env.local` and `services/perception/.env` from their examples if they are missing, generates `AUTH_SECRET`, `DEVICE_TOKEN_SECRET`, and a demo `CAREGIVER_PASSWORD`, and copies the token secret and database settings into the perception file. It never overwrites a value that is already set. It prints the demo login when it finishes. API keys (OpenAI, Deepgram, ElevenLabs, S3) stay empty until you fill them in. If something already listens on :27017 it uses that MongoDB instead of starting a container. With `--tunnel` it starts `next dev` with `NEXT_PUBLIC_PERCEPTION_WS_URL` set to the perception tunnel's `wss://` URL. It waits for cloudflared to connect, and where the network blocks cloudflared's port 7844 it falls back to an SSH tunnel through localhost.run. That fallback needs no account but drops some requests with a 503, so prefer a network where cloudflared works.
+
+The same steps by hand:
 
 ```bash
 pnpm install

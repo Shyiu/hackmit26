@@ -39,6 +39,12 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-soft: var(--brand-soft);
+  --color-butter: var(--butter);
+  --color-butter-deep: var(--butter-deep);
+  --color-butter-soft: var(--butter-soft);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,38 +55,46 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* Blues carry the brand; butter yellow is the accent for highlights and the
+     one thing on a screen that should catch the eye. Backgrounds stay white. */
+  --brand: #2f5fd0;
+  --brand-deep: #1b3a8f;
+  --brand-soft: #e9f0ff;
+  --butter: #f7d774;
+  --butter-deep: #8a6a0a;
+  --butter-soft: #fdf3c9;
+  --background: #ffffff;
+  --foreground: #0f1b3d;
+  --card: #ffffff;
+  --card-foreground: #0f1b3d;
+  --popover: #ffffff;
+  --popover-foreground: #0f1b3d;
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: #eef3fc;
+  --secondary-foreground: #1b3a8f;
+  --muted: #f5f8fd;
+  --muted-foreground: #5f6f93;
+  --accent: var(--brand-soft);
+  --accent-foreground: var(--brand-deep);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --border: #e4eaf6;
+  --input: #d6dfef;
+  --ring: #7fa2ec;
+  --chart-1: #bcd0f7;
+  --chart-2: #7fa2ec;
+  --chart-3: #2f5fd0;
+  --chart-4: #1b3a8f;
+  --chart-5: #0f2260;
+  --radius: 1rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f1b3d;
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--brand-soft);
+  --sidebar-accent-foreground: var(--brand-deep);
+  --sidebar-border: #e4eaf6;
+  --sidebar-ring: #7fa2ec;
 }
 
 .dark {
@@ -90,8 +104,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: #6f95f0;
+  --primary-foreground: #0b1430;
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);

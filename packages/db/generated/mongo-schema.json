@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "f7e8267ffa41e9d5c06379a6209f2695292eabeed8d5f6c75e5f5482d88b5586",
+  "fingerprint": "a4c7eaa9cbf04019b6709960aeb90341804788e4542fe5cd9dfb30d048cea4e6",
   "collections": {
     "patients": {
       "validator": {
@@ -146,6 +146,11 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 60
+            },
+            "passwordHash": {
+              "type": "string",
+              "minLength": 40,
+              "maxLength": 300
             },
             "patientIds": {
               "minItems": 1,
@@ -1472,7 +1477,8 @@
               "type": "string",
               "enum": [
                 "caregiver_message",
-                "reminder"
+                "reminder",
+                "danger_alert"
               ]
             },
             "text": {
@@ -1516,6 +1522,9 @@
             },
             "expiresAt": {
               "bsonType": "date"
+            },
+            "dangerEventId": {
+              "bsonType": "objectId"
             }
           },
           "required": [
@@ -1540,6 +1549,824 @@
             "patientId": 1,
             "status": 1,
             "showAt": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "people": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "relation": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "referenceImageKeys": {
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              }
+            },
+            "faceEmbeddings": {
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 20000
+              }
+            },
+            "embeddingModel": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "consentedAt": {
+              "bsonType": "date"
+            },
+            "consentedBy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "createdAt": {
+              "bsonType": "date"
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "name",
+            "relation",
+            "referenceImageKeys",
+            "faceEmbeddings",
+            "embeddingModel",
+            "consentedAt",
+            "consentedBy",
+            "createdAt",
+            "expiresAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "patient_people_by_name",
+          "key": {
+            "patientId": 1,
+            "name": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "frame_observations": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "deviceId": {
+              "anyOf": [
+                {
+                  "bsonType": "objectId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "captureSessionId": {
+              "anyOf": [
+                {
+                  "bsonType": "objectId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "capturedAt": {
+              "bsonType": "date"
+            },
+            "imageKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "imageWidth": {
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "imageHeight": {
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "caption": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "detections": {
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "bbox": {
+                    "type": "array",
+                    "items": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    ],
+                    "additionalItems": false,
+                    "minItems": 4,
+                    "maxItems": 4
+                  }
+                },
+                "required": [
+                  "label",
+                  "confidence",
+                  "bbox"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "faces": {
+              "maxItems": 50,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "bbox": {
+                    "type": "array",
+                    "items": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    ],
+                    "additionalItems": false,
+                    "minItems": 4,
+                    "maxItems": 4
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "personId": {
+                    "anyOf": [
+                      {
+                        "bsonType": "objectId"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "matchConfidence": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "bbox",
+                  "confidence",
+                  "personId",
+                  "matchConfidence"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "hazards": {
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "bbox": {
+                    "type": "array",
+                    "items": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    ],
+                    "additionalItems": false,
+                    "minItems": 4,
+                    "maxItems": 4
+                  }
+                },
+                "required": [
+                  "label",
+                  "confidence",
+                  "bbox"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "vlm": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "skipped",
+                    "confirmed",
+                    "rejected",
+                    "failed"
+                  ]
+                },
+                "model": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 100
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "confidence": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "observableEvidence": {
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 1000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "status",
+                "model",
+                "confidence",
+                "observableEvidence",
+                "error"
+              ],
+              "additionalProperties": false
+            },
+            "processing": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "complete",
+                    "failed"
+                  ]
+                },
+                "failedStage": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 60
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 1000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "durationMs": {
+                  "minimum": 0,
+                  "bsonType": [
+                    "int",
+                    "long",
+                    "double"
+                  ],
+                  "multipleOf": 1
+                }
+              },
+              "required": [
+                "status",
+                "failedStage",
+                "error",
+                "durationMs"
+              ],
+              "additionalProperties": false
+            },
+            "detectorName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "deviceId",
+            "captureSessionId",
+            "capturedAt",
+            "imageKey",
+            "imageWidth",
+            "imageHeight",
+            "caption",
+            "detections",
+            "faces",
+            "hazards",
+            "vlm",
+            "processing",
+            "detectorName",
+            "expiresAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "patient_frames",
+          "key": {
+            "patientId": 1,
+            "capturedAt": -1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "danger_events": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "unknown_face",
+                "weapon_visible",
+                "medication_or_chemical_visible",
+                "hot_surface_visible",
+                "hazard_visible"
+              ]
+            },
+            "hazardLabel": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "severity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "verification": {
+              "type": "string",
+              "enum": [
+                "unverified",
+                "model_confirmed",
+                "model_rejected"
+              ]
+            },
+            "evidenceScope": {
+              "type": "string",
+              "enum": [
+                "single_frame",
+                "temporal"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "open",
+                "acknowledged",
+                "dismissed",
+                "escalated",
+                "closed"
+              ]
+            },
+            "firstSeenAt": {
+              "bsonType": "date"
+            },
+            "lastSeenAt": {
+              "bsonType": "date"
+            },
+            "bbox": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              ],
+              "additionalItems": false,
+              "minItems": 4,
+              "maxItems": 4
+            },
+            "frameSize": {
+              "type": "array",
+              "items": [
+                {
+                  "minimum": 0,
+                  "exclusiveMinimum": true,
+                  "bsonType": [
+                    "int",
+                    "long",
+                    "double"
+                  ],
+                  "multipleOf": 1
+                },
+                {
+                  "minimum": 0,
+                  "exclusiveMinimum": true,
+                  "bsonType": [
+                    "int",
+                    "long",
+                    "double"
+                  ],
+                  "multipleOf": 1
+                }
+              ],
+              "additionalItems": false,
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "keyframeKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "frameObservationIds": {
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "bsonType": "objectId"
+              }
+            },
+            "evidence": {
+              "type": "object",
+              "properties": {
+                "detectorName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "detectorConfidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "vlmModel": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 100
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "vlmConfidence": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "observableEvidence": {
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                }
+              },
+              "required": [
+                "detectorName",
+                "detectorConfidence",
+                "vlmModel",
+                "vlmConfidence",
+                "observableEvidence"
+              ],
+              "additionalProperties": false
+            },
+            "acknowledgedAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "acknowledgedBy": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "notification": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "queued",
+                    "failed"
+                  ]
+                },
+                "notificationId": {
+                  "anyOf": [
+                    {
+                      "bsonType": "objectId"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "status",
+                "notificationId"
+              ],
+              "additionalProperties": false
+            },
+            "createdAt": {
+              "bsonType": "date"
+            },
+            "updatedAt": {
+              "bsonType": "date"
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "kind",
+            "hazardLabel",
+            "severity",
+            "confidence",
+            "verification",
+            "evidenceScope",
+            "status",
+            "firstSeenAt",
+            "lastSeenAt",
+            "bbox",
+            "frameSize",
+            "keyframeKey",
+            "frameObservationIds",
+            "evidence",
+            "acknowledgedAt",
+            "acknowledgedBy",
+            "notification",
+            "createdAt",
+            "updatedAt",
+            "expiresAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "open_by_last_seen",
+          "key": {
+            "patientId": 1,
+            "status": 1,
+            "lastSeenAt": -1
           },
           "unique": false
         },

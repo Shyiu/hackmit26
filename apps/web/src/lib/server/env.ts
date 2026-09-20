@@ -14,7 +14,8 @@ export type ServerEnvName =
   | "DEEPGRAM_STT_MODEL"
   | "ELEVENLABS_API_KEY"
   | "OPENAI_API_KEY"
-  | "NEXT_PUBLIC_PERCEPTION_WS_URL";
+  | "NEXT_PUBLIC_PERCEPTION_WS_URL"
+  | "PERCEPTION_URL";
 
 export class MissingEnvError extends Error {
   override name = "MissingEnvError";

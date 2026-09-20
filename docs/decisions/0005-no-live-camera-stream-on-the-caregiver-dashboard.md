@@ -13,7 +13,9 @@ screen, and it made the demo depend on a stream nothing else in the product need
 ## Decision
 
 The caregiver side carries no camera stream. The dashboard stays read-only over stored data: item
-cards, sighting timelines, the question log, latency, and capture/pause state. Item labels and
+cards, sighting timelines, the question log, latency, and capture/pause state. `/dashboard/live`
+keeps its route but not its meaning: it renders the house in 3D from stored sightings and points at
+a chosen item, with no video on it. Item labels and
 sighting notifications draw over the wearer's own video, on the capture page that already receives
 detections on `/ws/frames`. The perception service has no debug socket, and the `debug` token scope
 is gone.

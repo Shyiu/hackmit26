@@ -41,7 +41,7 @@ export default async function ItemsPage() {
               <li key={item._id.toHexString()}>
                 <Link
                   href={`/dashboard/items/${item._id.toHexString()}`}
-                  className="group flex h-full flex-col gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10 transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                  className="group flex h-full flex-col gap-3 rounded-3xl bg-card p-4 shadow-[0_4px_20px_-8px_rgb(20_45_120/0.15)] ring-1 ring-foreground/5 transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

@@ -138,7 +138,7 @@ function CountGrid({ counts }: { counts: Counts }) {
               className="flex h-10 items-center justify-center rounded-md tabular-nums"
               style={{
                 backgroundColor:
-                  count === 0 ? undefined : `color-mix(in oklch, var(--foreground) ${8 + (count / max) * 32}%, transparent)`,
+                  count === 0 ? undefined : `color-mix(in oklch, var(--brand) ${15 + (count / max) * 55}%, transparent)`,
               }}
             >
               {count === 0 ? <span className="text-muted-foreground/60">0</span> : count}

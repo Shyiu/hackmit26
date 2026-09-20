@@ -59,11 +59,16 @@ export const patientDocSchema = z.strictObject({
 
 export type PatientDoc = z.infer<typeof patientDocSchema>;
 
-/** A caregiver login. Credentials live in env, so this holds identity and access only. */
+/**
+ * A caregiver login. Accounts made through signup carry a scrypt password hash;
+ * the seeded demo caregiver has none and signs in with the env credentials.
+ */
 export const caregiverDocSchema = z.strictObject({
   _id: idSchema<CaregiverId>(),
   email: z.email().max(254),
   name: shortText,
+  /** `scrypt$N$r$p$salt$hash`, base64url. Never leaves the server. */
+  passwordHash: z.string().min(40).max(300).optional(),
   patientIds: z.array(idSchema<PatientId>()).min(1).max(20),
   lastLoginAt: z.date().nullable(),
   ...timestamps,
