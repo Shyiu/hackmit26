@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 from typing import Protocol
 
 import httpx
 
 from .config import Settings
 from .store import BBox, DescriptionResult
+
+log = logging.getLogger("perception.vision")
 
 
 def image_media_type(image_bytes: bytes) -> str:
@@ -141,7 +144,7 @@ class OpenAIDescriptionVLM:
             raw = "".join(part.get("text", "") for part in raw)
         payload = json.loads(raw)
         if not payload["item_visible"]:
-            return DescriptionResult(state="unknown", sentence="not confirmed in the frame")
+            return DescriptionResult(state="unknown", sentence="not confirmed in the frame", item_visible=False)
         return DescriptionResult(
             room=payload.get("room"),
             surface=payload.get("surface"),
@@ -156,4 +159,8 @@ def build_description_vlm(settings: Settings, client: httpx.Client | None = None
     """Real vision calls once an OpenAI key is configured; an honest "I don't know" otherwise."""
     if settings.resolved_vlm_api_key:
         return OpenAIDescriptionVLM(settings, client)
+    log.warning(
+        "No OPENAI_API_KEY (or VLM_API_KEY) configured -- every item description is the mock "
+        "placeholder, never a real location. Set one in services/perception/.env to fix answers."
+    )
     return MockDescriptionVLM()

@@ -84,4 +84,5 @@ def test_openai_unverified_item_becomes_unknown():
     result = adapter.describe(b"\xff\xd8\xffimage", (0.0, 0.0, 1.0, 1.0), "keys")
     assert result.state == "unknown"
     assert result.room is None
+    assert result.item_visible is False
     client.close()
