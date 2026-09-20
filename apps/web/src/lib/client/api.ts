@@ -38,7 +38,7 @@ export async function wearerFetch(path: string, init: RequestInit = {}): Promise
 
 export async function apiFetch<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, headers, ...rest } = init;
-  const response = await wearerFetch(path, {
+  const response = await fetch(path, {
     ...rest,
     headers: json === undefined ? headers : { "content-type": "application/json", ...headers },
     body: json === undefined ? rest.body : JSON.stringify(json),

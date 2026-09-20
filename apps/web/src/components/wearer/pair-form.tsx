@@ -45,7 +45,7 @@ export function PairForm({
     <div className={cn("flex flex-col gap-3", className)}>
       <div>
         <h2 className="font-medium">Pair this phone</h2>
-        <p className="mt-1 text-sm text-white/70">
+        <p className="mt-1 text-sm opacity-70">
           On the dashboard, open Settings and tap “Pair a phone”, then enter the code here.
         </p>
       </div>
@@ -74,7 +74,7 @@ export function PairForm({
         </Button>
       </form>
       {error && <p className="text-sm text-red-300">{error}</p>}
-      <p className="text-xs text-white/60">
+      <p className="text-xs opacity-60">
         Or a caregiver can{" "}
         <Link href={`/login?next=${next}`} className={buttonVariants({ variant: "link", size: "xs" })}>
           sign in

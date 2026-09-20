@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ApiError, apiFetch } from "@/lib/client/api";
 import type { DeviceView } from "@/lib/server/views";
@@ -28,17 +28,28 @@ export function DevicesPanel({ initialDevices }: { initialDevices: DeviceView[] 
 
   const expired = pairing !== null && new Date(pairing.expiresAt).getTime() <= now;
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const result = await apiFetch<{ devices: DeviceView[] }>("/api/devices");
     setDevices(result.devices);
-  }
+  }, []);
+
+  const livePairing = pairing !== null && !expired;
+
+  useEffect(() => {
+    if (!livePairing) return;
+    const timer = window.setInterval(() => {
+      void refresh().catch((caught) => {
+        setError(caught instanceof ApiError ? caught.message : "Could not refresh devices");
+      });
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [livePairing, refresh]);
 
   async function mintCode() {
     setPending(true);
     setError(null);
     try {
       setPairing(await apiFetch<PairingCode>("/api/devices/pairing-codes", { method: "POST" }));
-      await refresh();
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not create a pairing code");
     } finally {

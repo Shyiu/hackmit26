@@ -21,8 +21,8 @@ import { requireEnv } from "./env";
 
 // Two ways in, per README "Caregiver dashboard": a caregiver session cookie,
 // and a bearer device token that /wear and /sim send after this phone is paired.
-// Either
-// way the wearer comes from a signed credential, never from a request body.
+// Either way the wearer comes from a signed credential, never from a request
+// body.
 
 export { SESSION_COOKIE } from "../session-cookie";
 export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
