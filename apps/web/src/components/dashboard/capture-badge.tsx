@@ -49,7 +49,7 @@ export function CaptureBadge({ className, compact = false }: { className?: strin
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border-2 border-terracotta/25 bg-terracotta-soft/40 px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-terracotta-deep",
+        "inline-flex items-center gap-1.5 rounded-[0.5rem] border-2 border-brand/25 bg-brand-soft/40 px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-brand-deep",
         className,
       )}
     >

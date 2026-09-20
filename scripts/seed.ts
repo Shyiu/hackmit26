@@ -1,7 +1,8 @@
 // Seeds one demo wearer, a caregiver login, rooms, the items a person with
-// dementia loses most, a caregiver message, and a reminder. The first three
-// items' sightings exercise the answer wording: one seen resting, one picked up
-// after it was put down, one still waiting for its description.
+// dementia loses most, a caregiver message, a reminder, and two open hazard
+// events for the Alerts tab. The first three items' sightings exercise the
+// answer wording: one seen resting, one picked up after it was put down, one
+// still waiting for its description.
 //
 // It seeds no `people`. Face records are written by services/perception, which
 // encrypts the embeddings, and each one records a real person's consent.
@@ -21,7 +22,7 @@ import {
   type Db,
   type PatientId,
 } from "@memory-glasses/db";
-import { seedObservation } from "@memory-glasses/db/observations";
+import { seedDangerEvent, seedObservation } from "@memory-glasses/db/observations";
 import { withDatabase } from "./lib/env";
 
 function fixedId<TId extends PatientId | CaregiverId>(hex: string): TId {
@@ -159,6 +160,25 @@ async function seed(db: Db) {
     showAt: new Date(now + 2 * 60 * MINUTE),
     createdBy: DEMO_CAREGIVER_ID,
   });
+
+  await seedDangerEvent(db, {
+    patientId: DEMO_PATIENT_ID,
+    kind: "hot_surface_visible",
+    hazardLabel: "stove burner",
+    severity: "high",
+    confidence: 0.91,
+    verification: "model_confirmed",
+    lastSeenAt: new Date(now - 6 * MINUTE),
+  });
+  await seedDangerEvent(db, {
+    patientId: DEMO_PATIENT_ID,
+    kind: "medication_or_chemical_visible",
+    hazardLabel: "pill bottle",
+    severity: "medium",
+    confidence: 0.72,
+    lastSeenAt: new Date(now - 45 * MINUTE),
+  });
+  await tenant.notifications.create({ kind: "danger_alert", text: "The stove looks hot and nobody is nearby." });
 
   for (const item of await tenant.items.list()) {
     console.log(`${item.name.padEnd(14)} ${locationStatus(item.lastSighting)}  ${item.lastSighting?.sentence ?? ""}`);

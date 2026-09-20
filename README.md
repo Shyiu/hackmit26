@@ -1,4 +1,4 @@
-# Memior (working title)
+# Memoir (working title)
 
 A wearable camera that remembers where things are, notices when someone's about to forget something, and watches for danger, for people living with dementia.
 
@@ -6,7 +6,7 @@ The wearer asks out loud, "Where are my keys?" About a second later they hear, "
 
 The product belongs on glasses, and Ray-Ban Meta was the platform we planned around. We can't get a pair for the hackathon, and a 3D-printed VR headset was tried on paper and dropped. So this build runs on a phone worn on the chest. Its rear camera faces forward and streams what's in front of the wearer, the phone records that view, and answers come back as speech in the wearer's ear. The live view with item labels shows on the caregiver dashboard. Ray-Ban Meta stays in the plan as a second client on the same contract, for when we have the hardware.
 
-**Status: early build.** The database is built: `packages/db` holds the MongoDB schemas, validators, indexes, and repositories, tested against a real MongoDB. The API routes read and write through it behind caregiver sessions and device tokens. Caregivers sign up at `/signup`, which creates their account (scrypt password hash) and one wearer for their family; the seeded demo caregiver still signs in with `CAREGIVER_EMAIL` and `CAREGIVER_PASSWORD`. `/wear` is the chest page: a dim screen where a tap anywhere asks a question. Speech to text runs on Deepgram when `DEEPGRAM_API_KEY` is set and falls back to the browser's recognizer when it isn't. `POST /api/ask` answers from the item snapshots. With `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` set, the answer streams back as 24 kHz PCM from ElevenLabs Flash v2.5 behind the `TTSProvider` seam in `apps/web/src/lib/server/tts/`, the phone plays it chunk by chunk and polls the interaction for the caption, and `pnpm bench:tts` measures time to first audio; without a key the route returns JSON and the browser's speech synthesis speaks it at the wearer's rate. Either way the answer is shown as a caption and playback timing goes back to the server. The page streams 1280 px JPEG frames to the perception socket at 3 fps when capture is resumed, and speaks queued caregiver messages. `/sim` runs the same client on a flat page with hold-to-ask and a typed question. The caregiver dashboard is built for phones and desktops: items, item detail and editing, questions, live status, messages, rooms, latency, settings. `apps/ios` is a Capacitor shell that loads the deployed web app ([ADR 0004](docs/decisions/0004-ios-shell-with-capacitor.md)). `services/perception` runs YOLOE-26 on each frame with the wearer's item names as prompts when its model assets are on disk (`NullDetector` otherwise), tracks detections across frames, and writes sightings. `/ws/debug` isn't built, so the dashboard live view has no video yet. The same service has face enrollment and matching and single-frame hazard events (`people`, `danger_events`) behind mock adapters by default. Geofencing and the routine/reminder engine described below are freshly scoped for this MVP and nothing for them is built yet. This README is still the build plan, so edit it freely.
+**Status: early build.** The database is built: `packages/db` holds the MongoDB schemas, validators, indexes, and repositories, tested against a real MongoDB. The API routes read and write through it behind caregiver sessions and device tokens. Caregivers sign up at `/signup`, which creates their account (scrypt password hash) and one wearer for their family; the seeded demo caregiver still signs in with `CAREGIVER_EMAIL` and `CAREGIVER_PASSWORD`. `/wear` is the chest page: a dim screen where a tap anywhere asks a question. Speech to text runs on Deepgram when `DEEPGRAM_API_KEY` is set and falls back to the browser's recognizer when it isn't. `POST /api/ask` answers from the item snapshots. With `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` set, the answer streams back as 24 kHz PCM from ElevenLabs Flash v2.5 behind the `TTSProvider` seam in `apps/web/src/lib/server/tts/`, the phone plays it chunk by chunk and polls the interaction for the caption, and `pnpm bench:tts` measures time to first audio; without a key the route returns JSON and the browser's speech synthesis speaks it at the wearer's rate. Either way the answer is shown as a caption and playback timing goes back to the server. The page streams 1280 px JPEG frames to the perception socket at 3 fps when capture is resumed, and speaks queued caregiver messages. `/sim` runs the same client on a flat page with hold-to-ask and a typed question. The caregiver dashboard is built for phones and desktops: items, item detail and editing, questions, live status, messages, faces, latency, settings. The Faces page (`/dashboard/people`) enrolls people from photos through `/api/people`, which proxies to the perception service, and shows when the camera last matched each one; it took the Rooms slot in the nav for testing, and the rooms page is still at `/dashboard/rooms`. `apps/ios` is a Capacitor shell that loads the deployed web app ([ADR 0004](docs/decisions/0004-ios-shell-with-capacitor.md)). `services/perception` runs YOLOE-26 on each frame with the wearer's item names as prompts when its model assets are on disk (`NullDetector` otherwise), tracks detections across frames, and writes sightings. `/ws/debug` isn't built, so the dashboard live view has no video yet. The same service has face enrollment and matching and single-frame hazard events (`people`, `danger_events`) behind mock adapters by default. Geofencing and the routine/reminder engine described below are freshly scoped for this MVP and nothing for them is built yet. This README is still the build plan, so edit it freely.
 
 ## The problem
 
@@ -560,6 +560,7 @@ Next.js:
 | `GET /api/perception/token` | Mints a short-lived token for the frame socket. A browser can't set headers on a WebSocket, so the page sends it as the first message |
 | `GET, POST /api/items`, `PATCH /api/items/:id` | Item CRUD and photo enrollment |
 | `GET /api/sightings` | Filter by item and time range |
+| `GET, POST /api/people`, `DELETE /api/people/:id` | Face enrollment. Multipart `name`, `relation`, `consent=yes`, and one to five `photos`, proxied to the perception service with an `api`-scope token. The list carries each person's last match time and confidence |
 | `GET, POST /api/rooms`, `PATCH /api/rooms/:id` | Room CRUD, the private flag, and later enrollment |
 | `GET, POST /api/people`, `PATCH /api/people/:id` | Face enrollment CRUD: name, relation, reference photos; saving pushes new embeddings to the perception service |
 | `GET /api/danger-events`, `POST /api/danger-events/:id/acknowledged` | List open/closed hazard events; the caregiver acknowledges one from the dashboard |
@@ -576,7 +577,7 @@ Perception service:
 
 | Route | Does |
 |---|---|
-| `WS /ws/frames` | Binary JPEG frames in, with the versioned session/sequence/timestamp envelope. JSON out per frame: `{ seq, detections: [{ itemId, label, bbox, confidence }] }` with boxes normalized to the frame |
+| `WS /ws/frames` | Binary JPEG frames in, with the versioned session/sequence/timestamp envelope. JSON out per frame: `{ seq, detections: [{ itemId, label, bbox, confidence }] }` with boxes normalized to the frame. While a face is in view it also sends `{ type: "faces", seq, faces: [{ personId, name, relation, bbox, confidence, matchConfidence }] }`, matched only against that wearer's enrolled people, and one empty list when the last face leaves |
 | `WS /ws/debug` | Detections and annotated frames for the dashboard live view |
 | `POST /config/classes` | Reloads the prompt list after a caregiver edits items |
 | `GET /health` | Model loaded, current fps, queue depth |
@@ -692,6 +693,23 @@ NEXT_PUBLIC_PERCEPTION_WS_URL=
 
 ## Running it
 
+### Database options
+
+The project supports two local Docker services and one hosted MongoDB option:
+
+1. **Web + perception with Docker MongoDB (development).** `pnpm start` starts the local MongoDB container from `docker-compose.yml`, initializes the schema, and runs the Next.js web app plus the perception service. This is the default when `MONGODB_URI` is empty or points at `127.0.0.1`.
+2. **Web + perception with an existing MongoDB server.** Set the same `MONGODB_URI` and `MONGODB_DB` in `apps/web/.env.local` and `services/perception/.env`, then run the services normally. The server can be a self-hosted MongoDB deployment or MongoDB Atlas.
+3. **Vercel web app with MongoDB Atlas.** Add `MONGODB_URI` and `MONGODB_DB` to the Vercel project environment variables. Vercel uses the Atlas URI; it does not start Docker. Keep the perception service deployed separately and set its public URL in `NEXT_PUBLIC_PERCEPTION_WS_URL` / `PERCEPTION_URL`.
+
+For local Docker development:
+
+```bash
+pnpm db:up
+pnpm start
+```
+
+For Vercel, copy the Atlas connection string into the project environment settings and set `MONGODB_DB=memory_glasses`. Add the Vercel egress IP range (or the project’s approved network access entry) to Atlas **Database & Network Access**. Do not commit `.env.local`, `services/perception/.env`, or credentials.
+
 One command sets up a fresh checkout and starts both servers:
 
 ```bash
@@ -743,7 +761,7 @@ See `apps/ios/README.md` for signing and limits.
 
 The web app deploys to Vercel as the project `memory-glasses`, at <https://memory-glasses.vercel.app>. The GitHub repo is connected: a push to `main` deploys production, and every other branch and pull request gets a preview URL. `services/perception` does not run on Vercel. It holds a WebSocket open and loads model weights, so it needs a long-running host with a `wss://` URL.
 
-`apps/web/vercel.json` sets the build command to `scripts/vercel-build.sh`. A production build runs `pnpm db:setup` and `pnpm db:seed` against `MONGODB_URI` before `next build`, so each deploy brings the database to its own schema and the demo wearer is always there ([ADR 0005](docs/decisions/0005-database-setup-in-the-vercel-production-build.md)). Preview builds skip the database steps.
+`apps/web/vercel.json` sets the build command to `scripts/vercel-build.sh`. A production build runs `pnpm db:setup` and `pnpm db:seed` against `MONGODB_URI` before `next build`, so each deploy brings the database to its own schema and the demo wearer is always there ([ADR 0006](docs/decisions/0006-database-setup-in-the-vercel-production-build.md)). Preview builds skip the database steps.
 
 Project settings that live on Vercel and not in the repo:
 

@@ -84,7 +84,7 @@ scripts read the same file.
 - The web app deploys to Vercel from `main` (README.md "Deploying"). The project's Root Directory is
   `apps/web` and `ENABLE_EXPERIMENTAL_COREPACK=1` pins pnpm 11; both live in Vercel's settings, not
   in the repo. A production build runs `db:setup` and `db:seed` first (`scripts/vercel-build.sh`,
-  ADR 0005), so keep both idempotent. Routes must keep reading env lazily through `lib/server/env.ts`, because the build
+  ADR 0006), so keep both idempotent. Routes must keep reading env lazily through `lib/server/env.ts`, because the build
   runs without most keys. `services/perception` is not on Vercel.
 - A phone opens the camera and mic only on HTTPS, and an HTTPS page opens only `wss://` sockets.
   Test on a phone through a tunnel or a Vercel URL. `allowedDevOrigins` in `apps/web/next.config.ts`
@@ -105,6 +105,9 @@ scripts read the same file.
   identifies specific real people. Never send it to a third-party API, never widen a query to cross
   `patientId`, and never add a code path that matches against anything but that patient's own
   enrolled set. See README.md "Faces, danger, and routines" and "Privacy and safety".
+- Face enrollment lives in the perception service, which owns the embedder and the encryption key.
+  `/api/people` proxies to it through `apps/web/src/lib/server/perception.ts`, at `PERCEPTION_URL`,
+  else the socket's host, else `http://127.0.0.1:8000`. The Faces page says so when it's down.
 - `CAREGIVER_EMAIL`/`CAREGIVER_PASSWORD` only seed the one demo pair (`pnpm db:seed`). Real caregiver
   signup is a separate flow (`POST /api/auth/signup`); don't assume there's exactly one caregiver
   account when writing a route or a test.

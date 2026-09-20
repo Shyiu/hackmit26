@@ -40,6 +40,16 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False, frozen=True)
 
 
+class ConfigClassesRequest(_Strict):
+    version: Annotated[int, BeforeValidator(_json_number), Field(ge=0)] | None = None
+
+
+class ConfigClassesResponse(_Strict):
+    patientId: ObjectIdHex
+    classes: list[Annotated[str, StringConstraints(min_length=1, max_length=200)]]
+    version: Annotated[int, BeforeValidator(_json_number), Field(ge=0)]
+
+
 class HelloMessage(_Strict):
     type: Literal["hello"]
     v: Version
@@ -96,6 +106,39 @@ class DetectionsMessage(_Strict):
     detections: list[Detection]
 
 
+class FaceCandidate(BaseModel):
+    model_config = ConfigDict(extra="ignore", allow_inf_nan=False, frozen=True)
+
+    # Debug-only: never stored, only sent for a caregiver to see why a face did
+    # or didn't get named.
+    personId: ObjectIdHex
+    name: Annotated[str, StringConstraints(max_length=200)]
+    relation: Annotated[str, StringConstraints(max_length=200)] | None
+    similarity: Annotated[Number, Field(ge=0, le=1)]
+
+
+class Face(BaseModel):
+    model_config = ConfigDict(extra="ignore", allow_inf_nan=False, frozen=True)
+
+    # All three are null for a face that matched nobody the caregiver enrolled.
+    personId: ObjectIdHex | None
+    name: Annotated[str, StringConstraints(max_length=200)] | None
+    relation: Annotated[str, StringConstraints(max_length=200)] | None
+    bbox: tuple[Number, Number, Number, Number]
+    # How sure the detector is that this is a face, then how close the match was.
+    confidence: Annotated[Number, Field(ge=0, le=1)]
+    matchConfidence: Annotated[Number, Field(ge=0, le=1)] | None
+    # Every enrolled person's similarity to this face, best first.
+    candidates: list[FaceCandidate] = Field(default_factory=list)
+
+
+class FacesMessage(_Strict):
+    type: Literal["faces"]
+    v: Version
+    seq: Annotated[Int, Field(ge=0)]
+    faces: list[Face]
+
+
 class ErrorMessage(_Strict):
     type: Literal["error"]
     v: Version
@@ -103,7 +146,9 @@ class ErrorMessage(_Strict):
     message: Annotated[str, StringConstraints(max_length=500)]
 
 
-ServerMessage = Annotated[SessionMessage | DetectionsMessage | ErrorMessage, Field(discriminator="type")]
+ServerMessage = Annotated[
+    SessionMessage | DetectionsMessage | FacesMessage | ErrorMessage, Field(discriminator="type")
+]
 
 _client_messages: TypeAdapter[HelloMessage | CaptureCommand] = TypeAdapter(ClientMessage)
 _server_messages: TypeAdapter[SessionMessage | DetectionsMessage | ErrorMessage] = TypeAdapter(ServerMessage)
@@ -123,12 +168,22 @@ def parse_client_message(data: str | bytes) -> HelloMessage | CaptureCommand:
     return _client_messages.validate_python(_loads(data))
 
 
-def parse_server_message(data: str | bytes) -> SessionMessage | DetectionsMessage | ErrorMessage:
+def parse_server_message(
+    data: str | bytes,
+) -> SessionMessage | DetectionsMessage | FacesMessage | ErrorMessage:
     return _server_messages.validate_python(_loads(data))
 
 
 def parse_frame_header(data: str | bytes) -> FrameHeader:
     return FrameHeader.model_validate(_loads(data))
+
+
+def parse_config_classes_request(data: str | bytes) -> ConfigClassesRequest:
+    return ConfigClassesRequest.model_validate(_loads(data))
+
+
+def parse_config_classes_response(data: str | bytes) -> ConfigClassesResponse:
+    return ConfigClassesResponse.model_validate(_loads(data))
 
 
 def session_message(session_id: str, state: CaptureState) -> SessionMessage:
@@ -137,6 +192,10 @@ def session_message(session_id: str, state: CaptureState) -> SessionMessage:
 
 def detections_message(seq: int, detections: list[Detection]) -> DetectionsMessage:
     return DetectionsMessage(type="detections", v=1, seq=seq, detections=detections)
+
+
+def faces_message(seq: int, faces: list[Face]) -> FacesMessage:
+    return FacesMessage(type="faces", v=1, seq=seq, faces=faces)
 
 
 def error_message(code: ErrorCode, message: str) -> ErrorMessage:

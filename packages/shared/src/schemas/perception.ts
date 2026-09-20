@@ -12,6 +12,9 @@ import { frameDetectionsSchema } from "./detection";
 // 4. While live, each frame is one binary message: a 4-byte big-endian header
 //    length, the header as UTF-8 JSON, then the JPEG bytes.
 // 5. The service answers each processed frame with `detections` for its `seq`.
+// 6. When a frame shows a face, the service also sends `faces` for that `seq`, and one
+//    empty `faces` when the last face leaves. It comes from its own worker, so it can
+//    land before or after the same frame's `detections`.
 
 export const PERCEPTION_PROTOCOL_VERSION = 1;
 
@@ -53,6 +56,39 @@ export const detectionsMessageSchema = frameDetectionsSchema
   .extend({ type: z.literal("detections"), v: z.literal(1) })
   .strict();
 
+// One enrolled person's raw similarity to a detected face, whether or not it
+// won the match. Debug-only: never stored, only sent for a caregiver to see
+// on a live capture page why a face did or didn't get named.
+export const faceCandidateSchema = z.object({
+  personId: objectIdHex,
+  name: z.string().max(200),
+  relation: z.string().max(200).nullable(),
+  similarity: z.number().min(0).max(1),
+});
+
+// A face the service saw, matched only against the people this wearer's caregiver enrolled.
+// personId, name, and relation are null for a face that matched nobody.
+export const faceSchema = z.object({
+  personId: objectIdHex.nullable(),
+  name: z.string().max(200).nullable(),
+  relation: z.string().max(200).nullable(),
+  bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  confidence: z.number().min(0).max(1),
+  matchConfidence: z.number().min(0).max(1).nullable(),
+  // Every enrolled person's similarity to this face, best first. Optional and
+  // defaulted so older messages without it still parse.
+  candidates: z.array(faceCandidateSchema).default([]),
+});
+
+export const facesMessageSchema = z
+  .object({
+    type: z.literal("faces"),
+    v: z.literal(1),
+    seq: z.number().int().nonnegative(),
+    faces: z.array(faceSchema),
+  })
+  .strict();
+
 export const perceptionErrorCodeSchema = z.enum([
   "unauthorized",
   "bad_message",
@@ -73,8 +109,22 @@ export const errorMessageSchema = z
 export const serverMessageSchema = z.discriminatedUnion("type", [
   sessionMessageSchema,
   detectionsMessageSchema,
+  facesMessageSchema,
   errorMessageSchema,
 ]);
+
+// POST /config/classes on the perception service, called by the web app after a
+// caregiver edits items. The tenant comes from the token, never the body.
+export const reloadClassesRequestSchema = z
+  .object({ version: z.number().int().nonnegative().optional() })
+  .strict();
+export const reloadClassesResponseSchema = z
+  .object({
+    patientId: objectIdHex,
+    classes: z.array(z.string().min(1).max(200)),
+    version: z.number().int().nonnegative(),
+  })
+  .strict();
 
 export type HelloMessage = z.infer<typeof helloMessageSchema>;
 export type CaptureCommand = z.infer<typeof captureCommandSchema>;
@@ -83,5 +133,10 @@ export type FrameHeader = z.infer<typeof frameHeaderSchema>;
 export type CaptureState = z.infer<typeof captureStateSchema>;
 export type SessionMessage = z.infer<typeof sessionMessageSchema>;
 export type DetectionsMessage = z.infer<typeof detectionsMessageSchema>;
+export type FaceCandidate = z.infer<typeof faceCandidateSchema>;
+export type Face = z.infer<typeof faceSchema>;
+export type FacesMessage = z.infer<typeof facesMessageSchema>;
 export type PerceptionErrorCode = z.infer<typeof perceptionErrorCodeSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
+export type ReloadClassesRequest = z.infer<typeof reloadClassesRequestSchema>;
+export type ReloadClassesResponse = z.infer<typeof reloadClassesResponseSchema>;

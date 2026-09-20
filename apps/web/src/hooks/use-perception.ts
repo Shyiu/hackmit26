@@ -3,6 +3,7 @@ import {
   serverMessageSchema,
   type CaptureState,
   type Detection,
+  type Face,
   type FrameHeader,
 } from "@memory-glasses/shared";
 
@@ -61,20 +62,26 @@ function grabJpeg(video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<B
 // Streams JPEG frames from `video` while `capturing`, and hands back fresh
 // detections for the labels. Capture starts paused on every connection, and a
 // reconnect calls `onReconnect` so the page can require an explicit resume
-// (README "Privacy and safety").
+// (README "Privacy and safety") -- unless `autoResumeOnReconnect` is set, for
+// pages (the /sim dev fallback, not a real wearer device) that want frames to
+// keep flowing across a reconnect with no manual step.
 export function usePerception({
   video,
   enabled,
   capturing,
   onReconnect,
+  autoResumeOnReconnect = false,
 }: {
   video: HTMLVideoElement | null;
   enabled: boolean;
   capturing: boolean;
   onReconnect: () => void;
+  autoResumeOnReconnect?: boolean;
 }) {
   const [status, setStatus] = useState<PerceptionStatus>("off");
   const [detections, setDetections] = useState<Detection[]>([]);
+  const [faces, setFaces] = useState<Face[]>([]);
+  const [facesUpdatedAt, setFacesUpdatedAt] = useState<number | null>(null);
   const [framesSent, setFramesSent] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -179,10 +186,13 @@ export function usePerception({
           attempt = 0;
           setStatus("connected");
           setError(null);
-          if (reconnect) reconnected();
+          if (reconnect && !autoResumeOnReconnect) reconnected();
           // Every session starts paused. After a reconnect it stays paused until
-          // the wearer resumes; on the first connection it follows the page.
-          const state: CaptureState = capturingRef.current && !reconnect ? "live" : "paused";
+          // the wearer resumes, unless autoResumeOnReconnect says to just keep
+          // following the page's own capturing state; on the first connection
+          // it always follows the page.
+          const state: CaptureState =
+            capturingRef.current && (!reconnect || autoResumeOnReconnect) ? "live" : "paused";
           socket.send(JSON.stringify({ type: "capture", v: 1, state }));
         } else if (message.type === "detections") {
           const capturedAt = captured.get(message.seq);
@@ -191,6 +201,11 @@ export function usePerception({
           if (capturedAt === undefined || performance.now() - capturedAt > MAX_LABEL_AGE_MS) return;
           setDetections(message.detections);
           clearLabelsSoon();
+        } else if (message.type === "faces") {
+          // Comes from its own worker (see the protocol notes), so it isn't
+          // matched to a captured-frame timestamp the way detections are.
+          setFaces(message.faces);
+          setFacesUpdatedAt(Date.now());
         } else if (message.type === "error") {
           setError(message.message);
           if (message.code === "unauthorized") setStatus("error");
@@ -201,6 +216,8 @@ export function usePerception({
         sessionRef.current = null;
         inFlight = null;
         setDetections([]);
+        setFaces([]);
+        setFacesUpdatedAt(null);
         if (!stopped) retry("The frame socket closed");
       };
     }
@@ -228,8 +245,17 @@ export function usePerception({
       sessionRef.current = null;
       setStatus("off");
       setDetections([]);
+      setFaces([]);
+      setFacesUpdatedAt(null);
     };
-  }, [enabled]);
+  }, [enabled, autoResumeOnReconnect]);
 
-  return { status: enabled ? status : "off", detections, framesSent, error };
+  return {
+    status: enabled ? status : "off",
+    detections,
+    faces,
+    facesUpdatedAt,
+    framesSent,
+    error,
+  };
 }

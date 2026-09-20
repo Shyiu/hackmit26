@@ -18,31 +18,39 @@ from typing import Any, Literal
 from bson import ObjectId
 from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from pymongo import AsyncMongoClient
 from pymongo.errors import PyMongoError
 from starlette.requests import HTTPConnection
 
 from .config import Settings
-from .detector import Detector, Prompt, Prompts, build_detector
+from .detector import Detector, Prompts, build_detector
+from .prompts import PromptCache
 from .protocol import (
     CaptureCommand,
+    ConfigClassesRequest,
+    ConfigClassesResponse,
+    Face,
+    FaceCandidate,
     Frame,
     FrameError,
     HelloMessage,
     capture_time,
     detections_message,
     error_message,
+    faces_message,
     parse_client_message,
     parse_frame,
     session_message,
 )
 from .safety.adapters.registry import Adapters, build_adapters
 from .safety.images import LocalFrameStore
+from .safety.models import FaceObservation
+from .safety.routes import _claims
 from .safety.routes import router as safety_router
 from .safety.service import SafetyService
 from .safety.store import SafetyStore
-from .store import CaptureSource, ItemPrompts, ObservationStore, UnknownPatientError
+from .store import CaptureSource, ObservationStore, UnknownPatientError
 from .tokens import DeviceTokenClaims, InvalidTokenError, Scope, verify_device_token
 from .tracker import SightingTracker, SightingWriter, TrackerConfig
 
@@ -65,6 +73,7 @@ class Services:
     settings: Settings
     store: ObservationStore
     detector: Detector
+    prompts: PromptCache
     token_clock: Callable[[], float]
     safety: SafetyService | None = None
 
@@ -94,6 +103,7 @@ def create_app(
         )
         db = client[resolved.mongodb_db]
         store = ObservationStore(db)
+        prompts = PromptCache(store, resolved.prompt_refresh_seconds)
         safety = None
         if resolved.safety_enabled:
             safety = SafetyService(
@@ -112,7 +122,7 @@ def create_app(
                 },
             )
         app.state.services = Services(
-            resolved, store, detector or build_detector(resolved), token_clock, safety
+            resolved, store, detector or build_detector(resolved), prompts, token_clock, safety
         )
         try:
             yield
@@ -163,6 +173,7 @@ async def health(request: Request) -> JSONResponse:
         "detector": services.detector.name,
         "db": db,
         "queueDepth": queue_depth,
+        "classes": services.prompts.versions(),
         "safety": safety_names,
     }
     # 503 lets a tunnel or load balancer health check see that the database is gone.
@@ -170,10 +181,31 @@ async def health(request: Request) -> JSONResponse:
 
 
 @router.post("/config/classes")
-async def reload_classes() -> JSONResponse:
-    # M1: reload the detector's prompt list after a caregiver edits items. It
-    # needs a credential from the web app before it can do anything.
-    return JSONResponse({"error": "not implemented"}, status_code=501)
+async def reload_classes(request: Request) -> JSONResponse:
+    claims = _claims(request, "api")
+    try:
+        body = await request.body()
+        parsed = ConfigClassesRequest.model_validate_json(body) if body else ConfigClassesRequest()
+    except ValidationError:
+        raise HTTPException(422, "Invalid request body") from None
+    services = _services(request)
+    patient_id = ObjectId(claims.pid)
+    cached = await services.prompts.reload(patient_id, parsed.version)
+    classes: list[str] = []
+    seen: set[str] = set()
+    for prompt in cached.prompts:
+        if prompt.text not in seen:
+            seen.add(prompt.text)
+            classes.append(prompt.text)
+    log.info(
+        "reloaded %d classes for wearer %s (version %d)",
+        len(classes),
+        patient_id,
+        cached.version,
+    )
+    return JSONResponse(
+        ConfigClassesResponse(patientId=str(patient_id), classes=classes, version=cached.version).model_dump()
+    )
 
 
 @router.websocket("/ws/debug")
@@ -205,7 +237,7 @@ async def frames_socket(ws: WebSocket) -> None:
             await _refuse(ws, "Device is unknown or was revoked")
             return
         session_id = await services.store.open_capture_session(patient_id, device_id, source)
-        prompts = await services.store.active_items(patient_id)
+        prompts = (await services.prompts.get(patient_id)).prompts
     except UnknownPatientError:
         await _refuse(ws, "Unknown wearer")
         return
@@ -218,7 +250,7 @@ async def frames_socket(ws: WebSocket) -> None:
     connection.writer = SightingWriter(
         services.store, patient_id=patient_id, session_id=session_id, device_id=device_id, source=source
     )
-    connection.set_prompts(prompts)
+    connection.prompts = prompts
     await connection.run()
 
 
@@ -271,6 +303,8 @@ class FrameConnection:
     The receive loop never waits for the detector. A worker task runs it on the
     newest frame, and a frame that arrives while another is waiting replaces
     it, so a slow detector drops frames instead of answering with stale ones.
+    The safety pass has a worker and a newest-frame slot of its own, so a face
+    is named without waiting for the item detector, and the other way round.
     """
 
     def __init__(
@@ -286,6 +320,7 @@ class FrameConnection:
         self.detector = services.detector
         self.settings = services.settings
         self.services_safety = services.safety
+        self.services_prompts = services.prompts
         self.patient_id = patient_id
         self.device_id = device_id
         self.session_id = session_id
@@ -294,21 +329,19 @@ class FrameConnection:
         self.live_frames = 0
         self.pending: _Pending | None = None
         self.wake = asyncio.Event()
+        self.safety_pending: _Pending | None = None
+        self.safety_wake = asyncio.Event()
+        self.safety_persisted_seq: int | None = None
+        self.faces_in_view = False
         self.send_lock = asyncio.Lock()
         self.prompts: Prompts = ()
-        self.prompts_loaded_at = time.monotonic()
         self.tracker = SightingTracker(TrackerConfig.from_settings(services.settings))
         # None until the socket has a device and source to write sightings for.
         self.writer: SightingWriter | None = None
 
-    def set_prompts(self, items: list[ItemPrompts]) -> None:
-        self.prompts = tuple(
-            Prompt(str(item.item_id), item.name, text) for item in items for text in item.prompts
-        )
-        self.prompts_loaded_at = time.monotonic()
-
     async def run(self) -> None:
         worker = asyncio.create_task(self._work())
+        safety_worker = asyncio.create_task(self._safety_work()) if self.services_safety else None
         try:
             await self._send(session_message(str(self.session_id), "paused"))
             while True:
@@ -328,6 +361,10 @@ class FrameConnection:
                 await self.ws.close(code=1011)
         finally:
             worker.cancel()
+            if safety_worker is not None:
+                # Not waited for. It writes nothing the cleanup below depends on, and a storage
+                # call it's in the middle of can take a while to give up.
+                safety_worker.cancel()
             await asyncio.gather(worker, return_exceptions=True)
             try:
                 if self.writer is not None:
@@ -348,6 +385,7 @@ class FrameConnection:
             return
         self.live = command.state == "live"
         if not self.live:
+            self.safety_pending = None
             await self._drop_pending()
         await self.store.set_capture_state(self.patient_id, self.session_id, command.state)
         await self._send(session_message(str(self.session_id), command.state))
@@ -376,6 +414,10 @@ class FrameConnection:
             return
         self.last_seq = header.seq
         self.live_frames += 1
+        if self.services_safety is not None:
+            # Every live frame is offered, stride or not. The worker takes whichever is newest.
+            self.safety_pending = _Pending(frame, received_at, capture_time(received_at, header))
+            self.safety_wake.set()
         if (self.live_frames - 1) % self.settings.frame_stride:
             # Between strides. Skipped on purpose, but still a frame the session saw.
             await self.store.record_frame(
@@ -410,30 +452,92 @@ class FrameConnection:
                     events = self.tracker.observe(
                         detections, pending.observed_at, header.seq, (header.width, header.height)
                     )
-                    await self.writer.apply(events)
-                if (
-                    self.services_safety is not None
-                    and header.seq % self.services_safety.settings.safety_sample_every_n_frames == 0
-                ):
+                    # A write can reach MongoDB before apply() records its sighting ID.
+                    # Finish that bookkeeping before disconnect cleanup closes the tracks.
+                    write = asyncio.create_task(self.writer.apply(events))
                     try:
-                        await self.services_safety.process(
-                            self.patient_id,
-                            self.device_id,
-                            self.session_id,
-                            pending.frame.jpeg,
-                            pending.observed_at,
-                        )
-                    except Exception:
-                        log.exception("Safety processing failed for frame %s", header.seq)
+                        await asyncio.shield(write)
+                    except asyncio.CancelledError:
+                        await write
+                        raise
             except WebSocketDisconnect:
                 return
             except Exception:
                 log.exception("Frame %s of capture session %s failed", header.seq, self.session_id)
 
+    async def _safety_work(self) -> None:
+        safety = self.services_safety
+        assert safety is not None
+        every = safety.settings.safety_sample_every_n_frames
+        while True:
+            await self.safety_wake.wait()
+            self.safety_wake.clear()
+            pending, self.safety_pending = self.safety_pending, None
+            if pending is None:
+                continue
+            header = pending.frame.header
+            jpeg = pending.frame.jpeg
+
+            async def report(faces: list[FaceObservation], seq: int = header.seq) -> None:
+                await self._send_faces(seq, faces)
+
+            try:
+                analysis = await safety.analyze(self.patient_id, jpeg, on_faces=report)
+                # Faces are already on their way to the page. Storage is sampled, except that a
+                # frame behind a danger event, or one that failed, is always kept.
+                last = self.safety_persisted_seq
+                due = last is None or header.seq - last >= every
+                if not analysis.width:
+                    # It never decoded, so there is no image to keep and nothing to say about it.
+                    continue
+                if due or analysis.candidates or analysis.processing_status != "complete":
+                    self.safety_persisted_seq = header.seq
+                    await safety.persist(
+                        self.patient_id,
+                        self.device_id,
+                        self.session_id,
+                        jpeg,
+                        pending.observed_at,
+                        analysis,
+                    )
+            except (WebSocketDisconnect, RuntimeError):
+                return
+            except Exception:
+                log.exception("Safety processing failed for frame %s", header.seq)
+
+    async def _send_faces(self, seq: int, faces: list[FaceObservation]) -> None:
+        # Silent while nobody is in view, apart from the one empty list that says they left.
+        if not faces and not self.faces_in_view:
+            return
+        self.faces_in_view = bool(faces)
+        await self._send(
+            faces_message(
+                seq,
+                [
+                    Face(
+                        personId=str(face.person_id) if face.person_id else None,
+                        name=face.name,
+                        relation=face.relation,
+                        bbox=(face.bbox.x, face.bbox.y, face.bbox.w, face.bbox.h),
+                        confidence=face.confidence,
+                        matchConfidence=face.match_confidence,
+                        candidates=[
+                            FaceCandidate(
+                                personId=str(candidate.person_id),
+                                name=candidate.name,
+                                relation=candidate.relation,
+                                similarity=candidate.similarity,
+                            )
+                            for candidate in face.candidates
+                        ],
+                    )
+                    for face in faces
+                ],
+            )
+        )
+
     async def _refresh_prompts(self) -> None:
-        # A caregiver edit to the item list reaches the detector within this long.
-        if time.monotonic() - self.prompts_loaded_at >= self.settings.prompt_refresh_seconds:
-            self.set_prompts(await self.store.active_items(self.patient_id))
+        self.prompts = (await self.services_prompts.get(self.patient_id)).prompts
 
     async def _drop_pending(self) -> None:
         dropped, self.pending = self.pending, None
