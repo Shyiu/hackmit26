@@ -54,6 +54,9 @@ class Settings(TokenSettings):
     frame_stride: int = Field(default=1, ge=1)
     # How long the wearer's item prompt list is kept before it's re-read from the database.
     prompt_refresh_seconds: float = Field(default=30.0, gt=0.0)
+    # How often an open socket bumps its capture session's updatedAt, so a paused
+    # wearer still looks connected on the dashboard instead of going stale.
+    capture_heartbeat_s: float = Field(default=5.0, gt=0.0)
 
     # From detections to sightings. README "From detections to sightings".
     confirm_frames: int = Field(default=3, ge=1)

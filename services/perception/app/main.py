@@ -360,6 +360,7 @@ class FrameConnection:
 
     async def run(self) -> None:
         worker = asyncio.create_task(self._work())
+        heartbeat = asyncio.create_task(self._heartbeat())
         safety_worker = asyncio.create_task(self._safety_work()) if self.services_safety else None
         try:
             await self._send(session_message(str(self.session_id), "paused"))
@@ -379,6 +380,7 @@ class FrameConnection:
                 await self._send(error_message("server_error", "Storage is unavailable"))
                 await self.ws.close(code=1011)
         finally:
+            heartbeat.cancel()
             worker.cancel()
             if safety_worker is not None:
                 # Not waited for. It writes nothing the cleanup below depends on, and a storage
@@ -448,6 +450,16 @@ class FrameConnection:
         self.wake.set()
         if replaced is not None:
             await self._record_drop(replaced)
+
+    async def _heartbeat(self) -> None:
+        """Keeps an open session's updatedAt fresh while paused, so the dashboard doesn't
+        read a deliberately paused camera as offline. A storage blip mustn't kill the socket."""
+        while True:
+            await asyncio.sleep(self.settings.capture_heartbeat_s)
+            try:
+                await self.store.touch_capture_session(self.patient_id, self.session_id)
+            except PyMongoError:
+                log.warning("Couldn't heartbeat capture session %s", self.session_id)
 
     async def _work(self) -> None:
         while True:
