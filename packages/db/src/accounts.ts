@@ -4,9 +4,12 @@ import { newId, type CaregiverId, type DeviceId, type PatientId } from "./ids";
 import { collection } from "./registry";
 import {
   caregiverDocSchema,
+  caregiverPreferencesSchema,
+  DEFAULT_CAREGIVER_PREFERENCES,
   DEFAULT_PATIENT_SETTINGS,
   patientDocSchema,
   type CaregiverDoc,
+  type CaregiverPreferences,
   type PatientDoc,
   type PatientSettings,
   type WearerAccount,
@@ -22,6 +25,30 @@ export function findCaregiverByEmail(db: Db, email: string): Promise<CaregiverDo
 /** The wearer behind their own sign-in. Wearers a caregiver created have no account. */
 export function findPatientByAccountEmail(db: Db, email: string): Promise<PatientDoc | null> {
   return collection(db, "patients").findOne({ "account.email": email.trim().toLowerCase() });
+}
+
+export function findCaregiverById(db: Db, id: CaregiverId): Promise<CaregiverDoc | null> {
+  return collection(db, "caregivers").findOne({ _id: id });
+}
+
+export function caregiverPreferences(caregiver: Pick<CaregiverDoc, "preferences"> | null): CaregiverPreferences {
+  return { ...DEFAULT_CAREGIVER_PREFERENCES, ...caregiver?.preferences };
+}
+
+/** Merges into the caregiver's own preferences; a missing document leaves null. */
+export async function updateCaregiverPreferences(
+  db: Db,
+  id: CaregiverId,
+  patch: Partial<CaregiverPreferences>,
+): Promise<CaregiverDoc | null> {
+  const current = await findCaregiverById(db, id);
+  if (!current) return null;
+  const preferences = caregiverPreferencesSchema.parse({ ...caregiverPreferences(current), ...patch });
+  return collection(db, "caregivers").findOneAndUpdate(
+    { _id: id },
+    { $set: { preferences, updatedAt: new Date() } },
+    { returnDocument: "after" },
+  );
 }
 
 export function findPatientById(db: Db, id: PatientId): Promise<PatientDoc | null> {

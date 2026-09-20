@@ -1,13 +1,14 @@
 import { Settings } from "lucide-react";
+import { AccountPreferencesForm } from "@/components/dashboard/account-preferences-form";
 import { AttachPatientForm } from "@/components/dashboard/attach-patient-form";
 import { PairDeviceCard } from "@/components/dashboard/pair-device-card";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { SettingsForm } from "@/components/dashboard/settings-form";
-import { dashboardTenant } from "@/lib/server/dashboard";
+import { dashboardPreferences, dashboardTenant } from "@/lib/server/dashboard";
 
 export default async function SettingsPage() {
-  const { settings, patient, tenant } = await dashboardTenant("/dashboard/settings");
-  const devices = await tenant.devices.list();
+  const { settings, patient, tenant, principal } = await dashboardTenant("/dashboard/settings");
+  const [devices, preferences] = await Promise.all([tenant.devices.list(), dashboardPreferences(principal)]);
   const zones = Intl.supportedValuesOf("timeZone");
   const timeZones = zones.includes(settings.timezone) ? zones : [settings.timezone, ...zones];
 
@@ -20,6 +21,7 @@ export default async function SettingsPage() {
       />
       <PageBody width="sm">
         <SettingsForm initial={settings} timeZones={timeZones} />
+        <AccountPreferencesForm initial={preferences} />
         <PairDeviceCard
           initialDevices={devices.map((device) => ({
             _id: device._id.toHexString(),

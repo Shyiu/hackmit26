@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "da37f4ba6a94b606f974daff977281f1b1d59dbec563afbf8ea5f44f02a1f3e5",
+  "fingerprint": "f37573b892d1447288f1aff12a30726192f684d321f0534a7bcca19d4f078f5e",
   "collections": {
     "patients": {
       "validator": {
@@ -207,6 +207,18 @@
               "items": {
                 "bsonType": "objectId"
               }
+            },
+            "preferences": {
+              "type": "object",
+              "properties": {
+                "soundNotificationsEnabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "soundNotificationsEnabled"
+              ],
+              "additionalProperties": false
             },
             "lastLoginAt": {
               "anyOf": [

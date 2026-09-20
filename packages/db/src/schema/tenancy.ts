@@ -86,6 +86,18 @@ export const patientDocSchema = z.strictObject({
 
 export type PatientDoc = z.infer<typeof patientDocSchema>;
 
+/** Per-account dashboard preferences. These follow the caregiver, not the wearer. */
+export const caregiverPreferencesSchema = z.strictObject({
+  /** Off by default: the dashboard plays a short tone when a new alert arrives. */
+  soundNotificationsEnabled: z.boolean(),
+});
+
+export type CaregiverPreferences = z.infer<typeof caregiverPreferencesSchema>;
+
+export const DEFAULT_CAREGIVER_PREFERENCES: CaregiverPreferences = {
+  soundNotificationsEnabled: false,
+};
+
 /**
  * A caregiver login. Accounts made through signup carry a scrypt password hash;
  * the seeded demo caregiver has none and signs in with the env credentials.
@@ -97,6 +109,8 @@ export const caregiverDocSchema = z.strictObject({
   /** `scrypt$N$r$p$salt$hash`, base64url. Never leaves the server. */
   passwordHash: z.string().min(40).max(300).optional(),
   patientIds: z.array(idSchema<PatientId>()).min(1).max(20),
+  /** Absent on accounts made before preferences existed; read as the defaults. */
+  preferences: caregiverPreferencesSchema.optional(),
   lastLoginAt: z.date().nullable(),
   ...timestamps,
 });

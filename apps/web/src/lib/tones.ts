@@ -24,6 +24,13 @@ export function playStallTone(ctx: AudioContext) {
   beep(ctx, 330, ctx.currentTime, 0.4, 0.25);
 }
 
+// Two quick notes: a new alert reached the caregiver dashboard.
+export function playAlertTone(ctx: AudioContext) {
+  const now = ctx.currentTime;
+  beep(ctx, 784, now, 0.1, 0.15);
+  beep(ctx, 784, now + 0.14, 0.1, 0.15);
+}
+
 // A single soft chime: someone was just recognized. Deliberately not the
 // listening chime's rising pair, so the two are never confused -- this one
 // never means the mic is open.
