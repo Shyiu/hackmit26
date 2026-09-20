@@ -50,7 +50,10 @@ export function WearView() {
         onPointerDown={handleTap}
       >
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="relative max-h-full max-w-full" style={{ aspectRatio: aspect }}>
+          <div
+            className="relative"
+            style={{ aspectRatio: aspect, width: `min(100%, calc(100dvh * ${aspect}))` }}
+          >
             <LiveVideo stream={camera.stream} onElement={client.setVideo} className="h-full w-full opacity-60" />
             <ItemLabels detections={perception.detections} />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/70" />
