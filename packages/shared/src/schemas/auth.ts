@@ -35,7 +35,23 @@ export const attachPatientRequestSchema = z
   })
   .strict();
 
+export const pairDeviceRequestSchema = z
+  .object({
+    code: z.string().regex(/^\d{6}$/, "Enter the 6-digit code"),
+    label: z.string().trim().min(1).max(60),
+  })
+  .strict();
+
+export const devicePairingCodeRequestSchema = z
+  .object({
+    kind: z.enum(["wear", "sim"]),
+    label: z.string().trim().min(1).max(60).optional(),
+  })
+  .strict();
+
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type SignupRequest = z.infer<typeof signupRequestSchema>;
 export type WearerSignupRequest = z.infer<typeof wearerSignupRequestSchema>;
 export type AttachPatientRequest = z.infer<typeof attachPatientRequestSchema>;
+export type PairDeviceRequest = z.infer<typeof pairDeviceRequestSchema>;
+export type DevicePairingCodeRequest = z.infer<typeof devicePairingCodeRequestSchema>;
