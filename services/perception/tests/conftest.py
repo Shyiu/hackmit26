@@ -25,6 +25,18 @@ REPO = Path(__file__).resolve().parents[3]
 SCHEMA: dict[str, Any] = json.loads(
     (REPO / "packages" / "db" / "generated" / "mongo-schema.json").read_text()
 )
+# Settings also reads the developer's .env, where the real models may be switched on. The
+# environment wins over that file, so the tests always get the mocks.
+os.environ.update(
+    {
+        "SAFETY_DETECTOR": "mock",
+        "FACE_DETECTOR": "mock",
+        "FACE_EMBEDDER": "mock",
+        "VLM": "mock",
+        "DETECTOR": "auto",
+    }
+)
+
 TEST_URI = os.environ.get("MONGODB_TEST_URI", "mongodb://127.0.0.1:27017/?directConnection=true")
 
 Database = AsyncDatabase[dict[str, Any]]

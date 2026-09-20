@@ -126,7 +126,8 @@ pnpm db:seed ${seed_args[@]+"${seed_args[@]}"}
 
 if $perception; then
   step "Installing Python dependencies"
-  (cd "$PERCEPTION_DIR" && uv sync)
+  # --inexact keeps the optional model stacks (yoloe, faces) that a plain sync would uninstall.
+  (cd "$PERCEPTION_DIR" && uv sync --inexact)
 fi
 
 login="Sign in at http://localhost:$WEB_PORT/login as $(env_get CAREGIVER_EMAIL "$WEB_ENV") / $(env_get CAREGIVER_PASSWORD "$WEB_ENV")"
