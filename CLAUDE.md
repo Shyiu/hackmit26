@@ -40,6 +40,7 @@ pnpm build
 pnpm lint
 pnpm typecheck
 pnpm test             # vitest in packages/shared and packages/db; the db tests need MongoDB
+pnpm perception:serve # perception on :8000 behind a public https URL, for a deployed web app
 pnpm db:up            # local MongoDB 8.0 with Atlas Search in Docker, on :27017
 pnpm db:setup         # sync collections, validators, indexes; --search adds vector indexes
 pnpm db:seed          # demo wearer, caregiver, 3 items with sightings; --reset starts over
