@@ -56,7 +56,7 @@ The store and app tests run against a real MongoDB. Each test module gets a fres
 
 ## Safety pipeline
 
-Safety analysis is synchronous and runs in a worker thread so the frame socket stays responsive. Every sampled frame is decoded, passed through an object detector and face detector, matched against tenant-scoped encrypted enrollments, evaluated by declarative hazard rules, optionally confirmed once by a VLM, and persisted as a `frame_observations` document. A candidate creates or refreshes a `danger_events` record and a `danger_alert` notification. Events are single-frame “worth checking” signals, never proof that someone did something dangerous and never an emergency classifier.
+Safety analysis runs in a worker thread, on a worker task of its own, so neither the frame socket nor the item detector waits for it. Every live frame is offered to it and it takes the newest one. Faces go first: the frame is decoded, faces are found and matched against the wearer's own encrypted enrollments, and a `faces` message goes back on the socket before anything else runs. Then come the hazard detector, the declarative rules, and one optional VLM confirmation. Every `SAFETY_SAMPLE_EVERY_N_FRAMES`th frame is persisted as a `frame_observations` document, and so is any frame that raised a candidate. A candidate creates or refreshes a `danger_events` record and a `danger_alert` notification. Events are single-frame “worth checking” signals, never proof that someone did something dangerous and never an emergency classifier.
 
 The default mock path needs no model weights. Configure the service with lowercase settings fields through uppercase environment variables:
 
@@ -87,7 +87,23 @@ curl -X PATCH -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/js
   http://localhost:8000/danger-events/<event-id>
 ```
 
-Enroll people with `POST /people` and multipart fields `name`, `consentedBy`, optional `relation`, and one or more `photos`. Each photo must contain exactly one face. Face embeddings are encrypted at rest and are never returned by the API. Raw images stay under `FRAME_IMAGE_DIR`; only object keys are stored in MongoDB. Obtain explicit consent before enrollment, set a durable `FACE_EMBEDDING_KEY` outside local development, and apply the configured retention window.
+### Face recognition
+
+```bash
+uv sync --extra faces      # InsightFace and onnxruntime; the first boot downloads buffalo_l, about 280 MB
+# in .env: FACE_DETECTOR=insightface, FACE_EMBEDDER=insightface, and a FACE_EMBEDDING_KEY
+uv run python scripts/enroll_face.py --name Maria --relation daughter --consented-by Maria a.jpg b.jpg
+uv run python scripts/enroll_face.py --list
+uv run python scripts/bench_faces.py me.jpg    # time the face pass across models, sizes, providers
+```
+
+A plain `uv sync` uninstalls the extra again; `pnpm start` syncs with `--inexact` so it survives. The mock adapters find no face in a camera frame and can't match a person, so nothing is recognized until both switches say `insightface`.
+
+While a face is in view, each analyzed frame answers with `{"type":"faces","v":1,"seq":…,"faces":[…]}`, and one empty list follows when the last face leaves. Each face has `personId`, `name`, and `relation` (all null for someone not enrolled), a normalized `bbox`, the detector's `confidence`, and `matchConfidence`. The schema is `facesMessageSchema` in `packages/shared`. The message can land before or after the same frame's `detections`. A face is named when its best cosine similarity to a person's reference photos reaches `FACE_MATCH_THRESHOLD` and beats the next person by 0.05. People are only scored against embeddings made by the model that is running, so switching `INSIGHTFACE_MODEL` means enrolling again.
+
+What keeps it fast: detection and embedding share one InsightFace pass, and the pack's landmark and age models are never loaded. `FACE_PROVIDERS=auto` runs on CoreML or CUDA when onnxruntime has one. The wearer's decrypted gallery is cached in the process, dropped on every enroll and delete, and scored in one matrix product. On an M-series Mac, `buffalo_l` at 640 takes about 14 ms for a 640 px frame with four faces (94 ms on CPU alone), and a 1280 px frame sent over the socket comes back named in 35 to 50 ms. `FACE_DET_SIZE=320` and `INSIGHTFACE_MODEL=buffalo_s` are the next steps down if the host has no accelerator.
+
+Enroll people with `POST /people` and multipart fields `name`, `consentedBy`, optional `relation`, and one or more `photos`. Each photo must contain exactly one face. Face embeddings are encrypted at rest and are never returned by the API. Raw images stay under `FRAME_IMAGE_DIR`; only object keys are stored in MongoDB. Phone photos are turned upright from their EXIF flag first. Obtain explicit consent before enrollment and apply the configured retention window. Set a durable `FACE_EMBEDDING_KEY`: without one the key lasts as long as the process, and a person enrolled under another key is skipped with a warning until they are enrolled again. The route needs a device token with `api` scope; the web app mints one with `mintDeviceToken({ scope: "api" })`, and `scripts/enroll_face.py` signs its own.
 
 ## Evaluation
 
@@ -130,9 +146,14 @@ The mock adapters support deterministic filename/label hints and are intended fo
 | `TRACK_MATCH_IOU` | `0.3` | Minimum overlap to keep a track on a detection |
 | `MONGODB_TEST_URI` | `mongodb://127.0.0.1:27017/?directConnection=true` | Tests only |
 | `SAFETY_ENABLED` | `true` | Enables safety processing |
-| `SAFETY_SAMPLE_EVERY_N_FRAMES` | `3` | Socket sampling interval |
+| `SAFETY_SAMPLE_EVERY_N_FRAMES` | `3` | How often an analyzed frame is stored. Every live frame is analyzed |
 | `SAFETY_DETECTOR`, `FACE_DETECTOR`, `FACE_EMBEDDER`, `VLM` | `mock` | Safety adapter switches. `SAFETY_DETECTOR` is separate from the item `DETECTOR` |
 | `FACE_EMBEDDING_KEY` | none | Durable Fernet key; a process-local key is used otherwise |
+| `INSIGHTFACE_MODEL` | `buffalo_l` | The model pack. `buffalo_s` is smaller and faster |
+| `FACE_PROVIDERS` | `auto` | onnxruntime providers, comma separated. `auto` takes CUDA or CoreML, else CPU |
+| `FACE_DET_SIZE`, `FACE_MAX_PER_FRAME` | `640`, `4` | Detector input size; how many of the largest faces are embedded |
+| `FACE_MATCH_THRESHOLD`, `FACE_MIN_CONFIDENCE` | `0.45`, `0.6` | Similarity needed to name a face; detector confidence before an unknown face is flagged |
+| `FACE_GALLERY_TTL_S` | `60` | How long a wearer's decrypted gallery is cached |
 | `FRAME_IMAGE_DIR` | `./data/frames` | Local image root |
 | `ALLOW_LOCAL_PATH_INGEST` | `false` | Enables development-only JSON path ingestion |
 

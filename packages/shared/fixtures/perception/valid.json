@@ -32,6 +32,37 @@
       ]
     },
     { "type": "detections", "v": 1, "seq": 43, "detections": [] },
+    {
+      "type": "faces",
+      "v": 1,
+      "seq": 42,
+      "faces": [
+        {
+          "personId": "5eed00000000000000000201",
+          "name": "Maria",
+          "relation": "daughter",
+          "bbox": [0.3, 0.2, 0.2, 0.3],
+          "confidence": 0.93,
+          "matchConfidence": 0.71,
+          "candidates": [
+            { "personId": "5eed00000000000000000201", "name": "Maria", "relation": "daughter", "similarity": 0.71 },
+            { "personId": "5eed00000000000000000202", "name": "Dana", "relation": "sister", "similarity": 0.33 }
+          ]
+        },
+        {
+          "personId": null,
+          "name": null,
+          "relation": null,
+          "bbox": [0.6, 0.25, 0.15, 0.2],
+          "confidence": 0.88,
+          "matchConfidence": 0.12,
+          "candidates": [
+            { "personId": "5eed00000000000000000201", "name": "Maria", "relation": "daughter", "similarity": 0.12 }
+          ]
+        }
+      ]
+    },
+    { "type": "faces", "v": 1, "seq": 43, "faces": [] },
     { "type": "error", "v": 1, "code": "unauthorized", "message": "Token expired" }
   ]
 }

@@ -94,3 +94,49 @@ async def test_events_merge_and_are_tenant_scoped(safety_store, db):
     assert await safety_store.list_danger_events(other) == []
     assert await safety_store.list_frame_observations(other) == []
     assert await safety_store.update_danger_event_status(other, event[0], "acknowledged") is None
+
+
+@pytest.mark.asyncio
+async def test_gallery_is_cached_until_the_wearers_people_change(safety_store, db):
+    from conftest import Seed
+
+    patient_id = await Seed(db).patient()
+    other_id = await Seed(db).patient()
+    vector = np.ones(512, dtype=np.float32)
+    alex = await safety_store.enroll_person(
+        patient_id, "Alex", "son", "caregiver", ["people/a.jpg"], [vector], "mock-512"
+    )
+    first = await safety_store.gallery(patient_id, "mock-512")
+    assert [(person.name, person.relation) for person in first.people] == [("Alex", "son")]
+    assert await safety_store.gallery(patient_id, "mock-512") is first
+    # Never anyone else's enrolled set.
+    assert (await safety_store.gallery(other_id, "mock-512")).people == ()
+
+    await safety_store.enroll_person(
+        patient_id, "Sam", None, "caregiver", ["people/s.jpg"], [vector], "mock-512"
+    )
+    assert len((await safety_store.gallery(patient_id, "mock-512")).people) == 2
+    assert await safety_store.delete_person(patient_id, alex["_id"])
+    assert [person.name for person in (await safety_store.gallery(patient_id, "mock-512")).people] == ["Sam"]
+
+
+@pytest.mark.asyncio
+async def test_a_person_enrolled_under_another_key_is_skipped(db, tmp_path):
+    from conftest import Seed
+    from cryptography.fernet import Fernet
+
+    patient_id = await Seed(db).patient()
+    vector = np.ones(512, dtype=np.float32)
+    old = SafetyStore(
+        db,
+        ObservationStore(db),
+        settings(frame_image_dir=str(tmp_path), face_embedding_key=Fernet.generate_key().decode()),
+    )
+    await old.enroll_person(patient_id, "Alex", None, "caregiver", ["people/a.jpg"], [vector], "mock-512")
+    new = SafetyStore(
+        db,
+        ObservationStore(db),
+        settings(frame_image_dir=str(tmp_path), face_embedding_key=Fernet.generate_key().decode()),
+    )
+    await new.enroll_person(patient_id, "Sam", None, "caregiver", ["people/s.jpg"], [vector], "mock-512")
+    assert [person.name for person in await new.enrolled_embeddings(patient_id)] == ["Sam"]

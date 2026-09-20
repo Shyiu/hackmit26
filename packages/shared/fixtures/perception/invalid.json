@@ -16,6 +16,9 @@
     { "type": "session", "v": 1, "sessionId": "5eed00000000000000000c01", "state": "recording" },
     { "type": "detections", "v": 1, "seq": 1, "detections": [{ "itemId": "x", "label": "keys", "bbox": [0.1, 0.2, 0.3], "confidence": 0.5 }] },
     { "type": "detections", "v": 1, "seq": 1, "detections": [{ "itemId": "x", "label": "keys", "bbox": [0.1, 0.2, 0.3, 0.4], "confidence": 1.5 }] },
+    { "type": "faces", "v": 1, "seq": 1, "faces": [{ "personId": "not-an-id", "name": "Maria", "relation": null, "bbox": [0.1, 0.2, 0.3, 0.4], "confidence": 0.9, "matchConfidence": 0.7 }] },
+    { "type": "faces", "v": 1, "seq": 1, "faces": [{ "personId": null, "name": null, "relation": null, "bbox": [0.1, 0.2, 0.3, 0.4], "confidence": 0.9, "matchConfidence": 1.5 }] },
+    { "type": "faces", "v": 1, "seq": 1 },
     { "type": "error", "v": 1, "code": "teapot", "message": "no" }
   ]
 }

@@ -192,7 +192,7 @@ export default async function DashboardHomePage() {
             <Tile href="/dashboard/live" title="3D Render" icon={Video} tone="navy" size="square" />
             <Tile href="/dashboard/questions" title="Questions" icon={MessageCircleQuestion} tone="sky" size="square" />
             <Tile href="/dashboard/messages" title="Messages" icon={MessageSquareHeart} tone="butter" size="square" />
-            <Tile href="/dashboard/faces" title="Faces" icon={ScanFace} tone="ice" size="square" />
+            <Tile href="/dashboard/people" title="Faces" icon={ScanFace} tone="ice" size="square" />
           </div>
         </section>
       </div>

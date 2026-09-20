@@ -1,35 +1,35 @@
 import { HttpError, withTenant } from "@/lib/server/api";
-import { perceptionError, perceptionFetch } from "@/lib/server/perception";
-import { personView } from "@/lib/server/views";
+import { listPeople, perceptionFetch, personView } from "@/lib/server/perception";
 
-const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
-
-// Enrolled faces. Perception owns the writes, because it makes and stores the
-// embeddings; this route lists from the database and forwards enrollment.
-export const GET = withTenant("caregiver", async ({ tenant }) => {
-  const people = await tenant.people.list();
-  return Response.json({ people: people.map(personView) });
+// Face enrollment. The photos and embeddings live in the perception service, which
+// matches a wearer's frames against that wearer's own people and nobody else's.
+export const GET = withTenant("caregiver", async ({ principal }) => {
+  return Response.json({ people: await listPeople(principal.patientId) });
 });
 
+const MAX_PHOTOS = 5;
+const MAX_PHOTO_BYTES = 12_000_000;
+
 export const POST = withTenant("caregiver", async ({ request, principal }) => {
+  if (principal.kind !== "caregiver") throw new HttpError(403, "Only a caregiver can do this");
   const form = await request.formData().catch(() => null);
-  if (!form) throw new HttpError(400, "The body must be a form");
+  if (!form) throw new HttpError(400, "Send the photos as a form");
   const name = String(form.get("name") ?? "").trim();
   const relation = String(form.get("relation") ?? "").trim();
-  const photo = form.get("photo");
-  if (!name || name.length > 60) throw new HttpError(400, "Enter a name of up to 60 characters");
-  if (!relation || relation.length > 60) throw new HttpError(400, "Enter how they're related, up to 60 characters");
-  if (form.get("consent") !== "true") throw new HttpError(400, "Confirm the person agreed to be enrolled");
-  if (!(photo instanceof File) || photo.size === 0) throw new HttpError(400, "Choose a photo");
-  if (photo.type !== "image/jpeg") throw new HttpError(400, "The photo must be a JPEG");
-  if (photo.size > MAX_PHOTO_BYTES) throw new HttpError(400, "The photo is over 8 MB");
+  const photos = form.getAll("photos").filter((item): item is File => item instanceof File && item.size > 0);
+  if (!name || name.length > 60) throw new HttpError(422, "Give a name of up to 60 characters");
+  if (relation.length > 60) throw new HttpError(422, "Keep the relation under 60 characters");
+  if (form.get("consent") !== "yes") throw new HttpError(422, "This person has to agree to being recognized first");
+  if (photos.length === 0 || photos.length > MAX_PHOTOS) throw new HttpError(422, `Add one to ${MAX_PHOTOS} photos`);
+  if (photos.some((photo) => photo.size > MAX_PHOTO_BYTES)) throw new HttpError(422, "Each photo must be under 12 MB");
 
-  const forward = new FormData();
-  forward.set("name", name);
-  forward.set("relation", relation);
-  forward.set("consentedBy", `caregiver ${principal.kind === "caregiver" ? principal.caregiverId.toHexString() : ""}`.trim());
-  forward.append("photos", photo, photo.name || "photo.jpg");
-  const response = await perceptionFetch(principal.patientId, "/people", { method: "POST", body: forward });
-  if (!response.ok) throw await perceptionError(response);
-  return Response.json(await response.json(), { status: 201 });
+  const upstream = new FormData();
+  upstream.set("name", name);
+  if (relation) upstream.set("relation", relation);
+  // Who recorded the consent, never a value the form chose.
+  upstream.set("consentedBy", principal.caregiverId.toHexString());
+  for (const photo of photos) upstream.append("photos", photo, photo.name);
+
+  const response = await perceptionFetch(principal.patientId, "/people", { method: "POST", body: upstream });
+  return Response.json(personView(await response.json()), { status: 201 });
 });

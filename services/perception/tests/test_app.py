@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import threading
 import time
@@ -27,6 +28,7 @@ from app.protocol import (
     Detection,
     DetectionsMessage,
     ErrorMessage,
+    FacesMessage,
     FrameHeader,
     SessionMessage,
     encode_frame,
@@ -34,8 +36,9 @@ from app.protocol import (
 )
 from app.safety.adapters.mock import MockDetector, MockFaceDetector, MockFaceEmbedder, MockVLM
 from app.safety.adapters.registry import Adapters
-from app.safety.models import BBox
+from app.safety.models import BBox, FaceBox
 from app.safety.models import Detection as SafetyDetection
+from app.store import ObservationStore
 from app.tokens import DeviceTokenClaims, sign_device_token
 
 FIXTURE: dict[str, Any] = json.loads(
@@ -304,6 +307,86 @@ def test_frames_socket_runs_a_capture_session(
     assert session["endedAt"] is not None
 
 
+class _DarkFrameFaces:
+    """Finds one face in a dark frame and none in a bright one."""
+
+    name = "dark-frames"
+
+    def detect(self, image, *, filename: str = "") -> list[FaceBox]:
+        if image.mean() > 128:
+            return []
+        return [FaceBox(bbox=BBox(x=0.25, y=0.25, w=0.5, h=0.5), confidence=0.95)]
+
+
+def _jpeg_of(color: str) -> bytes:
+    output = BytesIO()
+    Image.new("RGB", (16, 16), color).save(output, format="JPEG")
+    return output.getvalue()
+
+
+def _next_faces(ws: WebSocketTestSession) -> FacesMessage:
+    # The face worker and the item worker answer in whichever order they finish.
+    while True:
+        message = parse_server_message(ws.receive_text())
+        if isinstance(message, FacesMessage):
+            return message
+        assert isinstance(message, DetectionsMessage)
+
+
+def test_live_frames_name_an_enrolled_face_and_say_when_it_leaves(
+    wearer_db: Database, tmp_path: Path
+) -> None:
+    settings = Settings(
+        mongodb_uri=TEST_URI,
+        mongodb_db=wearer_db.name,
+        device_token_secret=SECRET,
+        frame_image_dir=str(tmp_path),
+    )
+    safety_adapters = Adapters(
+        detector=MockDetector([]),
+        face_detector=_DarkFrameFaces(),
+        face_embedder=MockFaceEmbedder(),
+        vlm=None,
+    )
+    api_token = sign_device_token(
+        DeviceTokenClaims.model_validate({**FIXTURE["claims"], "sub": None, "scope": "api"}), SECRET
+    )
+    with TestClient(
+        create_app(settings, safety_adapters=safety_adapters, token_clock=lambda: FIXTURE["validAt"])
+    ) as app_client:
+        with app_client.websocket_connect("/ws/frames") as ws:
+            ws.send_text(_hello(FIXTURE["token"]))
+            opened = parse_server_message(ws.receive_text())
+            assert isinstance(opened, SessionMessage)
+            ws.send_text(_capture("live"))
+            parse_server_message(ws.receive_text())
+
+            # A stranger first, which also fills the gallery cache with nobody in it.
+            ws.send_bytes(_frame_with_jpeg(opened.sessionId, 1, _jpeg_of("black")))
+            stranger = _next_faces(ws)
+            assert [(face.personId, face.name) for face in stranger.faces] == [(None, None)]
+
+            # Enrolling mid-session has to reach the very next frame, cache or not.
+            enrolled = app_client.post(
+                "/people",
+                headers={"Authorization": f"Bearer {api_token}"},
+                files={"photos": ("alex.jpg", _jpeg_of("black"), "image/jpeg")},
+                data={"name": "Alex", "relation": "son", "consentedBy": "caregiver"},
+            )
+            assert enrolled.status_code == 201, enrolled.text
+
+            ws.send_bytes(_frame_with_jpeg(opened.sessionId, 2, _jpeg_of("black")))
+            known = _next_faces(ws)
+            assert known.seq == 2
+            assert [(face.personId, face.name, face.relation) for face in known.faces] == [
+                (enrolled.json()["_id"], "Alex", "son")
+            ]
+            assert known.faces[0].matchConfidence is not None and known.faces[0].matchConfidence > 0.99
+
+            ws.send_bytes(_frame_with_jpeg(opened.sessionId, 3, _jpeg_of("white")))
+            assert _next_faces(ws) == FacesMessage(type="faces", v=1, seq=3, faces=[])
+
+
 def test_live_frame_runs_safety_after_detections(wearer_db: Database, tmp_path: Path) -> None:
     settings = Settings(
         mongodb_uri=TEST_URI,
@@ -382,9 +465,27 @@ def wearer(wearer_db: Database) -> Iterator[Database]:
         )
 
 
+@pytest.mark.parametrize("disconnect_during_write", [False, True])
 def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_frames(
-    wearer: Database, keys_item: ObjectId, sessions: Collection[dict[str, Any]]
+    wearer: Database,
+    keys_item: ObjectId,
+    sessions: Collection[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    disconnect_during_write: bool,
 ) -> None:
+    write_finished = threading.Event()
+    release_write = threading.Event()
+    original_open = ObservationStore.open_sighting
+
+    async def delayed_open(self: ObservationStore, **kwargs: Any) -> Any:
+        opened = await original_open(self, **kwargs)
+        write_finished.set()
+        # Hold the return after the DB writes, before SightingWriter records the ID.
+        await asyncio.to_thread(release_write.wait, 5)
+        return opened
+
+    if disconnect_during_write:
+        monkeypatch.setattr(ObservationStore, "open_sighting", delayed_open)
     detector = StubDetector()
     with _client(wearer.name, detector=detector) as client, client.websocket_connect("/ws/frames") as ws:
         session_id = _live_session(ws)
@@ -400,9 +501,15 @@ def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_fram
         assert (sighting["itemId"], sighting["firstSeq"], sighting["lastSeq"]) == (keys_item, 1, 3)
         assert (sighting["sessionId"], sighting["source"]) == (ObjectId(session_id), "headset")
         assert sighting["eventId"] == f"{session_id}:1"
-        item = db["items"].find_one({"_id": keys_item})
-        assert item is not None and item["lastSighting"]["sightingId"] == sighting["_id"]
+        # The snapshot is a second write, after the sighting itself.
+        item = _wait_for(
+            lambda: db["items"].find_one({"_id": keys_item, "lastSighting.sightingId": sighting["_id"]})
+        )
+        assert item is not None
+        if disconnect_during_write:
+            assert write_finished.wait(5)
         ws.close()
+        release_write.set()
         _wait_for(lambda: db["sightings"].find_one({"_id": sighting["_id"], "status": "closed"}))
 
     # Only the active item's prompts reached the detector.
