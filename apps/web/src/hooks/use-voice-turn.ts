@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { browserSpeechAvailable, openBrowserTurn } from "@/lib/client/browser-speech";
 import { openDeepgramTurn, type SttOutcome, type TurnMode } from "@/lib/client/deepgram";
 import { capturePcm, type PcmCapture } from "@/lib/client/pcm-capture";
+import { wearerFetch } from "@/lib/client/api";
 
 type AudioSessionType =
   | "auto"
@@ -46,7 +47,7 @@ type ActiveTurn = {
 
 async function fetchSttToken(): Promise<SttToken | null> {
   try {
-    const response = await fetch("/api/stt/token", { cache: "no-store" });
+    const response = await wearerFetch("/api/stt/token", { cache: "no-store" });
     if (!response.ok) return null;
     const body = (await response.json()) as { token: string; model: string; expiresAt: string };
     return { token: body.token, model: body.model, expiresAt: Date.parse(body.expiresAt) };

@@ -1,13 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useEffectEvent, useState, type FormEvent } from "react";
 import { Circle, Mic, Pause, Play, Square } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CameraSelect } from "@/components/wearer/camera-select";
 import { FaceLabels, Hud, ItemLabels, StallCard } from "@/components/wearer/hud";
 import { LiveVideo } from "@/components/wearer/live-video";
+import { PairForm } from "@/components/wearer/pair-form";
 import { RecordingsList } from "@/components/wearer/recordings-list";
 import { useVideoAspect } from "@/hooks/use-video-frames";
 import { useWearerClient } from "@/hooks/use-wearer-client";
@@ -73,10 +73,7 @@ export function SimulatorView() {
     <div className="flex flex-col gap-4">
       {client.signedIn === false && (
         <div className="flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <p>Sign in first. Answers and frame upload use the caregiver session.</p>
-          <Link href="/login?next=/sim" className={buttonVariants()}>
-            Sign in
-          </Link>
+          <PairForm kind="simulator" next="/sim" />
         </div>
       )}
 

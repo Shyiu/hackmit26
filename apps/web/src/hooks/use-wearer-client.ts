@@ -9,12 +9,13 @@ import {
   type SpeechOutcome,
 } from "@/lib/client/speaker";
 import { playListeningChime, playStallTone } from "@/lib/tones";
+import { DEVICE_TOKEN_SETTING, wearerFetch } from "@/lib/client/api";
 import { CAMERA_SETTING, parseCameraChoice, useCamera, type CameraChoice } from "./use-camera";
 import { useHudMessage } from "./use-hud-message";
 import { usePerception } from "./use-perception";
 import { useRecorder } from "./use-recorder";
 import { enterFullscreen, useWakeLock } from "./use-screen";
-import { readStoredString, writeStoredString } from "./use-stored-setting";
+import { readStoredString, useStoredString, writeStoredString } from "./use-stored-setting";
 import { useFeedWatchdog } from "./use-video-frames";
 import { useVoiceTurn, type TurnResult } from "./use-voice-turn";
 
@@ -37,7 +38,7 @@ function sleep(ms: number) {
 // Polls an interaction until it settles. Server TTS answers carry only audio,
 // so the caption text comes from here while the voice is already playing.
 async function fetchInteraction(id: string): Promise<InteractionView> {
-  const poll = await fetch(`/api/interactions/${id}`, { cache: "no-store" });
+  const poll = await wearerFetch(`/api/interactions/${id}`, { cache: "no-store" });
   if (!poll.ok) throw new Error(`Polling the answer failed with ${poll.status}`);
   return (await poll.json()) as InteractionView;
 }
@@ -58,7 +59,7 @@ type ServerAnswer =
   | { kind: "audio"; interactionId: string; body: ReadableStream<Uint8Array>; format: { sampleRate: number; channels: number } };
 
 async function askServer(transcript: string): Promise<ServerAnswer> {
-  const response = await fetch("/api/ask", {
+  const response = await wearerFetch("/api/ask", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ transcript, requestId: crypto.randomUUID() }),
@@ -82,7 +83,7 @@ function reportPlayback(interactionId: string, outcome: SpeechOutcome, firstPlay
     outcome: outcome === "played" ? "played" : outcome === "cancelled" ? "cancelled" : "failed",
     ...(firstPlaybackMs !== null && { clientFirstPlaybackMs: Math.min(60_000, Math.round(firstPlaybackMs)) }),
   };
-  void fetch(`/api/interactions/${interactionId}/playback`, {
+  void wearerFetch(`/api/interactions/${interactionId}/playback`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -93,6 +94,7 @@ function reportPlayback(interactionId: string, outcome: SpeechOutcome, firstPlay
 function useWearerSettings() {
   const [settings, setSettings] = useState<WearerSettings | null>(null);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [token] = useStoredString(DEVICE_TOKEN_SETTING);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,15 +102,13 @@ function useWearerSettings() {
     async function load() {
       if (cancelled || needsSignIn) return;
       try {
-        const response = await fetch("/api/settings", { cache: "no-store" });
+        const response = await wearerFetch("/api/settings", { cache: "no-store" });
         if (cancelled) return;
         if (response.status === 401) {
           needsSignIn = true;
           window.clearInterval(timer);
           setSettings(null);
           setSignedIn(false);
-          const next = window.location.pathname + window.location.search;
-          window.location.replace(`/login?next=${encodeURIComponent(next)}`);
           return;
         }
         if (!response.ok) return;
@@ -126,7 +126,7 @@ function useWearerSettings() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [token]);
 
   return { settings, signedIn };
 }
@@ -374,7 +374,7 @@ export function useWearerClient({
   // the server until marked shown.
   const checkNotifications = useEffectEvent(async () => {
     if (voice.listening || answer !== "idle" || notificationRef.current) return;
-    const response = await fetch("/api/notifications", { cache: "no-store" }).catch(() => null);
+    const response = await wearerFetch("/api/notifications", { cache: "no-store" }).catch(() => null);
     if (!response?.ok) return;
     const { notification } = (await response.json()) as { notification: NotificationView | null };
     if (!notification || notificationRef.current) return;
@@ -382,7 +382,7 @@ export function useWearerClient({
     try {
       const { outcome } = await say(notification.text);
       if (outcome !== "cancelled") {
-        await fetch(`/api/notifications/${notification._id}/shown`, { method: "POST" }).catch(() => null);
+        await wearerFetch(`/api/notifications/${notification._id}/shown`, { method: "POST" }).catch(() => null);
       }
     } finally {
       notificationRef.current = null;

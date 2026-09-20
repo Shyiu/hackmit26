@@ -1,15 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { Circle, Square } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CameraSelect } from "@/components/wearer/camera-select";
+import { PairForm } from "@/components/wearer/pair-form";
 import { RecordingsList } from "@/components/wearer/recordings-list";
+import { DEVICE_TOKEN_SETTING, clearDeviceToken } from "@/lib/client/api";
+import { useStoredString } from "@/hooks/use-stored-setting";
 import { useDisplayMode } from "@/hooks/use-screen";
 import type { WearerClient } from "@/hooks/use-wearer-client";
-import { cn } from "@/lib/utils";
 
 const SAMPLE_ANSWER =
   "I last saw your keys on the kitchen counter, next to the coffee maker, about twenty minutes ago.";
@@ -23,7 +24,7 @@ const ENGINE_LABELS = {
 const PERCEPTION_LABELS = {
   off: "off",
   unconfigured: "no perception URL set",
-  "signed-out": "sign in first",
+  "signed-out": "pair or sign in first",
   connecting: "connecting",
   connected: "connected",
   error: "reconnecting",
@@ -44,6 +45,7 @@ export function SetupPanel({
 }) {
   const displayMode = useDisplayMode();
   const [question, setQuestion] = useState("");
+  const [deviceToken] = useStoredString(DEVICE_TOKEN_SETTING);
   const { camera, recorder, voice, perception, wakeLock, live, capturing } = client;
   const starting = camera.status === "starting";
   const track = camera.stream?.getVideoTracks()[0];
@@ -72,10 +74,7 @@ export function SetupPanel({
 
         {client.signedIn === false && (
           <div className="flex flex-col gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 p-4">
-            <p>Nobody is signed in on this phone. A caregiver signs in once, and this page uses that session.</p>
-            <Link href="/login?next=/wear" className={cn(buttonVariants({ size: "lg" }), "self-start")}>
-              Sign in
-            </Link>
+            <PairForm kind="headset" next="/wear" />
           </div>
         )}
 
@@ -202,6 +201,8 @@ export function SetupPanel({
             <dd>{voice.error ?? (voice.micAllowed ? "allowed" : "not asked yet")}</dd>
             <dt>Speech to text</dt>
             <dd>{voice.engine ? ENGINE_LABELS[voice.engine] : "not checked yet"}</dd>
+            <dt>Pairing</dt>
+            <dd>{deviceToken ? "paired" : client.signedIn ? "caregiver session" : "not paired"}</dd>
             <dt>Frame upload</dt>
             <dd>
               {PERCEPTION_LABELS[perception.status]}
@@ -212,6 +213,11 @@ export function SetupPanel({
             <dt>Display</dt>
             <dd>{displayMode}</dd>
           </dl>
+          {deviceToken && (
+            <Button variant="outline" className="self-start" onClick={clearDeviceToken}>
+              Unpair this phone
+            </Button>
+          )}
           {perception.error && perception.status !== "connected" && (
             <p className="text-sm text-white/50">Frames: {perception.error}</p>
           )}

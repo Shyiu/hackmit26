@@ -6,6 +6,7 @@ import {
   type Face,
   type FrameHeader,
 } from "@memory-glasses/shared";
+import { wearerFetch } from "@/lib/client/api";
 
 // Frames to the perception service over /ws/frames. See the protocol notes in
 // packages/shared/src/schemas/perception.ts and README "Frame handling".
@@ -31,7 +32,7 @@ type Token = { token: string; url: string | null };
 
 async function fetchToken(): Promise<Token | "signed-out" | null> {
   try {
-    const response = await fetch("/api/perception/token", { cache: "no-store" });
+    const response = await wearerFetch("/api/perception/token", { cache: "no-store" });
     if (response.status === 401) return "signed-out";
     if (!response.ok) return null;
     return (await response.json()) as Token;
