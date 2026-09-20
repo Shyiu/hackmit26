@@ -36,9 +36,11 @@ export {
   createPatient,
   findCaregiverByEmail,
   findPatientByAccountEmail,
+  findPatientById,
   listPatientsByIds,
   patientHasCaregiver,
   recordLogin,
+  setWearerAccountDevice,
 } from "./accounts";
 export {
   addPatientToCaregiver,

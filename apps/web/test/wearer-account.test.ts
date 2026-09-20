@@ -1,16 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { POST as attachPatient } from "@/app/api/auth/attach-patient/route";
-import { GET as caregiverLinkStatus } from "@/app/api/auth/caregiver-link/route";
+import { GET as caregiverLinkStatus, POST as inviteCaregiver } from "@/app/api/auth/caregiver-link/route";
 import { POST as login } from "@/app/api/auth/login/route";
 import { POST as caregiverSignup } from "@/app/api/auth/signup/route";
 import { POST as wearerSignup } from "@/app/api/auth/wearer-signup/route";
 import { GET as getSettings } from "@/app/api/settings/route";
 import { DEVICE_COOKIE, SESSION_COOKIE } from "@/lib/server/auth";
-import { call, newHousehold, openRouteDb } from "./helpers";
+import { apiClaims, call, deviceToken, newHousehold, openRouteDb } from "./helpers";
 
 function cookieValue(response: Response, name: string) {
   return (response.headers.get("set-cookie") ?? "").match(new RegExp(`${name}=([^;]+)`))?.[1] ?? null;
+}
+
+function expires(response: Response, name: string) {
+  return response.headers.getSetCookie().some((cookie) => cookie.startsWith(`${name}=;`));
 }
 
 const signUp = (body: unknown) => call(wearerSignup, { method: "POST", path: "/api/auth/wearer-signup", body });
@@ -60,6 +64,27 @@ describe("a wearer's own account", () => {
 
     const after = await call(login, { method: "POST", path: "/api/auth/login", body: { email, password } });
     expect(await after.json()).toEqual({ kind: "wearer", next: "/wear" });
+
+    // The invite is spent: nothing on this account can hand out a second one.
+    const again = await call(inviteCaregiver, {
+      method: "POST",
+      path: "/api/auth/caregiver-link",
+      auth: { deviceCookie: cookieValue(after, DEVICE_COOKIE)! },
+    });
+    expect(again.status).toBe(409);
+  });
+
+  it("only lets the wearer's own account device invite a caregiver", async () => {
+    const household = await newHousehold(env.db);
+    const paired = await deviceToken(
+      apiClaims({ patientId: household.patient._id, deviceId: household.device._id }),
+    );
+    const invite = await call(inviteCaregiver, {
+      method: "POST",
+      path: "/api/auth/caregiver-link",
+      auth: { deviceCookie: paired },
+    });
+    expect(invite.status).toBe(403);
   });
 
   it("rejects a wrong password and an email that is already taken", async () => {
@@ -98,5 +123,23 @@ describe("a wearer's own account", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ kind: "caregiver", next: "/dashboard" });
     expect(cookieValue(response, SESSION_COOKIE)).toBeTruthy();
+    // One browser, one account: the wearer cookie can't linger and outrank this session.
+    expect(expires(response, DEVICE_COOKIE)).toBe(true);
+  });
+
+  it("keeps a caregiver from taking an email a wearer account already holds", async () => {
+    const { email, password } = credentials();
+    expect((await signUp({ wearerName: "Rose", email, password })).status).toBe(201);
+
+    const taken = await call(caregiverSignup, {
+      method: "POST",
+      path: "/api/auth/signup",
+      body: { name: "Ada", email, password, wearerName: "Rose" },
+    });
+    expect(taken.status).toBe(409);
+
+    // The wearer still signs in with their own password.
+    const signedIn = await call(login, { method: "POST", path: "/api/auth/login", body: { email, password } });
+    expect((await signedIn.json()).kind).toBe("wearer");
   });
 });

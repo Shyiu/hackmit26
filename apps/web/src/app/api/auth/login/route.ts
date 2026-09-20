@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
         }
         const body: LoginResponse = { kind: "wearer", next: await wearerLanding(wearer._id) };
         const response = NextResponse.json(body);
-        await signInWearer(response, wearer._id);
+        await signInWearer(response, wearer);
         return response;
       }
     }

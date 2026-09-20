@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 },
     );
-    if (account) await signInWearer(response, patient._id);
+    if (account) await signInWearer(response, patient);
     return response;
   } catch (error) {
     return errorResponse(error);

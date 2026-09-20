@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "9a801448683e8e742461c0e176ed209b06fd681c4b20b0be2bb8c2ed0f9acab2",
+  "fingerprint": "8fb29901649bc6511b18335afae02ac718f0dd8f7dc3f989a06fab268e72be21",
   "collections": {
     "patients": {
       "validator": {
@@ -24,6 +24,16 @@
                   "maxLength": 254,
                   "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                 },
+                "deviceId": {
+                  "anyOf": [
+                    {
+                      "bsonType": "objectId"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "passwordHash": {
                   "type": "string",
                   "minLength": 40,
@@ -32,6 +42,7 @@
               },
               "required": [
                 "email",
+                "deviceId",
                 "passwordHash"
               ],
               "additionalProperties": false

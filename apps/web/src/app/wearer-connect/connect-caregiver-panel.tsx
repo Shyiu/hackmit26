@@ -21,6 +21,11 @@ export function ConnectCaregiverPanel() {
       const issued = await apiFetch<{ code: string }>("/api/auth/caregiver-link", { method: "POST" });
       setCode(issued.code);
     } catch (err) {
+      // A caregiver joined between the poll and this click: the code is moot now.
+      if (err instanceof ApiError && err.status === 409) {
+        router.replace("/wear");
+        return;
+      }
       setError(err instanceof ApiError ? err.message : "Couldn't reach the server. Try again.");
     } finally {
       setPending(false);
@@ -33,13 +38,15 @@ export function ConnectCaregiverPanel() {
       .then((issued) => {
         if (!cancelled) setCode(issued.code);
       })
-      .catch(() => {
-        if (!cancelled) setError("Couldn't get a code. Try again.");
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 409) router.replace("/wear");
+        else setError("Couldn't get a code. Try again.");
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   // The caregiver redeems the code on their own device, so nothing here would
   // notice otherwise; the wear page is where the wearer belongs once they have.

@@ -64,6 +64,8 @@ export const DEFAULT_PATIENT_SETTINGS: PatientSettings = {
  */
 export const wearerAccountSchema = z.strictObject({
   email: z.email().max(254),
+  /** The one device this account signs in on, so nothing else can act as the wearer. */
+  deviceId: idSchema<DeviceId>().nullable(),
   /** `scrypt$N$r$p$salt$hash`, base64url, like the caregiver's. Never leaves the server. */
   passwordHash: z.string().min(40).max(300),
 });
