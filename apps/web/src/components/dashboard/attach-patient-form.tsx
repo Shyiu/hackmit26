@@ -19,15 +19,16 @@ export function AttachPatientForm() {
     event.preventDefault();
     setPending(true);
     setError(null);
+    const formElement = event.currentTarget;
     try {
-      const form = new FormData(event.currentTarget);
+      const form = new FormData(formElement);
       const attached = await apiFetch<{ patientId: string }>("/api/auth/attach-patient", {
         method: "POST",
         json: { code: form.get("code") },
       });
       await apiFetch("/api/auth/select-patient", { method: "POST", json: attached });
+      formElement.reset();
       router.refresh();
-      event.currentTarget.reset();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't reach the server. Try again.");
     } finally {

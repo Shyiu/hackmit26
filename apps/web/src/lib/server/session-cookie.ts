@@ -23,13 +23,3 @@ export function setPatientCookie(response: NextResponse, patientId: string) {
     maxAge: SESSION_TTL_SECONDS,
   });
 }
-
-export function clearPatientCookie(response: NextResponse) {
-  response.cookies.set(PATIENT_COOKIE, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
-}
