@@ -1,4 +1,4 @@
-import { createNotificationSchema } from "@memory-glasses/shared";
+import { caregiverNotificationSchema } from "@memory-glasses/shared";
 import { readBody, withTenant } from "@/lib/server/api";
 import { notificationView } from "@/lib/server/views";
 
@@ -10,7 +10,7 @@ export const GET = withTenant("any", async ({ tenant }) => {
 });
 
 export const POST = withTenant("caregiver", async ({ request, principal, tenant }) => {
-  const input = await readBody(request, createNotificationSchema);
+  const input = await readBody(request, caregiverNotificationSchema);
   const notification = await tenant.notifications.create({
     ...input,
     createdBy: principal.kind === "caregiver" ? principal.caregiverId : null,

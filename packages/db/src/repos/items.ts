@@ -22,7 +22,7 @@ export type ItemPatch = Partial<NewItem> & {
   /** false archives the item: its history stays and its names free up. */
   active?: boolean;
   /** The `updatedAt` the caller's form loaded. A save made since then wins, and this one gets a 409. */
-  expectedUpdatedAt?: Date;
+  expectedUpdatedAt?: Date | null;
 };
 
 export type ItemResolution =
@@ -102,7 +102,14 @@ export function itemsRepo(ctx: RepoContext) {
       plural: patch.plural ?? current.plural,
       aliases,
       lookupKeys: lookupKeysFor(name, aliases),
-      detectorPrompts: patch.detectorPrompts?.length ? [...patch.detectorPrompts] : current.detectorPrompts,
+      // The stored schema requires at least one prompt, so an explicit empty
+      // list resets to the item's name instead of clearing.
+      detectorPrompts:
+        patch.detectorPrompts === undefined
+          ? current.detectorPrompts
+          : patch.detectorPrompts.length
+            ? [...patch.detectorPrompts]
+            : [name],
       active: patch.active ?? current.active,
       updatedAt: ctx.now(),
     });

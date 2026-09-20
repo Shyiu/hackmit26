@@ -151,7 +151,7 @@ ServerMessage = Annotated[
 ]
 
 _client_messages: TypeAdapter[HelloMessage | CaptureCommand] = TypeAdapter(ClientMessage)
-_server_messages: TypeAdapter[SessionMessage | DetectionsMessage | ErrorMessage] = TypeAdapter(ServerMessage)
+_server_messages: TypeAdapter[ServerMessage] = TypeAdapter(ServerMessage)
 
 
 def _reject_constant(name: str) -> float:
