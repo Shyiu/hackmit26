@@ -49,7 +49,8 @@ function encodeFrame(header: FrameHeader, jpeg: ArrayBuffer) {
   return message;
 }
 
-function grabJpeg(video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<Blob | null> {
+// Shared with use-scan-feed, which grabs its own frames when this socket isn't sending.
+export function grabJpeg(video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<Blob | null> {
   const width = Math.min(FRAME_WIDTH, video.videoWidth);
   const height = Math.round((video.videoHeight / video.videoWidth) * width);
   if (!width || !height) return Promise.resolve(null);
@@ -64,19 +65,24 @@ function grabJpeg(video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<B
 // reconnect calls `onReconnect` so the page can require an explicit resume
 // (README "Privacy and safety") -- unless `autoResumeOnReconnect` is set, for
 // pages (the /sim dev fallback, not a real wearer device) that want frames to
-// keep flowing across a reconnect with no manual step.
+// keep flowing across a reconnect with no manual step. `onFrame` gets every
+// frame that was sent and `onDetections` every answer, keyed by the same seq.
 export function usePerception({
   video,
   enabled,
   capturing,
   onReconnect,
   autoResumeOnReconnect = false,
+  onFrame,
+  onDetections,
 }: {
   video: HTMLVideoElement | null;
   enabled: boolean;
   capturing: boolean;
   onReconnect: () => void;
   autoResumeOnReconnect?: boolean;
+  onFrame?: (seq: number, jpeg: Blob, capturedAtMs: number) => void;
+  onDetections?: (seq: number, detections: Detection[]) => void;
 }) {
   const [status, setStatus] = useState<PerceptionStatus>("off");
   const [detections, setDetections] = useState<Detection[]>([]);
@@ -88,8 +94,15 @@ export function usePerception({
   const sessionRef = useRef<string | null>(null);
   const capturingRef = useRef(capturing);
   const videoRef = useRef(video);
+  // Never repeats within a page load, so a seq names one frame even across camera restarts.
+  // The service only needs it to rise within a connection.
+  const seqRef = useRef(0);
 
   const reconnected = useEffectEvent(() => onReconnect());
+  const frameSent = useEffectEvent((seq: number, jpeg: Blob, capturedAtMs: number) =>
+    onFrame?.(seq, jpeg, capturedAtMs),
+  );
+  const detectionsReceived = useEffectEvent((seq: number, found: Detection[]) => onDetections?.(seq, found));
 
   useEffect(() => {
     videoRef.current = video;
@@ -111,7 +124,6 @@ export function usePerception({
     let retryTimer: number | null = null;
     let frameTimer: number | null = null;
     let labelTimer: number | null = null;
-    let seq = 0;
     let hadSession = false;
     let inFlight: { seq: number; capturedAt: number } | null = null;
     const captured = new Map<number, number>();
@@ -133,7 +145,7 @@ export function usePerception({
       const blob = await grabJpeg(element, canvas);
       if (!blob || stopped || socket.readyState !== WebSocket.OPEN) return;
       const jpeg = await blob.arrayBuffer();
-      const frameSeq = seq++;
+      const frameSeq = seqRef.current++;
       const header: FrameHeader = {
         v: 1,
         sessionId,
@@ -149,6 +161,7 @@ export function usePerception({
       if (captured.size > 32) captured.delete(captured.keys().next().value ?? frameSeq);
       socket.send(encodeFrame(header, jpeg));
       setFramesSent((count) => count + 1);
+      frameSent(frameSeq, blob, capturedAtMs);
     }
 
     async function connect() {
@@ -198,6 +211,8 @@ export function usePerception({
           const capturedAt = captured.get(message.seq);
           captured.delete(message.seq);
           if (inFlight?.seq === message.seq) inFlight = null;
+          // Before the age check: a late answer is no good as a label but still places the item.
+          detectionsReceived(message.seq, message.detections);
           if (capturedAt === undefined || performance.now() - capturedAt > MAX_LABEL_AGE_MS) return;
           setDetections(message.detections);
           clearLabelsSoon();

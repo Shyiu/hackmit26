@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Bell, Mic } from "lucide-react";
+import { Bell, Box, Mic } from "lucide-react";
 import type { Detection, Face } from "@memory-glasses/shared";
 import type { HudMessage } from "@/hooks/use-hud-message";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ type HudProps = {
   messageVisible: boolean;
   listening: boolean;
   recording: boolean;
+  scanning?: boolean;
   scale?: number;
   className?: string;
   style?: CSSProperties;
@@ -21,6 +22,7 @@ export function Hud({
   messageVisible,
   listening,
   recording,
+  scanning = false,
   scale = 1,
   className,
   style,
@@ -41,6 +43,12 @@ export function Hud({
           <span className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1">
             <Mic className="size-[1.1em]" />
             Listening
+          </span>
+        )}
+        {scanning && (
+          <span className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1">
+            <Box className="size-[1.1em]" />
+            3D scan
           </span>
         )}
       </div>

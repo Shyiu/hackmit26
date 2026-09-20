@@ -5,6 +5,7 @@ import { Camera, Mic, Pause, Play, ScanEye, Settings2 } from "lucide-react";
 import { ItemLabels, StallCard } from "@/components/wearer/hud";
 import { LiveVideo } from "@/components/wearer/live-video";
 import { NoticeStack } from "@/components/wearer/notice-stack";
+import { ScanStatusChip } from "@/components/wearer/scan-status";
 import { useStoredNumber } from "@/hooks/use-stored-setting";
 import { useVideoAspect } from "@/hooks/use-video-frames";
 import { useWearerClient } from "@/hooks/use-wearer-client";
@@ -83,6 +84,7 @@ export function WearView() {
                 Seeing
               </StatusChip>
             )}
+            <ScanStatusChip status={client.scan.status} />
           </div>
           <button
             type="button"
