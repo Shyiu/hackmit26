@@ -8,14 +8,14 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "Memior",
-    short_name: "Memior",
+    name: "Memoir",
+    short_name: "Memoir",
     description: "A wearable camera that remembers where things are, for people living with dementia.",
     start_url: "/",
     scope: "/",
     display: "standalone",
     background_color: "#000000",
-    theme_color: "#c65d3b",
+    theme_color: "#2f5fd0",
     icons: [
       { src: "/icons/192", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icons/512", sizes: "512x512", type: "image/png", purpose: "any" },

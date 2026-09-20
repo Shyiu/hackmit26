@@ -16,7 +16,7 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
       footer={
         <>
           Already have an account?{" "}
-          <Link href={`/login?next=${encodeURIComponent(target)}`} className="font-semibold text-terracotta-deep">
+          <Link href={`/login?next=${encodeURIComponent(target)}`} className="font-semibold text-brand-deep">
             Sign in
           </Link>
         </>

@@ -17,7 +17,7 @@ export default async function LivePage() {
         {/* Intentionally empty: the 3D render goes here. */}
         <div
           aria-label="3D render"
-          className="h-[26rem] min-w-0 rounded-3xl bg-card shadow-[0_4px_20px_-8px_rgb(60_30_20/0.15)] ring-1 ring-foreground/5 sm:h-[32rem]"
+          className="h-[26rem] min-w-0 rounded-3xl bg-card shadow-[0_4px_20px_-8px_rgb(20_45_120/0.15)] ring-1 ring-foreground/5 sm:h-[32rem]"
         />
         <section aria-label="Items" className="flex min-w-0 flex-col gap-3">
           <h2 className="flex items-center gap-2 text-lg font-semibold">

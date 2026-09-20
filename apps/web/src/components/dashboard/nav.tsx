@@ -14,8 +14,8 @@ import { navRowClass, SignOutButton } from "./sign-out-button";
 export function Sidebar() {
   const pathname = usePathname();
   return (
-    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-6 border-r px-3 py-6 md:flex">
-      <Link href="/dashboard" className="px-3 text-sm" aria-label="Memior home">
+    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-6 border-r border-border/70 bg-white px-4 py-7 md:flex">
+      <Link href="/dashboard" className="px-3 text-sm" aria-label="Memoir home">
         <Wordmark />
       </Link>
       <CaptureBadge className="mx-3 self-start" />
@@ -45,7 +45,7 @@ export function MobileHeader() {
   return (
     <header className="sticky top-0 z-30 border-b bg-background/90 pt-safe backdrop-blur md:hidden">
       <div className="flex h-14 items-center justify-between gap-3 px-4">
-        <Link href="/dashboard" className="text-[0.8rem]" aria-label="Memior home">
+        <Link href="/dashboard" className="text-[0.8rem]" aria-label="Memoir home">
           <Wordmark />
         </Link>
         <CaptureBadge />
@@ -70,14 +70,14 @@ export function TabBar() {
     return () => window.removeEventListener("keydown", handle);
   }, []);
 
-  // The active tab sits in a soft terracotta pill; the rest keep tinted icons.
+  // The active tab sits in a soft brand pill; the rest keep tinted icons.
   const tabClass = (active: boolean) =>
     cn(
       "my-1.5 flex flex-1 flex-col items-center justify-center gap-1 rounded-[1.4rem] text-xs font-medium transition-colors",
-      active ? "bg-terracotta-soft text-terracotta-deep" : "text-foreground/80",
+      active ? "bg-brand-soft text-brand-deep" : "text-muted-foreground",
     );
   const iconClass = (active: boolean) =>
-    cn("size-7", active ? "fill-terracotta text-terracotta" : "fill-terracotta/15 text-terracotta/45");
+    cn("size-7", active ? "fill-butter text-brand" : "fill-transparent text-brand/45");
 
   return (
     <>
@@ -122,7 +122,7 @@ export function TabBar() {
           </div>
         </div>
       )}
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border/60 bg-background/95 pb-safe shadow-[0_-4px_20px_-8px_rgb(60_30_20/0.12)] backdrop-blur md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border/60 bg-background/95 pb-safe shadow-[0_-4px_20px_-8px_rgb(20_45_120/0.12)] backdrop-blur md:hidden">
         <div className="flex h-20 gap-1 px-2">
           {PRIMARY_LINKS.map(({ href, label, icon: Icon }) => (
             <Link
@@ -141,7 +141,7 @@ export function TabBar() {
             onClick={() => setMoreOpen((open) => !open)}
             className={tabClass(moreOpen || moreActive)}
           >
-            <Ellipsis className={cn("size-7", moreOpen || moreActive ? "text-terracotta" : "text-terracotta/45")} />
+            <Ellipsis className={cn("size-7", moreOpen || moreActive ? "text-brand" : "text-brand/45")} />
             More
           </button>
         </div>

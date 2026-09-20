@@ -15,8 +15,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       description="Sign in on the chest phone once, and the wear page uses the same session."
       footer={
         <>
-          New to Memior?{" "}
-          <Link href={`/signup?next=${encodeURIComponent(target)}`} className="font-semibold text-terracotta-deep">
+          New to Memoir?{" "}
+          <Link href={`/signup?next=${encodeURIComponent(target)}`} className="font-semibold text-brand-deep">
             Create an account
           </Link>
         </>

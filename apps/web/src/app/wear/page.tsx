@@ -3,7 +3,7 @@ import { WearView } from "./wear-view";
 
 export const metadata: Metadata = {
   title: "Wear",
-  appleWebApp: { capable: true, title: "Memior", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Memoir", statusBarStyle: "black-translucent" },
 };
 
 // No pinch zoom: a tap anywhere is the ask button.

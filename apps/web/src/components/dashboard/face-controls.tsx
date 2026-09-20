@@ -62,7 +62,7 @@ export function AddFaceForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="flex flex-col gap-4 rounded-3xl bg-card p-4 shadow-[0_4px_20px_-8px_rgb(60_30_20/0.15)] ring-1 ring-foreground/5"
+      className="flex flex-col gap-4 rounded-3xl bg-card p-4 shadow-[0_4px_20px_-8px_rgb(20_45_120/0.15)] ring-1 ring-foreground/5"
     >
       <div className="flex flex-col gap-4 sm:flex-row">
         <button
