@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "1c84dd67863d18be1f897b70ae92b84b29c7430e15ff53d766e3002b074d3ad1",
+  "fingerprint": "da37f4ba6a94b606f974daff977281f1b1d59dbec563afbf8ea5f44f02a1f3e5",
   "collections": {
     "patients": {
       "validator": {
@@ -2104,6 +2104,136 @@
           },
           "unique": false,
           "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "scanPins": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "itemId": {
+              "bsonType": "objectId"
+            },
+            "sceneId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "position": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "additionalItems": false,
+                  "minItems": 3,
+                  "maxItems": 3
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "positionFrame": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "observation": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "frame": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "u": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "v": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": [
+                    "frame",
+                    "u",
+                    "v"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "manual",
+                "slam",
+                "seed"
+              ]
+            },
+            "seenAt": {
+              "bsonType": "date"
+            },
+            "updatedAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "itemId",
+            "sceneId",
+            "position",
+            "observation",
+            "source",
+            "seenAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "item_scene_unique",
+          "key": {
+            "patientId": 1,
+            "itemId": 1,
+            "sceneId": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "scene_pins",
+          "key": {
+            "patientId": 1,
+            "sceneId": 1
+          },
+          "unique": false
         }
       ]
     },

@@ -65,7 +65,7 @@ export class TenantCollection<TDoc extends { patientId: PatientId }> {
 
   findOneAndUpdate(
     filter: Filter<TDoc>,
-    update: UpdateFilter<TDoc>,
+    update: UpdateFilter<TDoc> | Document[],
     options: Omit<FindOneAndUpdateOptions, "includeResultMetadata" | "upsert"> = {},
   ): Promise<WithId<TDoc> | null> {
     return this.collection.findOneAndUpdate(this.scope(filter), update, {
@@ -81,7 +81,7 @@ export class TenantCollection<TDoc extends { patientId: PatientId }> {
    */
   async upsertOne(
     filter: Filter<TDoc>,
-    update: UpdateFilter<TDoc>,
+    update: UpdateFilter<TDoc> | Document[],
   ): Promise<{ doc: WithId<TDoc>; created: boolean }> {
     const result = await this.collection.findOneAndUpdate(this.scope(filter), update, {
       upsert: true,

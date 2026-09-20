@@ -95,6 +95,7 @@ export function SimulatorView() {
           messageVisible={hud.visible}
           listening={voice.listening}
           recording={recorder.recording}
+          scanning={client.scan.status === "scanning"}
         />
         <span
           className={cn(
@@ -170,7 +171,8 @@ export function SimulatorView() {
       )}
       <p className="text-xs text-muted-foreground">
         Speech to text: {voice.engine ?? "not checked yet"} · Frames: {perception.status}
-        {perception.framesSent > 0 && `, ${perception.framesSent} sent`}
+        {perception.framesSent > 0 && `, ${perception.framesSent} sent`} · 3D scan: {client.scan.status}
+        {client.scan.kept > 0 && `, ${client.scan.kept} kept`}
       </p>
 
       {/* Debug: the raw "faces" messages off /ws/frames (packages/shared/src/schemas/perception.ts),

@@ -4,20 +4,29 @@
 //
 //   pnpm db:seed           seed once; a second run changes nothing
 //   pnpm db:seed --reset   delete the demo wearer's data and seed again
+//
+// Every run also pins the demo items in the bundled 3D room, where a pin is missing.
 
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
   collection,
   collections,
   createCaregiver,
   createPatient,
   locationStatus,
+  newId,
+  parseDocument,
   parseId,
+  scanPinDocSchema,
   tenantRepos,
   type CaregiverId,
   type Db,
   type PatientId,
+  type ScanPinId,
 } from "@memory-glasses/db";
 import { seedObservation } from "@memory-glasses/db/observations";
+import { STATIC_SCAN_SCENE_ID } from "@memory-glasses/shared";
 import { withDatabase } from "./lib/env";
 
 function fixedId<TId extends PatientId | CaregiverId>(hex: string): TId {
@@ -110,12 +119,58 @@ async function seed(db: Db) {
   }
 }
 
+// By name, not by list position: an item the caregiver adds later must not shift the
+// order and pick up a made-up pin. Same order the first version of this seed produced.
+const ANCHOR_BY_NAME: Record<string, number> = { glasses: 0, keys: 1, wallet: 2 };
+
+const SCENE_FILE = fileURLToPath(new URL("../apps/web/public/scan/room/scene.json", import.meta.url));
+
+/**
+ * One pin per seeded demo item in the bundled room, at the anchors its scene.json
+ * lists. Insert only: a pin the caregiver moved by hand survives a reseed.
+ */
+async function seedScanPins(db: Db) {
+  if (!existsSync(SCENE_FILE)) {
+    console.log(`No ${SCENE_FILE}, so no 3D room pins were seeded.`);
+    return;
+  }
+  const scene = JSON.parse(readFileSync(SCENE_FILE, "utf8")) as { anchors?: { position?: unknown }[] };
+  const anchors = scene.anchors ?? [];
+  const items = await tenantRepos(db, DEMO_PATIENT_ID).items.list();
+  const now = new Date();
+  let added = 0;
+  for (const item of items) {
+    const index = ANCHOR_BY_NAME[item.name];
+    const anchor = index === undefined ? undefined : anchors[index];
+    if (!anchor) continue;
+    const { patientId, itemId, sceneId, ...rest } = parseDocument(scanPinDocSchema, {
+      _id: newId<ScanPinId>(),
+      patientId: DEMO_PATIENT_ID,
+      itemId: item._id,
+      sceneId: STATIC_SCAN_SCENE_ID,
+      position: anchor.position,
+      observation: null,
+      source: "seed",
+      seenAt: item.lastSighting?.lastSeenAt ?? now,
+      updatedAt: now,
+    });
+    const result = await collection(db, "scanPins").updateOne(
+      { patientId, itemId, sceneId },
+      { $setOnInsert: rest },
+      { upsert: true },
+    );
+    added += result.upsertedCount;
+  }
+  console.log(`3D room pins: ${added} added for ${items.length} item(s), ${anchors.length} anchor(s) in scene.json`);
+}
+
 await withDatabase(async (db) => {
   if (process.argv.includes("--reset")) await reset(db);
   if (await collection(db, "patients").findOne({ _id: DEMO_PATIENT_ID })) {
     console.log("The demo wearer is already seeded. Pass --reset to start over.");
-    return;
+  } else {
+    await seed(db);
+    console.log(`\nDemo wearer ${DEMO_PATIENT_ID.toHexString()}, caregiver login ${process.env.CAREGIVER_EMAIL || "caregiver@example.com"}`);
   }
-  await seed(db);
-  console.log(`\nDemo wearer ${DEMO_PATIENT_ID.toHexString()}, caregiver login ${process.env.CAREGIVER_EMAIL || "caregiver@example.com"}`);
+  await seedScanPins(db);
 });

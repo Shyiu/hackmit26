@@ -14,6 +14,7 @@ import { CAMERA_SETTING, parseCameraChoice, useCamera, type CameraChoice } from 
 import { useHudMessage } from "./use-hud-message";
 import { usePerception } from "./use-perception";
 import { useRecorder } from "./use-recorder";
+import { useScanFeed } from "./use-scan-feed";
 import { enterFullscreen, useWakeLock } from "./use-screen";
 import { readStoredString, writeStoredString } from "./use-stored-setting";
 import { useFeedWatchdog } from "./use-video-frames";
@@ -139,13 +140,14 @@ function useWearerSettings() {
 }
 
 // Everything the wearer's phone does, shared by /wear and /sim: camera,
-// recording, frame upload, the question-and-answer loop, spoken caregiver
-// messages, wake lock, and the stalled-feed watchdog. The pages only differ in
-// what they draw and how a question starts: tap to ask on the chest ("auto"),
-// hold to ask on the flat page ("hold"). `autoResumeOnReconnect` skips the
-// require-an-explicit-resume-after-a-reconnect privacy step (PLAN.md "Privacy
-// and safety") -- /sim, a laptop dev/testing fallback, sets it so its stream
-// to the db never silently stops; /wear, a real wearer's chest camera, doesn't.
+// recording, frame upload, the 3D room scan feed, the question-and-answer loop,
+// spoken caregiver messages, wake lock, and the stalled-feed watchdog. The
+// pages only differ in what they draw and how a question starts: tap to ask on
+// the chest ("auto"), hold to ask on the flat page ("hold").
+// `autoResumeOnReconnect` skips the require-an-explicit-resume-after-a-reconnect
+// privacy step (PLAN.md "Privacy and safety") -- /sim, a laptop dev/testing
+// fallback, sets it so its stream to the db never silently stops; /wear, a real
+// wearer's chest camera, doesn't.
 export function useWearerClient({
   turnMode,
   fullscreen = false,
@@ -301,11 +303,16 @@ export function useWearerClient({
 
   const voice = useVoiceTurn({ mode: turnMode, getAudioContext: resumeAudio, onTurnEnd });
 
+  // The 3D room scan takes the same frames, and its own when perception sends none.
+  const { onFrame, onDetections, ...scan } = useScanFeed({ video, enabled: live && signedIn === true, capturing });
+
   const perception = usePerception({
     video,
     enabled: live && signedIn === true,
     capturing,
     autoResumeOnReconnect,
+    onFrame,
+    onDetections,
     onReconnect: () => {
       setCapturing(false);
       recorder.stop();
@@ -433,6 +440,7 @@ export function useWearerClient({
     hud,
     voice,
     perception,
+    scan,
     wakeLock,
     signedIn,
     settings,
