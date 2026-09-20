@@ -1,9 +1,26 @@
 import "server-only";
-import { DEFAULT_PATIENT_SETTINGS, tenantRepos } from "@memory-glasses/db";
+import { DEFAULT_PATIENT_SETTINGS, listPatientsByIds, tenantRepos } from "@memory-glasses/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { principalFromSession, SESSION_COOKIE } from "./auth";
+import { PATIENT_COOKIE, principalFromSession, sessionPatientIds, SESSION_COOKIE } from "./auth";
 import { getDb } from "./db";
+
+export async function caregiverWearers() {
+  const cookieJar = await cookies();
+  const session = await sessionPatientIds(cookieJar.get(SESSION_COOKIE)?.value);
+  if (!session) return { caregiverId: null, patients: [], selectedId: null };
+  const selected = await principalFromSession(
+    cookieJar.get(SESSION_COOKIE)?.value,
+    undefined,
+    cookieJar.get(PATIENT_COOKIE)?.value,
+  );
+  const patients = await listPatientsByIds(getDb(), session.patientIds);
+  return {
+    caregiverId: session.caregiverId.toHexString(),
+    patients: patients.map((patient) => ({ id: patient._id.toHexString(), displayName: patient.displayName })),
+    selectedId: selected?.patientId.toHexString() ?? null,
+  };
+}
 
 /**
  * For dashboard server components: the signed-in caregiver's wearer, their
@@ -11,7 +28,12 @@ import { getDb } from "./db";
  * login page, which brings them back to `path`.
  */
 export async function dashboardTenant(path: string) {
-  const principal = await principalFromSession((await cookies()).get(SESSION_COOKIE)?.value);
+  const cookieJar = await cookies();
+  const principal = await principalFromSession(
+    cookieJar.get(SESSION_COOKIE)?.value,
+    undefined,
+    cookieJar.get(PATIENT_COOKIE)?.value,
+  );
   if (!principal) redirect(`/login?next=${encodeURIComponent(path)}`);
   const patient = await tenantRepos(getDb(), principal.patientId).patient.get();
   const settings = patient?.settings ?? DEFAULT_PATIENT_SETTINGS;

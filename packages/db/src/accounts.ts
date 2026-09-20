@@ -18,6 +18,16 @@ export function findCaregiverByEmail(db: Db, email: string): Promise<CaregiverDo
   return collection(db, "caregivers").findOne({ email: email.trim().toLowerCase() });
 }
 
+export function listPatientsByIds(
+  db: Db,
+  ids: PatientId[],
+): Promise<Array<Pick<PatientDoc, "_id" | "displayName">>> {
+  return collection(db, "patients")
+    .find({ _id: { $in: ids } })
+    .project<Pick<PatientDoc, "_id" | "displayName">>({ _id: 1, displayName: 1 })
+    .toArray();
+}
+
 export async function recordLogin(db: Db, id: CaregiverId, at = new Date()): Promise<void> {
   await collection(db, "caregivers").updateOne({ _id: id }, { $set: { lastLoginAt: at } });
 }

@@ -32,6 +32,19 @@ describe("items", () => {
     expect((await tenant.patient.get())?.configVersion).toBe(before + 2);
   });
 
+  it("replaces detector prompts, and an empty list resets to the item's name", async () => {
+    const tenant = await newTenant(env.db);
+    const keys = await tenant.items.create({ name: "keys" });
+    expect((await tenant.items.get(keys._id))?.detectorPrompts).toEqual(["keys"]);
+
+    await tenant.items.update(keys._id, { detectorPrompts: ["a small metal keychain"] });
+    expect((await tenant.items.get(keys._id))?.detectorPrompts).toEqual(["a small metal keychain"]);
+
+    // The stored schema requires at least one prompt, so [] resets to the name.
+    await tenant.items.update(keys._id, { detectorPrompts: [] });
+    expect((await tenant.items.get(keys._id))?.detectorPrompts).toEqual(["keys"]);
+  });
+
   it("refuses a spoken name another active item already has", async () => {
     const tenant = await newTenant(env.db);
     await tenant.items.create({ name: "keys", aliases: ["key ring"] });

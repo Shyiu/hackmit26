@@ -30,7 +30,7 @@ export {
 } from "./setup";
 export { sweepExpired, type SweepOptions, type SweepReport } from "./retention";
 export { TenantCollection } from "./tenant-collection";
-export { createCaregiver, createPatient, findCaregiverByEmail, recordLogin } from "./accounts";
+export { createCaregiver, createPatient, findCaregiverByEmail, listPatientsByIds, recordLogin } from "./accounts";
 export {
   addPatientToCaregiver,
   createCaregiverPairingCode,
