@@ -46,7 +46,7 @@ export function AddPersonForm() {
       <Field
         id="person-photos"
         label="Photos"
-        hint="One to five, each showing only this person. Add one taken from chest height, the angle the phone sees."
+        hint="One to five photos. If several faces appear, the largest is used. Photos without a detected face are saved but cannot help recognize the person."
       >
         <Input id="person-photos" name="photos" type="file" accept="image/jpeg,image/png" multiple required />
       </Field>
@@ -77,7 +77,8 @@ function ago(iso: string, now: number): string {
 // Polls while the page is open, so streaming from the phone shows up here within a couple of seconds.
 export function PeopleList({ initial }: { initial: EnrolledPerson[] }) {
   const [people, setPeople] = useState(initial);
-  const [now, setNow] = useState(() => Date.now());
+  // Keep the server and first client render identical; polling supplies the client clock.
+  const [now, setNow] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -120,7 +121,7 @@ export function PeopleList({ initial }: { initial: EnrolledPerson[] }) {
       ) : (
         <ul className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10">
           {people.map((person) => {
-            const fresh = person.lastSeenAt !== null && now - new Date(person.lastSeenAt).getTime() < 10_000;
+            const fresh = now !== null && person.lastSeenAt !== null && now - new Date(person.lastSeenAt).getTime() < 10_000;
             return (
               <li key={person.id} className="flex items-center justify-between gap-3 px-4 py-3">
                 <div className="flex min-w-0 flex-col">
@@ -130,7 +131,7 @@ export function PeopleList({ initial }: { initial: EnrolledPerson[] }) {
                   </span>
                   <span className={fresh ? "text-sm font-medium text-emerald-600" : "text-sm text-muted-foreground"}>
                     {person.lastSeenAt
-                      ? `${fresh ? "In view" : "Seen"} ${ago(person.lastSeenAt, now)}, match ${(person.lastMatchConfidence ?? 0).toFixed(2)}`
+                      ? `${fresh ? "In view" : "Seen"} ${now === null ? person.lastSeenAt : ago(person.lastSeenAt, now)}, match ${(person.lastMatchConfidence ?? 0).toFixed(2)}`
                       : "Not seen yet"}
                     {` · ${person.photos} photo${person.photos === 1 ? "" : "s"}`}
                   </span>
