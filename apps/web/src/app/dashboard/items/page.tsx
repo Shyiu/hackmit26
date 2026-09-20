@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import { locationStatus } from "@memory-glasses/db";
 import { ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
@@ -56,6 +57,13 @@ export default async function ItemsPage() {
                     {whereLine(item.lastSighting)}
                   </p>
                   <div className="mt-auto flex items-center justify-between text-sm text-muted-foreground">
+                    {item.lastSighting?.thumbKey && (
+                      <img
+                        src={`/api/sightings/${item.lastSighting.sightingId}/thumb`}
+                        alt=""
+                        className="size-14 rounded-lg object-cover"
+                      />
+                    )}
                     <span>
                       {item.lastSighting ? `Seen ${relativeTime(item.lastSighting.lastSeenAt, now)}` : "Never seen"}
                     </span>

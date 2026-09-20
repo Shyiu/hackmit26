@@ -15,7 +15,12 @@ export type ServerEnvName =
   | "ELEVENLABS_API_KEY"
   | "OPENAI_API_KEY"
   | "NEXT_PUBLIC_PERCEPTION_WS_URL"
-  | "PERCEPTION_URL";
+  | "PERCEPTION_URL"
+  | "S3_ENDPOINT"
+  | "S3_BUCKET"
+  | "S3_ACCESS_KEY_ID"
+  | "S3_SECRET_ACCESS_KEY"
+  | "S3_REGION";
 
 export class MissingEnvError extends Error {
   override name = "MissingEnvError";
