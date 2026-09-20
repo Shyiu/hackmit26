@@ -40,6 +40,16 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False, frozen=True)
 
 
+class ConfigClassesRequest(_Strict):
+    version: Annotated[int, BeforeValidator(_json_number), Field(ge=0)] | None = None
+
+
+class ConfigClassesResponse(_Strict):
+    patientId: ObjectIdHex
+    classes: list[Annotated[str, StringConstraints(min_length=1, max_length=200)]]
+    version: Annotated[int, BeforeValidator(_json_number), Field(ge=0)]
+
+
 class HelloMessage(_Strict):
     type: Literal["hello"]
     v: Version
@@ -166,6 +176,14 @@ def parse_server_message(
 
 def parse_frame_header(data: str | bytes) -> FrameHeader:
     return FrameHeader.model_validate(_loads(data))
+
+
+def parse_config_classes_request(data: str | bytes) -> ConfigClassesRequest:
+    return ConfigClassesRequest.model_validate(_loads(data))
+
+
+def parse_config_classes_response(data: str | bytes) -> ConfigClassesResponse:
+    return ConfigClassesResponse.model_validate(_loads(data))
 
 
 def session_message(session_id: str, state: CaptureState) -> SessionMessage:

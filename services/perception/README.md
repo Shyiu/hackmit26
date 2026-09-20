@@ -4,7 +4,7 @@ Takes JPEG frames from the headset page over a WebSocket, runs tracked-item and 
 
 ## Status
 
-The frame socket, device tokens, capture sessions, the YOLOE-26 detector, the tracker that turns detections into sightings, and the MongoDB write path in `app/store.py` work and are tested. Without the model assets the service boots with `NullDetector`, which finds nothing. The vision model that describes keyframes is M1. `WS /ws/debug` and `POST /config/classes` are stubs. Face enrollment and matching, single-frame hazard rules, VLM confirmation, and danger-event persistence run behind mock adapters by default; their real models are optional extras, loaded lazily.
+The frame socket, device tokens, capture sessions, the YOLOE-26 detector, the tracker that turns detections into sightings, and the MongoDB write path in `app/store.py` work and are tested. Without the model assets the service boots with `NullDetector`, which finds nothing. The vision model that describes keyframes is M1. `WS /ws/debug` is a stub. `POST /config/classes` (api-scope token) re-reads the wearer's active items and swaps in the new class prompts for every open frame socket of that wearer; `/health` lists the loaded class-list version per wearer. Face enrollment and matching, single-frame hazard rules, VLM confirmation, and danger-event persistence run behind mock adapters by default; their real models are optional extras, loaded lazily.
 
 ## Run
 
@@ -85,6 +85,8 @@ curl -H "Authorization: Bearer $TOKEN" 'http://localhost:8000/danger-events?stat
 curl -X PATCH -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"status":"acknowledged","acknowledgedBy":"caregiver"}' \
   http://localhost:8000/danger-events/<event-id>
+curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{}' http://localhost:8000/config/classes
 ```
 
 ### Face recognition
