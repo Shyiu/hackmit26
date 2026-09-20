@@ -35,12 +35,9 @@ const NOTIFICATION_POLL_MS = 5000;
 
 // Still push-to-talk, not a real always-listening wake word (that needs a hotword
 // engine like Porcupine, out of scope for now -- PLAN.md frames it as optional/
-// later). The call word just has to appear in what got transcribed, so an item
-// question said by accident while holding the button doesn't get answered.
-// "Who is this" stays exempt: asking about a just-recognized face should feel
-// conversational, not require the call word first.
-const CALL_WORD_PATTERN = /^\s*hey\s+memoir[,]?\s*/i;
-const WHO_IS_THIS_PATTERN = /\bwho(?:'s| is| are)\s+(?:this|that|you)\b/i;
+// later). Saying "hey memoir" is allowed but not required: the button press is
+// the intent signal, and speech to text spells the name many ways.
+const CALL_WORD_PATTERN = /^\s*(?:hey|hi|ok|okay)?[,\s]*mem(?:oir|oire|wa|war|oi|ore)\b[,.]?\s*/i;
 
 function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -274,20 +271,12 @@ export function useWearerClient({
       switch (result.kind) {
         case "transcript": {
           const turnEndedAt = performance.now();
-          if (WHO_IS_THIS_PATTERN.test(result.text)) {
-            void answerQuestion(result.text, turnEndedAt);
-            break;
-          }
-          if (!CALL_WORD_PATTERN.test(result.text)) {
-            void say('Say "hey memoir" first.');
-            break;
-          }
-          const withoutCallWord = result.text.replace(CALL_WORD_PATTERN, "").trim();
-          if (!withoutCallWord) {
+          const question = result.text.replace(CALL_WORD_PATTERN, "").trim();
+          if (!question) {
             void say("I didn't hear a question.");
             break;
           }
-          void answerQuestion(withoutCallWord, turnEndedAt);
+          void answerQuestion(question, turnEndedAt);
           break;
         }
         case "empty":
