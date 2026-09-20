@@ -10,3 +10,4 @@ export * from "./schemas/auth";
 export * from "./signed-token";
 export * from "./device-token";
 export * from "./schemas/settings";
+export * from "./schemas/person";
