@@ -34,7 +34,13 @@ def build_adapters(settings: Settings) -> Adapters:
     elif settings.face_detector == "insightface" or settings.face_embedder == "insightface":
         from .insightface import InsightFaceAdapter
 
-        shared = InsightFaceAdapter(settings.insightface_model)
+        # One instance for both jobs, so the pipeline can detect and embed in a single pass.
+        shared = InsightFaceAdapter(
+            settings.insightface_model,
+            providers=settings.face_providers,
+            det_size=settings.face_det_size,
+            max_faces=settings.face_max_per_frame,
+        )
         face_detector = shared
         face_embedder = shared
     else:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 from ..models import BBox, FaceBox
@@ -13,53 +15,85 @@ def _iou(a: BBox, b: BBox) -> float:
     return inter / (a.w * a.h + b.w * b.h - inter or 1)
 
 
+def resolve_providers(requested: str) -> list[str]:
+    """`auto` takes CoreML or CUDA when onnxruntime was built with one, and always ends on CPU."""
+    import onnxruntime
+
+    available = onnxruntime.get_available_providers()
+    if requested.strip().lower() == "auto":
+        wanted = ["CUDAExecutionProvider", "CoreMLExecutionProvider"]
+    else:
+        wanted = [item.strip() for item in requested.split(",") if item.strip()]
+    providers = [item for item in wanted if item in available and item != "CPUExecutionProvider"]
+    return [*providers, "CPUExecutionProvider"]
+
+
 class InsightFaceAdapter:
     name = "insightface"
-    model = "insightface"
 
-    def __init__(self, model_name: str = "buffalo_l"):
+    def __init__(
+        self,
+        model_name: str = "buffalo_l",
+        *,
+        providers: str = "auto",
+        det_size: int = 640,
+        max_faces: int = 4,
+        warmup: bool = True,
+    ):
         try:
             from insightface.app import FaceAnalysis
         except ImportError as exc:
-            raise ImportError(
-                "InsightFace requires the [faces] extra: pip install 'vision-service[faces]'"
-            ) from exc
-        self.analysis = FaceAnalysis(name=model_name, providers=["CPUExecutionProvider"])
-        self.analysis.prepare(ctx_id=0)
+            raise ImportError("InsightFace requires the faces extra: uv sync --extra faces") from exc
+        # insightface calls a deprecated scikit-image method once per face, and says so each time.
+        warnings.filterwarnings("ignore", category=FutureWarning, module=r"insightface\..*")
+        # Stored with every enrollment, so a gallery built by one model is never scored by another.
+        self.model = f"insightface-{model_name}"
+        self.max_faces = max_faces
+        # The model pack also ships 3D landmarks, 106-point landmarks, and age/gender. Matching
+        # needs none of them, and each is a full forward pass per face.
+        self.analysis = FaceAnalysis(
+            name=model_name,
+            allowed_modules=["detection", "recognition"],
+            providers=resolve_providers(providers),
+        )
+        self.analysis.prepare(ctx_id=0, det_size=(det_size, det_size))
+        if warmup:
+            # The first inference pays for graph optimization and allocation. Pay it at boot,
+            # not on the first frame with a face in it.
+            self.analysis.get(np.zeros((det_size, det_size, 3), dtype=np.uint8))
 
     def _faces(self, image: np.ndarray):
-        return self.analysis.get(image)
+        # The pipeline decodes to RGB. InsightFace is trained on cv2's BGR.
+        bgr = np.ascontiguousarray(image[:, :, ::-1])
+        return self.analysis.get(bgr, max_num=self.max_faces)
+
+    def analyze(self, image: np.ndarray, *, filename: str = "") -> list[tuple[FaceBox, np.ndarray]]:
+        """Detection and embedding in one pass. `detect` then `embed` runs the detector twice."""
+        return [(self._to_face_box(face, image.shape), self._embedding(face)) for face in self._faces(image)]
 
     def detect(self, image: np.ndarray, *, filename: str = "") -> list[FaceBox]:
-        height, width = image.shape[:2]
-        result = []
-        for face in self._faces(image):
-            x1, y1, x2, y2 = face.bbox
-            result.append(
-                FaceBox(
-                    bbox=BBox(
-                        x=float(x1 / width),
-                        y=float(y1 / height),
-                        w=float((x2 - x1) / width),
-                        h=float((y2 - y1) / height),
-                    ),
-                    confidence=float(face.det_score),
-                    landmarks=face.kps.tolist() if getattr(face, "kps", None) is not None else None,
-                )
-            )
-        return result
+        return [box for box, _ in self.analyze(image, filename=filename)]
 
     def embed(self, image: np.ndarray, faces: list[FaceBox]) -> list[np.ndarray]:
-        detections = self._faces(image)
-        result = []
-        for face in faces:
-            selected = max(detections, key=lambda item: _iou(face.bbox, self._to_bbox(item, image.shape)))
-            embedding = np.asarray(selected.normed_embedding, dtype=np.float32)
-            result.append(embedding / (np.linalg.norm(embedding) or 1))
-        return result
+        found = self.analyze(image)
+        if not found:
+            raise ValueError("no face found to embed")
+        return [max(found, key=lambda item: _iou(face.bbox, item[0].bbox))[1] for face in faces]
 
     @staticmethod
-    def _to_bbox(face, shape) -> BBox:
+    def _embedding(face) -> np.ndarray:
+        embedding = np.asarray(face.normed_embedding, dtype=np.float32)
+        return embedding / (np.linalg.norm(embedding) or 1)
+
+    @staticmethod
+    def _to_face_box(face, shape) -> FaceBox:
         height, width = shape[:2]
-        x1, y1, x2, y2 = face.bbox
-        return BBox(x=x1 / width, y=y1 / height, w=(x2 - x1) / width, h=(y2 - y1) / height)
+        x1, y1, x2, y2 = (float(value) for value in face.bbox)
+        # SCRFD boxes can run past the frame edge, and BBox only takes 0 to 1.
+        x1, x2 = max(0.0, min(x1, width)), max(0.0, min(x2, width))
+        y1, y2 = max(0.0, min(y1, height)), max(0.0, min(y2, height))
+        return FaceBox(
+            bbox=BBox(x=x1 / width, y=y1 / height, w=(x2 - x1) / width, h=(y2 - y1) / height),
+            confidence=min(1.0, max(0.0, float(face.det_score))),
+            landmarks=face.kps.tolist() if getattr(face, "kps", None) is not None else None,
+        )
