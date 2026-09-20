@@ -111,6 +111,7 @@ class Seed:
                     "staleAfterMinutes": 15,
                     "wakeWordEnabled": False,
                     "wakeWordSensitivity": 0.5,
+                    "faceAnnounceSoundEnabled": False,
                 },
                 "configVersion": 0,
                 "createdAt": now,

@@ -2,7 +2,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { signDeviceToken, verifyDeviceToken } from "../src/device-token";
-import { clientMessageSchema, frameHeaderSchema, serverMessageSchema } from "../src/schemas/perception";
+import {
+  clientMessageSchema,
+  frameHeaderSchema,
+  reloadClassesRequestSchema,
+  reloadClassesResponseSchema,
+  serverMessageSchema,
+} from "../src/schemas/perception";
 
 // The same fixtures run through services/perception/tests/test_contract.py.
 function fixture(path: string): unknown {
@@ -13,6 +19,8 @@ const schemas: Record<string, z.ZodTypeAny> = {
   clientMessages: clientMessageSchema,
   frameHeaders: frameHeaderSchema,
   serverMessages: serverMessageSchema,
+  reloadClassesRequests: reloadClassesRequestSchema,
+  reloadClassesResponses: reloadClassesResponseSchema,
 };
 
 describe("perception protocol fixtures", () => {

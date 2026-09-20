@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from io import BytesIO
@@ -33,9 +32,6 @@ class SafetyService:
         self.store = store
         self.adapters = adapters
         self.frame_store = frame_store
-        # Per-process, per-(patient, person) cooldown clock. Lost on restart,
-        # which only costs one extra announcement.
-        self._last_announced: dict[tuple[ObjectId, ObjectId], float] = {}
 
     async def analyze(
         self,
@@ -63,24 +59,21 @@ class SafetyService:
         return await asyncio.to_thread(find_hazards, work, adapters=self.adapters, settings=self.settings)
 
     async def _announce_recognized(self, patient_id: ObjectId, faces: list[FaceObservation]) -> None:
-        """Speaks up the instant an enrolled face is matched, cooldown permitting.
-
-        Queues a `reminder` notification -- the existing generic kind the
-        wearer's page already polls and speaks -- so no new client code path
-        is needed. Skips anyone announced within `face_announce_cooldown_s`.
+        """Queues a silent `person_recognized` notification the instant an enrolled face
+        is matched, cooldown permitting. The cooldown lives in Mongo (`was_recently_announced`),
+        not process memory, so it survives a restart and every replica sees the same clock.
         """
-        now = time.monotonic()
+        now = datetime.now(UTC)
         for face in faces:
             if face.person_id is None:
                 continue
-            key = (patient_id, face.person_id)
-            last = self._last_announced.get(key)
-            if last is not None and now - last < self.settings.face_announce_cooldown_s:
-                continue
-            self._last_announced[key] = now
             try:
+                if await self.store.was_recently_announced(
+                    patient_id, face.person_id, now, self.settings.face_announce_cooldown_s
+                ):
+                    continue
                 await self.store.queue_person_recognized_notification(
-                    patient_id, face.name or "", face.relation
+                    patient_id, face.person_id, face.name or "", face.relation
                 )
             except Exception:
                 log.exception("Failed to queue recognized-person notification for %s", face.person_id)
@@ -133,6 +126,20 @@ class SafetyService:
         consented_by: str,
         photos: list[bytes | tuple[str, bytes]],
     ) -> dict:
+        keys, embeddings = await self._embed_photos(patient_id, photos)
+        return await self.store.enroll_person(
+            patient_id,
+            name,
+            relation,
+            consented_by,
+            keys,
+            embeddings,
+            self.adapters.face_embedder.model,
+        )
+
+    async def _embed_photos(
+        self, patient_id: ObjectId, photos: list[bytes | tuple[str, bytes]]
+    ) -> tuple[list[str], list]:
         embeddings = []
         keys = []
         now = datetime.now(UTC)
@@ -153,12 +160,18 @@ class SafetyService:
                 face = max(found, key=lambda item: item[0].bbox.w * item[0].bbox.h)
                 embeddings.append(face[1])
             keys.append(await asyncio.to_thread(self.frame_store.put_reference, patient_id, photo, now))
-        return await self.store.enroll_person(
-            patient_id,
-            name,
-            relation,
-            consented_by,
-            keys,
-            embeddings,
-            self.adapters.face_embedder.model,
-        )
+        return keys, embeddings
+
+    async def add_photos(
+        self,
+        patient_id: ObjectId,
+        person_id: ObjectId,
+        photos: list[bytes | tuple[str, bytes]],
+    ) -> dict | None:
+        person = await self.store.get_person(patient_id, person_id)
+        if person is None:
+            return None
+        if len(person["referenceImageKeys"]) + len(photos) > 20:
+            raise ValueError("a person can have at most 20 reference photos")
+        keys, embeddings = await self._embed_photos(patient_id, photos)
+        return await self.store.add_person_photos(patient_id, person_id, keys, embeddings)

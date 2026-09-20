@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { seedObservation } from "../src/observations";
+import { seedDangerEvent, seedObservation } from "../src/observations";
 import { collection } from "../src/registry";
 import { TenantCollection } from "../src/tenant-collection";
 import { newTenant, openTestDb } from "./helpers";
@@ -66,6 +66,19 @@ describe("tenant isolation", () => {
     expect(await b.notifications.nextDue()).toBeNull();
     expect(await b.notifications.listRecent()).toEqual([]);
     expect((await a.notifications.nextDue())?._id.equals(note._id)).toBe(true);
+  });
+
+  it("danger events: another wearer's hazard can't be read, listed, or acknowledged", async () => {
+    const hazard = await seedDangerEvent(env.db, {
+      patientId: a.patientId,
+      kind: "hot_surface_visible",
+      lastSeenAt: new Date(),
+    });
+    expect(await b.dangerEvents.get(hazard._id)).toBeNull();
+    expect(await b.dangerEvents.listRecent()).toEqual([]);
+    expect(await b.dangerEvents.countOpen()).toBe(0);
+    expect(await b.dangerEvents.acknowledge(hazard._id, { by: "intruder" })).toBeNull();
+    expect((await a.dangerEvents.get(hazard._id))?.status).toBe("open");
   });
 
   it("rooms: another wearer's room can't be read or renamed", async () => {

@@ -19,10 +19,13 @@ export function SignOutButton({ className }: { className?: string }) {
   );
 }
 
+// A sidebar row: 28 tall, 13px, a 6px radius, and no colour until it's the page
+// you're on — then it fills with the faintest brand tint, the way Linear marks
+// the active view.
 export const navRowClass = (active: boolean) =>
   cn(
-    "flex min-h-10 items-center gap-3 rounded-full px-4 text-sm transition-colors pointer-coarse:min-h-12",
+    "flex h-7 w-full items-center gap-2 rounded-md px-2 text-sm transition-colors pointer-coarse:h-10",
     active
-      ? "bg-brand font-medium text-white shadow-[0_6px_16px_-8px_rgb(47_95_208/0.7)]"
-      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+      ? "bg-brand-soft font-medium text-brand-deep"
+      : "text-muted-foreground hover:bg-row-hover hover:text-foreground",
   );

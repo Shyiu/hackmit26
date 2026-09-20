@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Caregiver messages and reminders waiting for the chest page. Optional, after M3.
 // Answer captions and sighting notifications are built on the client, not stored.
-export const notificationKindSchema = z.enum(["caregiver_message", "reminder", "danger_alert"]);
+export const notificationKindSchema = z.enum(["caregiver_message", "reminder", "danger_alert", "person_recognized"]);
 
 export const notificationStatusSchema = z.enum(["queued", "shown", "expired"]);
 

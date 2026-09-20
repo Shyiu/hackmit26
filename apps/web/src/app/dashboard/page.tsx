@@ -1,9 +1,11 @@
 import { locationStatus, type LocationStatus } from "@memory-glasses/db";
 import {
   BarChart3,
+  ChevronRight,
   Clock,
   Glasses,
   Hand,
+  House,
   MapPin,
   PackageOpen,
   ShieldAlert,
@@ -14,12 +16,13 @@ import {
   MessageSquareHeart,
   Search,
   Settings,
+  TriangleAlert,
   Video,
 } from "lucide-react";
 import Link from "next/link";
 import { AutoRefresh } from "@/components/auto-refresh";
-import { RoleChip, Wordmark } from "@/components/brand";
-import { CaptureBadge } from "@/components/dashboard/capture-badge";
+import { RoleChip } from "@/components/brand";
+import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { WeeklyMetric, type Trend } from "@/components/home/weekly-metric";
 import { NotificationCenter, type CenterEntry } from "@/components/home/notification-center";
 import { SectionTitle, ShortcutStrip, Tile } from "@/components/home/tiles";
@@ -62,10 +65,11 @@ export default async function DashboardHomePage() {
   const DAY = 24 * 60 * 60 * 1000;
   const dayAgo = now.getTime() - DAY;
   const monthAgo = now.getTime() - 28 * DAY;
-  const [items, questions, notifications] = await Promise.all([
+  const [items, questions, notifications, openAlerts] = await Promise.all([
     tenant.items.list(),
     recentQuestions(tenant, new Date(monthAgo)),
     tenant.notifications.listRecent({ limit: 20 }),
+    tenant.dangerEvents.countOpen(),
   ]);
 
   const needsALook = items.filter((item) => NEEDS_A_LOOK.includes(locationStatus(item.lastSighting)));
@@ -116,13 +120,25 @@ export default async function DashboardHomePage() {
         : `Usually ${Math.round(baseline)} a week over the last month.`;
 
   const entries: CenterEntry[] = [
+    ...(openAlerts > 0
+      ? [
+          {
+            id: "open-alerts",
+            tone: "alert" as const,
+            icon: TriangleAlert,
+            title: `${openAlerts} open ${openAlerts === 1 ? "alert" : "alerts"}`,
+            detail: "Hazards the camera raised that nobody has acknowledged.",
+            href: "/dashboard/alerts",
+          },
+        ]
+      : []),
     ...alerts.slice(0, 3).map((alert) => ({
       id: alert._id.toHexString(),
       tone: "alert" as const,
       icon: ShieldAlert,
       title: alert.text,
       detail: relativeTime(alert.showAt, now),
-      href: "/dashboard/questions",
+      href: "/dashboard/alerts",
     })),
     repeats.length > 0
       ? {
@@ -170,23 +186,15 @@ export default async function DashboardHomePage() {
   ];
 
   return (
-    <div className="flex flex-col gap-7">
+    <>
       <AutoRefresh intervalMs={5000} />
-
-      <header className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <Wordmark className="text-base" />
-          <RoleChip label="★ Caring" value={patient?.displayName ?? "Wearer"} />
-        </div>
-        <CaptureBadge compact className="shrink-0" />
-      </header>
-
-      <div className="flex min-h-[calc(100dvh-13rem)] flex-col gap-6 md:min-h-0">
-        <div className="grid h-[42dvh] min-h-72 grid-cols-2 grid-rows-[minmax(0,1fr)] gap-3 md:h-80">
+      <PageHeader title="Home" icon={House} action={<RoleChip label="★ Caring" value={patient?.displayName ?? "Wearer"} />} />
+      <PageBody>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:grid-rows-[minmax(0,1fr)] sm:[&>*]:h-60">
           <WeeklyMetric thisWeek={thisWeek} weeks={weeks} trend={trend} summary={summary} />
           <NotificationCenter entries={entries} />
         </div>
-        <section className="flex flex-1 flex-col justify-center gap-3 pb-6 md:flex-none">
+        <section className="hidden flex-col gap-3 md:flex">
           <Tile href="/dashboard/items" title="Find items" icon={Search} tone="royal" size="wide" />
           <div className="grid grid-cols-4 gap-3">
             <Tile href="/dashboard/live" title="3D Render" icon={Video} tone="navy" size="square" />
@@ -195,38 +203,40 @@ export default async function DashboardHomePage() {
             <Tile href="/dashboard/people" title="Faces" icon={ScanFace} tone="ice" size="square" />
           </div>
         </section>
-      </div>
 
-      <ShortcutStrip shortcuts={SHORTCUTS} />
+        <div className="hidden md:block">
+          <ShortcutStrip shortcuts={SHORTCUTS} />
+        </div>
 
-      {needsALook.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <SectionTitle>Needs a look</SectionTitle>
-          <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 md:mx-0 md:px-0">
-            {needsALook.map((item) => {
-              const status = locationStatus(item.lastSighting);
-              return (
-                <li key={item._id.toHexString()} className="w-[78%] shrink-0 snap-start sm:w-72">
-                  <Link
-                    href={`/dashboard/items/${item._id.toHexString()}`}
-                    className="flex h-full gap-4 rounded-3xl border-2 border-border p-4 hover:border-brand/40"
-                  >
-                    <Hand className="mt-1 size-7 shrink-0 text-brand" />
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="truncate text-lg font-semibold capitalize">{item.name}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {STATUS_LABELS[status]}
-                        {item.lastSighting && `, ${relativeTime(item.lastSighting.lastSeenAt, now)}`}
+        {needsALook.length > 0 && (
+          <section className="flex flex-col gap-2">
+            <SectionTitle>Needs a look</SectionTitle>
+            <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-5 sm:px-5 md:mx-0 md:px-0">
+              {needsALook.map((item) => {
+                const status = locationStatus(item.lastSighting);
+                return (
+                  <li key={item._id.toHexString()} className="w-[78%] shrink-0 snap-start sm:w-64">
+                    <Link
+                      href={`/dashboard/items/${item._id.toHexString()}`}
+                      className="flex h-full items-center gap-2.5 rounded-lg border border-hairline bg-panel px-3 py-2.5 transition-colors hover:bg-row-hover"
+                    >
+                      <Hand className="size-4 shrink-0 text-brand" />
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate text-sm font-medium capitalize">{item.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {STATUS_LABELS[status]}
+                          {item.lastSighting && `, ${relativeTime(item.lastSighting.lastSeenAt, now)}`}
+                        </span>
                       </span>
-                      <span className="mt-2 self-end text-sm font-semibold text-brand-deep">View</span>
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-    </div>
+                      <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+      </PageBody>
+    </>
   );
 }

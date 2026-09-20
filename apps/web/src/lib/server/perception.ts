@@ -1,5 +1,9 @@
 import "server-only";
 
+import {
+  reloadClassesResponseSchema,
+  type ReloadClassesRequest,
+} from "@memory-glasses/shared";
 import type { PatientId } from "@memory-glasses/db";
 import { HttpError } from "./api";
 import { mintDeviceToken } from "./auth";
@@ -40,11 +44,33 @@ export async function perceptionFetch(patientId: PatientId, path: string, init: 
     const body = (await response.json().catch(() => null)) as { detail?: unknown; error?: { message?: unknown } } | null;
     const message = body?.error?.message ?? body?.detail;
     throw new HttpError(
-      response.status === 422 ? 422 : 502,
+      response.status === 422 ? 422 : response.status === 404 ? 404 : 502,
       typeof message === "string" ? message : `The perception service answered ${response.status}`,
     );
   }
   return response;
+}
+
+// Tells the perception service a caregiver changed this wearer's items. Fire-and-forget:
+// an item edit must succeed even when perception is down, so failures are only logged.
+export function reloadClasses(patientId: PatientId): void {
+  void perceptionFetch(patientId, "/config/classes", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({} satisfies ReloadClassesRequest),
+    signal: AbortSignal.timeout(2_000),
+  })
+    .then(async (response) => {
+      const parsed = reloadClassesResponseSchema.safeParse(await response.json());
+      if (parsed.success) {
+        console.info(
+          `perception reloaded ${parsed.data.classes.length} classes (version ${parsed.data.version})`,
+        );
+      }
+    })
+    .catch((error: unknown) => {
+      console.warn("perception class reload failed", error instanceof Error ? error.message : error);
+    });
 }
 
 export type EnrolledPerson = {
@@ -83,6 +109,20 @@ export function personView(doc: PersonDoc, frames: FrameDoc[] = []): EnrolledPer
     lastSeenAt: seen?.capturedAt ?? null,
     lastMatchConfidence: face?.matchConfidence ?? null,
   };
+}
+
+export type LastSeenPerson = { name: string; relation: string | null; seenAt: string };
+
+/** The most recently recognized enrolled face, for "who is this" -- null when nobody's
+ * been matched within the perception service's recall window (or ever). */
+export async function getLastSeenPerson(patientId: PatientId): Promise<LastSeenPerson | null> {
+  try {
+    const response = await perceptionFetch(patientId, "/people/last-seen");
+    return (await response.json()) as LastSeenPerson;
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 export async function listPeople(patientId: PatientId): Promise<EnrolledPerson[]> {
