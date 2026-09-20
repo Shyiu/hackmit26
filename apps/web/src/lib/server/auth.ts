@@ -20,12 +20,15 @@ import { getDb } from "./db";
 import { requireEnv } from "./env";
 
 // Two ways in, per README "Caregiver dashboard": a caregiver session cookie,
-// which the /headset and /sim pages also ride on once the caregiver signs in
-// on the phone, and a bearer device token for native clients later. Either
+// and a bearer device token that /wear and /sim send after this phone is paired.
+// Either
 // way the wearer comes from a signed credential, never from a request body.
 
 export { SESSION_COOKIE } from "../session-cookie";
 export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
+// The phone keeps it in localStorage; revoke from the dashboard cuts it off
+// before expiry via tokenVersion.
+export const DEVICE_API_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 const objectIdHex = z.string().regex(/^[0-9a-f]{24}$/);
 

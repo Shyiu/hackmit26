@@ -21,3 +21,13 @@ export const signupRequestSchema = z
 
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type SignupRequest = z.infer<typeof signupRequestSchema>;
+
+export const pairDeviceRequestSchema = z
+  .object({
+    code: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code"),
+    name: z.string().trim().min(1, "Name this phone").max(60),
+    kind: z.enum(["headset", "simulator", "glasses"]).default("headset"),
+  })
+  .strict();
+
+export type PairDeviceRequest = z.input<typeof pairDeviceRequestSchema>;
