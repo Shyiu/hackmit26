@@ -172,7 +172,7 @@ export default async function DashboardHomePage() {
         <section className="hidden flex-col gap-3 md:flex">
           <Tile href="/dashboard/items" title="Find items" icon={Search} tone="royal" size="wide" />
           <div className="grid grid-cols-4 gap-3">
-            <Tile href="/dashboard/live" title="3D Render" icon={Video} tone="navy" size="square" />
+            <Tile href="/dashboard/map" title="3D Map" icon={Video} tone="navy" size="square" />
             <Tile href="/dashboard/questions" title="Questions" icon={MessageCircleQuestion} tone="sky" size="square" />
             <Tile href="/dashboard/messages" title="Messages" icon={MessageSquareHeart} tone="butter" size="square" />
             <Tile href="/dashboard/people" title="Faces" icon={ScanFace} tone="ice" size="square" />

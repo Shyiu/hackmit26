@@ -162,7 +162,7 @@ export function ScanViewer({
   }
 
   async function newScan() {
-    if (!window.confirm("Start a new scan? The current 3D scan of the room is dropped.")) return;
+    if (!window.confirm("Start a new scan? The viewer will switch to a fresh scene. The existing scan stays saved on the server.")) return;
     setResetting(true);
     try {
       await viewer.current?.resetScan();

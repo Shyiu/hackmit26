@@ -59,11 +59,14 @@ export async function slamFetch(
   }
   const key = optionalEnv("SPLAT_SLAM_KEY");
   if (key) url.searchParams.set("k", key);
+  const headers = new Headers(rest.headers);
+  const previewToken = optionalEnv("SPLAT_SLAM_PREVIEW_TOKEN");
+  if (previewToken) headers.set("x-daytona-preview-token", previewToken);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response;
   try {
-    response = await fetch(url, { ...rest, cache: "no-store", signal: controller.signal });
+    response = await fetch(url, { ...rest, headers, cache: "no-store", signal: controller.signal });
   } catch {
     clearTimeout(timer);
     throw new HttpError(502, "The splat-slam server isn't reachable. Start it with splat-slam serve.");
@@ -73,7 +76,7 @@ export async function slamFetch(
   if (stream) clearTimeout(timer);
   else timer.unref();
   if (response.status === 403) {
-    throw new HttpError(502, "The splat-slam server rejected the app's key. Set SPLAT_SLAM_KEY to the key it was started with.");
+    throw new HttpError(502, "The scan service rejected authentication. Check SPLAT_SLAM_KEY and, for a private Daytona preview, SPLAT_SLAM_PREVIEW_TOKEN.");
   }
   return response;
 }

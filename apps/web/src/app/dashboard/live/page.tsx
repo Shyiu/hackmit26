@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 const VIEWS = [
   { view: "live", label: "Live view" },
-  { view: "3d", label: "3D view" },
+  { view: "3d", label: "Live 3D Map" },
 ] as const;
 
 function first(value: string | string[] | undefined) {
@@ -25,6 +25,10 @@ function liveHref(view: "live" | "3d", item: string | undefined) {
   return search ? `/dashboard/live?${search}` : "/dashboard/live";
 }
 
+// The dashboard's real-time tab: the wearer's own camera feed and connection
+// status, plus the room reconstruction building live from that same feed.
+// /dashboard/map is the other 3D view -- the complete, already-scanned room,
+// demo or the last finished live scan -- not a live feed itself.
 export default async function LivePage({ searchParams }: PageProps<"/dashboard/live">) {
   const query = await searchParams;
   const view = first(query.view) === "3d" ? "3d" : "live";
@@ -39,7 +43,7 @@ export default async function LivePage({ searchParams }: PageProps<"/dashboard/l
         description={
           view === "live"
             ? "Whether the phone is connected and each item's status, to see what is and isn't working."
-            : "A 3D view of the house that shows the way to a chosen item."
+            : "The room rebuilding live from the wearer's camera, with an arrow to a chosen item."
         }
         action={
           <nav aria-label="Live" className="flex gap-0.5 rounded-md bg-muted p-0.5">
@@ -67,7 +71,7 @@ export default async function LivePage({ searchParams }: PageProps<"/dashboard/l
         ) : (
           <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
             <ScanPanel
-              mode="auto"
+              mode="live"
               focusItemId={item}
               className="h-[max(60vh,calc(100dvh-13rem))] md:h-[calc(100dvh-9rem)] md:min-h-96"
             />
