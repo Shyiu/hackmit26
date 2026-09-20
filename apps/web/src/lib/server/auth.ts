@@ -24,7 +24,7 @@ import { requireEnv } from "./env";
 // on the phone, and a bearer device token for native clients later. Either
 // way the wearer comes from a signed credential, never from a request body.
 
-export { SESSION_COOKIE } from "../session-cookie";
+export { PATIENT_COOKIE, SESSION_COOKIE } from "../session-cookie";
 export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 const objectIdHex = z.string().regex(/^[0-9a-f]{24}$/);
@@ -75,18 +75,39 @@ export async function createSessionToken(caregiver: { _id: CaregiverId; patientI
 export async function principalFromSession(
   cookie: string | undefined,
   requestedPatient?: string | null,
+  preferredPatient?: string | null,
 ): Promise<Principal | null> {
   if (!cookie) return null;
   const session = await verifyToken(sessionClaimsSchema, cookie, requireEnv("AUTH_SECRET"));
   if (session.kind !== "valid") return null;
-  const patient = requestedPatient ?? session.claims.pids[0];
+  const patient =
+    requestedPatient !== undefined && requestedPatient !== null
+      ? session.claims.pids.includes(requestedPatient)
+        ? requestedPatient
+        : null
+      : preferredPatient && session.claims.pids.includes(preferredPatient)
+        ? preferredPatient
+        : session.claims.pids[0];
   if (!patient || !session.claims.pids.includes(patient)) return null;
   return { kind: "caregiver", caregiverId: trustedId(session.claims.cid), patientId: trustedId(patient) };
+}
+
+export async function sessionPatientIds(
+  cookie: string | undefined,
+): Promise<{ caregiverId: CaregiverId; patientIds: PatientId[] } | null> {
+  if (!cookie) return null;
+  const session = await verifyToken(sessionClaimsSchema, cookie, requireEnv("AUTH_SECRET"));
+  if (session.kind !== "valid") return null;
+  return {
+    caregiverId: trustedId(session.claims.cid),
+    patientIds: session.claims.pids.map((id) => trustedId<PatientId>(id)),
+  };
 }
 
 export async function principalFromRequest(
   request: Request,
   sessionCookie: string | undefined,
+  preferredPatient?: string | null,
 ): Promise<Principal | null> {
   const authorization = request.headers.get("authorization");
   if (authorization?.startsWith("Bearer ")) {
@@ -99,7 +120,7 @@ export async function principalFromRequest(
     if (!device || device.tokenVersion !== verified.claims.tv) return null;
     return { kind: "device", deviceId, patientId };
   }
-  return principalFromSession(sessionCookie, request.headers.get("x-patient-id"));
+  return principalFromSession(sessionCookie, request.headers.get("x-patient-id"), preferredPatient);
 }
 
 export type MintedToken = { token: string; expiresAt: string };

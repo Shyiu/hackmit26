@@ -21,7 +21,11 @@ export function AttachPatientForm() {
     setError(null);
     try {
       const form = new FormData(event.currentTarget);
-      await apiFetch("/api/auth/attach-patient", { method: "POST", json: { code: form.get("code") } });
+      const attached = await apiFetch<{ patientId: string }>("/api/auth/attach-patient", {
+        method: "POST",
+        json: { code: form.get("code") },
+      });
+      await apiFetch("/api/auth/select-patient", { method: "POST", json: attached });
       router.refresh();
       event.currentTarget.reset();
     } catch (err) {

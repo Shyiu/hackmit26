@@ -10,7 +10,7 @@ import {
 } from "@memory-glasses/db";
 import { signDeviceToken, type DeviceTokenClaims } from "@memory-glasses/shared";
 import { NextRequest } from "next/server";
-import { createSessionToken, SESSION_COOKIE } from "@/lib/server/auth";
+import { createSessionToken, PATIENT_COOKIE, SESSION_COOKIE } from "@/lib/server/auth";
 import { getDb } from "@/lib/server/db";
 
 export type RouteHandler<TParams extends Record<string, string>> = (
@@ -72,7 +72,7 @@ export function deviceToken(claims: DeviceTokenClaims, secret = process.env.DEVI
   return signDeviceToken(claims, secret);
 }
 
-type Auth = { cookie?: string; bearer?: string; patientHeader?: string };
+type Auth = { cookie?: string; bearer?: string; patientHeader?: string; patientCookie?: string };
 
 export function call<TParams extends Record<string, string>>(
   handler: RouteHandler<TParams>,
@@ -81,6 +81,12 @@ export function call<TParams extends Record<string, string>>(
   const headers = new Headers();
   if (input.body !== undefined) headers.set("content-type", "application/json");
   if (input.auth?.cookie) headers.set("cookie", `${SESSION_COOKIE}=${input.auth.cookie}`);
+  if (input.auth?.patientCookie) {
+    headers.set(
+      "cookie",
+      `${SESSION_COOKIE}=${input.auth?.cookie ?? ""}; ${PATIENT_COOKIE}=${input.auth.patientCookie}`,
+    );
+  }
   if (input.auth?.bearer) headers.set("authorization", `Bearer ${input.auth.bearer}`);
   if (input.auth?.patientHeader) headers.set("x-patient-id", input.auth.patientHeader);
   const request = new NextRequest(new URL(input.path, "http://localhost"), {

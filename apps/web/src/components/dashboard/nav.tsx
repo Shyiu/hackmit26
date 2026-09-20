@@ -9,6 +9,9 @@ import { cn } from "@/lib/utils";
 import { CaptureBadge } from "./capture-badge";
 import { isActive, PRIMARY_LINKS, SECONDARY_LINKS } from "./nav-links";
 import { navRowClass, SignOutButton } from "./sign-out-button";
+import { WearerSwitcher } from "./wearer-switcher";
+
+type WearerProps = { patients: Array<{ id: string; displayName: string }>; selectedId: string | null };
 
 // The tiny muted heading over each group of sidebar rows.
 function GroupLabel({ children }: { children: string }) {
@@ -17,7 +20,7 @@ function GroupLabel({ children }: { children: string }) {
 
 // Desktop: a narrow sidebar on the page tint, with the wordmark and the camera
 // state at the top and every page grouped below it.
-export function Sidebar() {
+export function Sidebar({ patients, selectedId }: WearerProps) {
   const pathname = usePathname();
   return (
     <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col px-2 py-2 md:flex">
@@ -29,6 +32,7 @@ export function Sidebar() {
         <Wordmark />
       </Link>
       <CaptureBadge className="mx-2 mt-1.5 self-start" />
+      <WearerSwitcher patients={patients} selectedId={selectedId} />
       <nav className="mt-2 flex flex-col">
         {PRIMARY_LINKS.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href} className={navRowClass(isActive(pathname, href))}>
@@ -61,7 +65,7 @@ export function Sidebar() {
 
 // Phones: a tab bar over the home indicator, with the rest of the pages in a
 // sheet behind More.
-export function TabBar() {
+export function TabBar({ patients, selectedId }: WearerProps) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreActive = SECONDARY_LINKS.some((link) => isActive(pathname, link.href));
@@ -105,6 +109,7 @@ export function TabBar() {
                 <X className="size-4" />
               </button>
             </div>
+            <WearerSwitcher patients={patients} selectedId={selectedId} />
             <nav className="flex flex-col">
               {SECONDARY_LINKS.map(({ href, label, icon: Icon }) => (
                 <Link
