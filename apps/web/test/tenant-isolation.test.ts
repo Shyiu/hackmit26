@@ -7,6 +7,7 @@ import { GET as getInteraction } from "@/app/api/interactions/[id]/route";
 import { POST as postPlayback } from "@/app/api/interactions/[id]/playback/route";
 import { GET as listInteractions } from "@/app/api/interactions/route";
 import { PATCH as patchItem } from "@/app/api/items/[id]/route";
+import { POST as recomputeUsualSpots } from "@/app/api/items/[id]/usual-spots/route";
 import { GET as listItems } from "@/app/api/items/route";
 import { POST as postShown } from "@/app/api/notifications/[id]/shown/route";
 import { GET as nextNotification } from "@/app/api/notifications/route";
@@ -103,6 +104,13 @@ describe("API tenant isolation", () => {
     });
     expect(response.status).toBe(404);
     expect((await a.repos.items.list()).map((item) => item.name)).toEqual(["keys"]);
+    const recompute = await call(recomputeUsualSpots, {
+      method: "POST",
+      path: `/api/items/${ids.item}/usual-spots`,
+      params: { id: ids.item },
+      auth: asB(),
+    });
+    expect(recompute.status).toBe(404);
   });
 
   it("another wearer's interaction can't be read or given playback", async () => {

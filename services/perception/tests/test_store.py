@@ -607,3 +607,89 @@ async def test_a_sentence_with_a_dollar_sign_survives(scene: Scene) -> None:
         "$$ROOT",
     )
     assert item["lastRestingSighting"]["sentence"] == "next to the $5 bill"
+
+
+def _sighting_doc(seconds: float, **overrides: Any) -> dict[str, Any]:
+    doc: dict[str, Any] = {
+        "sentence": "on the kitchen counter",
+        "surface": "counter",
+        "relation": "next to the coffee maker",
+        "room": {"id": None, "name": "kitchen", "confidence": 0.9},
+        "firstSeenAt": at(seconds),
+        "lastSeenAt": at(seconds + 30),
+        "descriptionStatus": "ready",
+        "state": "resting",
+    }
+    doc.update(overrides)
+    return doc
+
+
+def test_compute_usual_spots_merges_fragments_and_needs_samples() -> None:
+    from app.store import compute_usual_spots
+
+    # Two placements of history is too sparse to claim a usual spot.
+    assert compute_usual_spots([_sighting_doc(0), _sighting_doc(3600)]) == []
+
+    # Six sightings at one place a minute apart are one placement, not six.
+    fragments = [_sighting_doc(i * 60) for i in range(6)]
+    others = [
+        _sighting_doc(7200, sentence="on the hallway table", surface="table", relation=None,
+                      room={"id": None, "name": "hallway", "confidence": 0.9}),
+        _sighting_doc(10800, sentence="on the desk", surface="desk", relation=None,
+                      room={"id": None, "name": "office", "confidence": 0.9}),
+    ]
+    spots = compute_usual_spots(fragments + others, min_share=0)
+    assert len(spots) == 3
+    merged = next(s for s in spots if s["sentence"] == "on the kitchen counter")
+    assert merged["samples"] == 1
+    assert merged["share"] == pytest.approx(1 / 3)
+    assert merged["source"] == "history"
+
+
+async def test_described_closed_sightings_become_usual_spots(scene: Scene, make_scene: SceneFactory) -> None:
+    store = scene.store
+    # Three placements at the same spot, far enough apart not to merge.
+    sighting_ids = []
+    for i, seconds in enumerate((0, 3600, 7200)):
+        opened = await scene.sight(f"e{i}", seconds, state="resting")
+        sighting_ids.append(opened.sighting_id)
+        await scene.enqueue(opened, key=f"kf/{i}.jpg", seconds=seconds)
+        claimed = await store.claim_job("w1", at(seconds + 30))
+        assert claimed is not None
+        assert await store.complete_job(claimed, "w1", RESULT, at(seconds + 40)) in (
+            "applied",
+            "history_only",
+        )
+    # Nothing counts until the sightings close.
+    assert (await scene.item())["usualSpots"] == []
+
+    for sighting_id in sighting_ids:
+        assert await store.close_sighting(scene.patient_id, sighting_id)
+
+    item = await scene.item()
+    assert item["usualSpots"] == [
+        {
+            "sentence": RESULT.sentence,
+            "share": pytest.approx(1.0),
+            "samples": 3,
+            "source": "history",
+        }
+    ]
+
+    # Another wearer's item is untouched by this wearer's history.
+    other = await make_scene()
+    assert (await other.item())["usualSpots"] == []
+
+
+async def test_the_idle_sweep_recomputes_usual_spots(scene: Scene) -> None:
+    store = scene.store
+    opened = await scene.sight("e-idle", 0, state="resting")
+    await scene.enqueue(opened)
+    claimed = await store.claim_job("w1", at(30))
+    assert claimed is not None
+    assert await store.complete_job(claimed, "w1", RESULT, at(40)) == "applied"
+
+    assert await store.close_idle_sightings(at(400)) == 1
+    # One placement is below the sparse-history floor, but the write landed.
+    item = await scene.item()
+    assert item["usualSpots"] == []

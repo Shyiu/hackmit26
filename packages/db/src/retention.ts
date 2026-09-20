@@ -1,6 +1,7 @@
 import type { Db, Document, Filter } from "mongodb";
-import type { PatientId, SightingId } from "./ids";
+import type { ItemId, PatientId, SightingId } from "./ids";
 import { collection, collections, type CollectionKey, type DocOf } from "./registry";
+import { tenantRepos } from "./repos";
 
 export type SweepOptions = {
   now?: Date;
@@ -22,6 +23,8 @@ export type SweepReport = {
   deleted: Partial<Record<CollectionKey, number>>;
   clearedSnapshots: number;
   objectKeys: number;
+  /** Items whose history-derived usual spots were recomputed after deletions. */
+  recomputedUsualSpots: number;
 };
 
 type ExpiringKey = {
@@ -82,7 +85,7 @@ export async function sweepExpired(db: Db, options: SweepOptions = {}): Promise<
   const batchSize = options.batchSize ?? 500;
   const dryRun = options.dryRun ?? false;
   const log = options.log ?? (() => {});
-  const report: SweepReport = { dryRun, deleted: {}, clearedSnapshots: 0, objectKeys: 0 };
+  const report: SweepReport = { dryRun, deleted: {}, clearedSnapshots: 0, objectKeys: 0, recomputedUsualSpots: 0 };
   for (const key of Object.keys(collections) as CollectionKey[]) {
     if (collections[key].expires) report.deleted[key] = 0;
   }
@@ -106,10 +109,18 @@ export async function sweepExpired(db: Db, options: SweepOptions = {}): Promise<
   // In a dry run nothing goes away, so later steps have to skip what an earlier one counted.
   const countedJobs = new Set<string>();
   const expiredSightings = sightings.find(expiredFilter("sightings", now, windows), {
-    projection: { _id: 1, keyframeKey: 1, thumbKey: 1 },
+    projection: { _id: 1, keyframeKey: 1, thumbKey: 1, patientId: 1, itemId: 1 },
   });
+  // Deleting a sighting can retire a usual spot, so remember whose history shrank.
+  const affectedItems = new Map<string, { patientId: PatientId; itemId: ItemId }>();
   for (;;) {
-    const batch: { _id: SightingId; keyframeKey: string | null; thumbKey: string | null }[] = [];
+    const batch: {
+      _id: SightingId;
+      keyframeKey: string | null;
+      thumbKey: string | null;
+      patientId: PatientId;
+      itemId: ItemId;
+    }[] = [];
     while (batch.length < batchSize) {
       const next = await expiredSightings.tryNext();
       if (!next) break;
@@ -117,6 +128,12 @@ export async function sweepExpired(db: Db, options: SweepOptions = {}): Promise<
     }
     if (batch.length === 0) break;
     const ids = batch.map((sighting) => sighting._id);
+    for (const sighting of batch) {
+      affectedItems.set(`${sighting.patientId.toHexString()}:${sighting.itemId.toHexString()}`, {
+        patientId: sighting.patientId,
+        itemId: sighting.itemId,
+      });
+    }
 
     if (dryRun) {
       report.clearedSnapshots += await items.countDocuments({
@@ -153,9 +170,19 @@ export async function sweepExpired(db: Db, options: SweepOptions = {}): Promise<
       const deleted = await sightings.deleteMany({ _id: { $in: ids } });
       count("sightings", deleted.deletedCount);
     }
-    // TODO(M6): recompute history-based usualSpots for the affected items once they exist.
   }
   await expiredSightings.close();
+
+  if (!dryRun) {
+    for (const { patientId, itemId } of affectedItems.values()) {
+      if (await tenantRepos(db, patientId).items.recomputeUsualSpots(itemId)) {
+        report.recomputedUsualSpots += 1;
+      }
+    }
+    if (report.recomputedUsualSpots) {
+      log(`usual spots recomputed for ${report.recomputedUsualSpots} item(s)`);
+    }
+  }
 
   const roomRefs = await collection(db, "roomRefs")
     .find(expiredFilter("roomRefs", now, windows), { projection: { imageKey: 1 } })

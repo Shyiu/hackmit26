@@ -196,6 +196,99 @@ class DescriptionJob:
         )
 
 
+def _place_key(sighting: Mapping[str, Any]) -> str | None:
+    """What makes two sightings "the same place". Mirrors placeKey() in packages/db/src/usual-spots.ts."""
+
+    def norm(value: Any) -> str:
+        return " ".join(str(value or "").split()).lower()
+
+    room = norm((sighting.get("room") or {}).get("name"))
+    surface = norm(sighting.get("surface"))
+    relation = norm(sighting.get("relation"))
+    if room or surface or relation:
+        return f"{room}|{surface}|{relation}"
+    return norm(sighting.get("sentence")) or None
+
+
+def compute_usual_spots(
+    sightings: list[Document],
+    *,
+    min_samples: int = 3,
+    min_share: float = 0.2,
+    merge_gap: timedelta = timedelta(minutes=5),
+    maximum: int = 5,
+) -> list[Document]:
+    """Where the item keeps ending up, counted in placements not sightings.
+
+    Mirrors computeUsualSpots() in packages/db/src/usual-spots.ts: a fragmented
+    track merges into one placement, and history sparser than min_samples says
+    nothing.
+    """
+    usable = [
+        s
+        for s in sightings
+        if s.get("descriptionStatus") == "ready"
+        and s.get("state") == "resting"
+        and (s.get("sentence") or "").strip()
+    ]
+    usable.sort(key=lambda s: s["firstSeenAt"])
+
+    placements: list[Document] = []
+    for sighting in usable:
+        key = _place_key(sighting)
+        if key is None:
+            continue
+        prev = placements[-1] if placements else None
+        if prev and prev["key"] == key and sighting["firstSeenAt"] - prev["lastSeenAt"] < merge_gap:
+            if sighting["lastSeenAt"] > prev["lastSeenAt"]:
+                prev["lastSeenAt"] = sighting["lastSeenAt"]
+                prev["sentence"] = sighting["sentence"]
+        else:
+            placements.append(
+                {"key": key, "lastSeenAt": sighting["lastSeenAt"], "sentence": sighting["sentence"]}
+            )
+
+    total = len(placements)
+    if total < min_samples:
+        return []
+
+    groups: dict[str, Document] = {}
+    for placement in placements:
+        group = groups.setdefault(
+            placement["key"],
+            {"samples": 0, "sentence": placement["sentence"], "lastSeenAt": placement["lastSeenAt"]},
+        )
+        group["samples"] += 1
+        if placement["lastSeenAt"] >= group["lastSeenAt"]:
+            group["lastSeenAt"] = placement["lastSeenAt"]
+            group["sentence"] = placement["sentence"]
+
+    spots = [
+        {
+            "sentence": group["sentence"],
+            "share": group["samples"] / total,
+            "samples": group["samples"],
+            "source": "history",
+        }
+        for group in groups.values()
+        if group["samples"] / total >= min_share
+    ]
+    spots.sort(key=lambda s: (-s["share"], -s["samples"], s["sentence"]))
+    return spots[:maximum]
+
+
+_USUAL_SPOT_SAMPLE = {
+    "sentence": 1,
+    "surface": 1,
+    "relation": 1,
+    "room": 1,
+    "firstSeenAt": 1,
+    "lastSeenAt": 1,
+    "descriptionStatus": 1,
+    "state": 1,
+}
+
+
 CompleteOutcome = Literal["applied", "history_only", "superseded", "lost_lease"]
 FailOutcome = Literal["retry", "failed", "lost_lease"]
 
@@ -472,10 +565,18 @@ class ObservationStore:
         return True
 
     async def close_sighting(self, patient_id: ObjectId, sighting_id: ObjectId) -> bool:
+        sighting = await self._sightings.find_one(
+            {"_id": sighting_id, "patientId": patient_id, "status": "open"}, {"itemId": 1}
+        )
+        if sighting is None:
+            return False
         result = await self._sightings.update_one(
             {"_id": sighting_id, "patientId": patient_id, "status": "open"}, _CLOSE
         )
-        return result.modified_count == 1
+        if result.modified_count != 1:
+            return False
+        await self.recompute_usual_spots(patient_id, sighting["itemId"])
+        return True
 
     async def close_idle_sightings(self, now: datetime, idle: timedelta = DEFAULT_IDLE) -> int:
         """Closes sightings with no usable frame for `idle`, across every wearer.
@@ -483,10 +584,37 @@ class ObservationStore:
         A system sweep, so no patientId. Filtering on status "open" lets it use
         the open_by_last_seen partial index.
         """
-        result = await self._sightings.update_many(
-            {"status": "open", "lastSeenAt": {"$lte": to_ms(now) - idle}}, _CLOSE
-        )
+        idle_filter: Document = {"status": "open", "lastSeenAt": {"$lte": to_ms(now) - idle}}
+        closing = await self._sightings.find(idle_filter, {"patientId": 1, "itemId": 1}).to_list()
+        result = await self._sightings.update_many(idle_filter, _CLOSE)
+        for patient_id, item_id in {(doc["patientId"], doc["itemId"]) for doc in closing}:
+            await self.recompute_usual_spots(patient_id, item_id)
         return result.modified_count
+
+    async def recompute_usual_spots(self, patient_id: ObjectId, item_id: ObjectId) -> list[Document]:
+        """Recomputes the item's history-derived usualSpots.
+
+        Same query and rules as items.recomputeUsualSpots() in
+        packages/db/src/repos/items.ts: closed, described, resting sightings
+        inside retention, newest first. Like a snapshot write, it leaves the
+        item's updatedAt alone.
+        """
+        sightings = await self._sightings.find(
+            {
+                "patientId": patient_id,
+                "itemId": item_id,
+                "status": "closed",
+                "state": "resting",
+                "descriptionStatus": "ready",
+                "expiresAt": {"$gt": self._now()},
+            },
+            _USUAL_SPOT_SAMPLE,
+        ).sort("lastSeenAt", -1).limit(200).to_list()
+        spots = compute_usual_spots(sightings)
+        await self._items.update_one(
+            {"_id": item_id, "patientId": patient_id}, {"$set": {"usualSpots": spots}}
+        )
+        return spots
 
     # The description queue
 
@@ -668,6 +796,8 @@ class ObservationStore:
             )
         if not await self._finish(job, worker_id, "succeeded", now):
             return "lost_lease"
+        # A fresh description may have made a spot "usual" (or stopped being it).
+        await self.recompute_usual_spots(job.patient_id, job.item_id)
         # No match means the item has newer evidence, so the description only enriches history.
         return "applied" if item.matched_count == 1 else "history_only"
 
