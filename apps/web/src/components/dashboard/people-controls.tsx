@@ -50,7 +50,7 @@ export function AddPersonForm() {
       >
         <Input id="person-photos" name="photos" type="file" accept="image/jpeg,image/png" multiple required />
       </Field>
-      <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm">
+      <label className="flex min-h-9 cursor-pointer items-start gap-2.5 text-sm">
         <input
           type="checkbox"
           checked={consent}
@@ -182,11 +182,11 @@ export function PeopleList({ initial }: { initial: EnrolledPerson[] }) {
     <div className="flex flex-col gap-2">
       {error && <FormMessage tone="error">{error}</FormMessage>}
       {people.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+        <p className="rounded-lg border border-dashed border-hairline p-6 text-center text-sm text-muted-foreground">
           Nobody enrolled yet.
         </p>
       ) : (
-        <ul className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10">
+        <ul className="flex flex-col divide-y divide-hairline overflow-hidden rounded-lg border border-hairline">
           {people.map((person) => {
             const fresh = now !== null && person.lastSeenAt !== null && now - new Date(person.lastSeenAt).getTime() < 10_000;
             return (
@@ -199,7 +199,7 @@ export function PeopleList({ initial }: { initial: EnrolledPerson[] }) {
                         <span className="font-normal text-muted-foreground"> · {person.relation}</span>
                       )}
                     </span>
-                    <span className={fresh ? "text-sm font-medium text-emerald-600" : "text-sm text-muted-foreground"}>
+                    <span className={fresh ? "text-xs font-medium text-emerald-600" : "text-xs text-muted-foreground"}>
                       {person.lastSeenAt
                         ? `${fresh ? "In view" : "Seen"} ${now === null ? person.lastSeenAt : ago(person.lastSeenAt, now)}, match ${(person.lastMatchConfidence ?? 0).toFixed(2)}`
                         : "Not seen yet"}

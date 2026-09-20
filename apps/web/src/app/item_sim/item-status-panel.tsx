@@ -2,8 +2,8 @@
 
 import type { Detection } from "@memory-glasses/shared";
 import type { ItemStatus } from "@/hooks/use-item-statuses";
-import { Badge } from "@/components/ui/badge";
-import { STATUS_LABELS, STATUS_VARIANTS, whereLine } from "@/lib/item-status";
+import { StatusDot } from "@/components/dashboard/status-dot";
+import { whereLine } from "@/lib/item-status";
 import { relativeTime } from "@/lib/relative-time";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +48,7 @@ export function ItemStatusPanel({
                 <span className="font-medium capitalize">{item.name}</span>
                 {inFrame && <span className="text-xs text-emerald-600 dark:text-emerald-400">in frame now</span>}
               </div>
-              <Badge variant={STATUS_VARIANTS[item.locationStatus]}>{STATUS_LABELS[item.locationStatus]}</Badge>
+              <StatusDot status={item.locationStatus} className="text-xs text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground">
               {progress ?? whereLine(item.lastSighting)}

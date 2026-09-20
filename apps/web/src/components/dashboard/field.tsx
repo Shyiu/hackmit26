@@ -18,7 +18,7 @@ export function Field({
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
       {children}
-      {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -42,11 +42,11 @@ export function SwitchRow({
   return (
     <label
       htmlFor={id}
-      className="flex min-h-11 cursor-pointer items-center justify-between gap-4 rounded-lg border px-3 py-2.5"
+      className="flex min-h-10 cursor-pointer items-center justify-between gap-4 rounded-md border border-hairline px-2.5 py-2"
     >
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="text-sm font-medium">{label}</span>
-        {hint && <span className="text-sm text-muted-foreground">{hint}</span>}
+        {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
       </span>
       <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
     </label>

@@ -1,7 +1,9 @@
 import type { DangerEventDoc } from "@memory-glasses/db";
+import { TriangleAlert } from "lucide-react";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { AcknowledgeAlertButton } from "@/components/dashboard/acknowledge-alert-button";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { PageBody, PageHeader } from "@/components/dashboard/page-header";
+import { EmptyState, Section } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { dayAndTime } from "@/lib/format";
 import { dashboardTenant } from "@/lib/server/dashboard";
@@ -44,35 +46,34 @@ export default async function AlertsPage() {
   const open = events.filter((event) => event.status === "open").length;
 
   return (
-    <div className="flex flex-col gap-8">
+    <>
       <AutoRefresh intervalMs={5000} />
       <PageHeader
         title="Alerts"
+        icon={TriangleAlert}
         description={
           open === 0
             ? "Hazards the camera has raised. Nothing is waiting on you."
             : `${open} open ${open === 1 ? "alert needs" : "alerts need"} a look.`
         }
       />
-      <div className="grid gap-8 lg:grid-cols-[3fr_2fr]">
-        <section className="flex min-w-0 flex-col gap-3">
-          <h2 className="text-lg font-semibold">Hazards</h2>
+      <PageBody>
+      <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
+        <Section title="Hazards">
           {events.length === 0 ? (
-            <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No hazards seen. Events show up here when the camera spots something risky.
-            </p>
+            <EmptyState>No hazards seen. Events show up here when the camera spots something risky.</EmptyState>
           ) : (
-            <ol className="flex flex-col gap-2">
+            <ol className="flex flex-col divide-y divide-hairline overflow-hidden rounded-lg border border-hairline">
               {events.map((event) => (
                 <li
                   key={event._id.toHexString()}
-                  className="flex flex-col gap-2 rounded-xl p-4 ring-1 ring-foreground/10"
+                  className="flex flex-col gap-2 px-3 py-2.5 transition-colors hover:bg-row-hover"
                   data-status={event.status}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-base font-semibold">{KIND_LABELS[event.kind]}</span>
-                      {event.hazardLabel && <span className="text-sm text-muted-foreground">{event.hazardLabel}</span>}
+                      <span className="text-sm font-semibold">{KIND_LABELS[event.kind]}</span>
+                      {event.hazardLabel && <span className="text-xs text-muted-foreground">{event.hazardLabel}</span>}
                       {severityBadge(event.severity)}
                     </div>
                     {statusBadge(event.status)}
@@ -109,32 +110,30 @@ export default async function AlertsPage() {
               ))}
             </ol>
           )}
-        </section>
+        </Section>
 
-        <section className="flex min-w-0 flex-col gap-3">
-          <h2 className="text-lg font-semibold">Recent alert notifications</h2>
+        <Section title="Recent alert notifications">
           {alerts.length === 0 ? (
-            <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No alerts have been sent yet.
-            </p>
+            <EmptyState>No alerts have been sent yet.</EmptyState>
           ) : (
-            <ol className="flex flex-col gap-2">
+            <ol className="flex flex-col divide-y divide-hairline overflow-hidden rounded-lg border border-hairline">
               {alerts.map((notification) => (
                 <li
                   key={notification._id.toHexString()}
-                  className="flex flex-col gap-1 rounded-xl p-4 ring-1 ring-foreground/10"
+                  className="flex flex-col gap-1 px-3 py-2.5 transition-colors hover:bg-row-hover"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                     <span>Danger alert, {dayAndTime(notification.showAt, settings.timezone)}</span>
                     <Badge variant="outline">{notification.status === "shown" ? "Spoken" : notification.status}</Badge>
                   </div>
-                  <p className="text-base">{notification.text}</p>
+                  <p className="text-sm">{notification.text}</p>
                 </li>
               ))}
             </ol>
           )}
-        </section>
+        </Section>
       </div>
-    </div>
+      </PageBody>
+    </>
   );
 }

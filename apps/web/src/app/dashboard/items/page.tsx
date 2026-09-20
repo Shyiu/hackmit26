@@ -1,14 +1,19 @@
 import { locationStatus } from "@memory-glasses/db";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, KeyRound, Plus } from "lucide-react";
 import Link from "next/link";
 import { AutoRefresh } from "@/components/auto-refresh";
-import { PageHeader } from "@/components/dashboard/page-header";
-import { Badge } from "@/components/ui/badge";
+import { PageBody, PageHeader } from "@/components/dashboard/page-header";
+import { EmptyState, ListHeader } from "@/components/dashboard/section";
 import { buttonVariants } from "@/components/ui/button";
-import { STATUS_LABELS, STATUS_VARIANTS, whereLine } from "@/lib/item-status";
+import { StatusDot } from "@/components/dashboard/status-dot";
+import { whereLine } from "@/lib/item-status";
 import { relativeTime } from "@/lib/relative-time";
 import { dashboardTenant } from "@/lib/server/dashboard";
 import { cn } from "@/lib/utils";
+
+// The columns the list keeps on wide screens. Name grows, the rest are fixed so
+// every row lines up the way Linear's issue list does.
+const COLUMNS = "md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_8rem_10rem] md:items-center md:gap-4";
 
 export default async function ItemsPage() {
   const { tenant } = await dashboardTenant("/dashboard/items");
@@ -16,57 +21,64 @@ export default async function ItemsPage() {
   const now = new Date();
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <AutoRefresh />
       <PageHeader
         title="Items"
+        icon={KeyRound}
         description="Where each tracked item was last seen."
         action={
-          <Link href="/dashboard/items/new" className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}>
+          <Link href="/dashboard/items/new" className={buttonVariants({ size: "sm" })}>
             <Plus />
             Add item
           </Link>
         }
       />
-      {items.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No items yet. Add the things the wearer looks for most, like keys or glasses.
-        </p>
-      ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((item) => {
-            const status = locationStatus(item.lastSighting);
-            const sentence = item.lastSighting?.sentence;
-            return (
-              <li key={item._id.toHexString()}>
-                <Link
-                  href={`/dashboard/items/${item._id.toHexString()}`}
-                  className="group flex h-full flex-col gap-3 rounded-3xl bg-card p-4 shadow-[0_4px_20px_-8px_rgb(20_45_120/0.15)] ring-1 ring-foreground/5 transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="truncate text-lg font-semibold capitalize">{item.name}</h2>
-                      {item.aliases.length > 0 && (
-                        <p className="truncate text-sm text-muted-foreground">{item.aliases.join(", ")}</p>
+      <PageBody>
+        {items.length === 0 ? (
+          <EmptyState>No items yet. Add the things the wearer looks for most, like keys or glasses.</EmptyState>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-hairline">
+            <ListHeader className={cn("hidden md:flex", COLUMNS)}>
+              <span>Name</span>
+              <span>Where</span>
+              <span>Status</span>
+              <span>Last seen</span>
+            </ListHeader>
+            <ul className="divide-y divide-hairline">
+              {items.map((item) => {
+                const status = locationStatus(item.lastSighting);
+                return (
+                  <li key={item._id.toHexString()}>
+                    <Link
+                      href={`/dashboard/items/${item._id.toHexString()}`}
+                      className={cn(
+                        "group flex flex-col gap-1 px-3 py-2.5 text-sm transition-colors hover:bg-row-hover focus-visible:bg-row-hover focus-visible:outline-none",
+                        COLUMNS,
                       )}
-                    </div>
-                    <Badge variant={STATUS_VARIANTS[status]}>{STATUS_LABELS[status]}</Badge>
-                  </div>
-                  <p className={cn("text-base", !sentence && "text-muted-foreground")}>
-                    {whereLine(item.lastSighting)}
-                  </p>
-                  <div className="mt-auto flex items-center justify-between text-sm text-muted-foreground">
-                    <span>
-                      {item.lastSighting ? `Seen ${relativeTime(item.lastSighting.lastSeenAt, now)}` : "Never seen"}
-                    </span>
-                    <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate font-medium capitalize">{item.name}</span>
+                        {item.aliases.length > 0 && (
+                          <span className="hidden truncate text-xs text-muted-foreground lg:inline">
+                            {item.aliases.join(", ")}
+                          </span>
+                        )}
+                      </span>
+                      <span className="min-w-0 truncate text-muted-foreground">{whereLine(item.lastSighting)}</span>
+                      <StatusDot status={status} className="text-muted-foreground" />
+                      <span className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        {item.lastSighting ? relativeTime(item.lastSighting.lastSeenAt, now) : "Never seen"}
+                        <ChevronRight className="hidden size-3.5 transition-transform group-hover:translate-x-0.5 md:block" />
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </PageBody>
+    </>
   );
 }
