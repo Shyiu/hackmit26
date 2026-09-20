@@ -274,6 +274,21 @@ into a chest harness with the rear camera facing forward. On iPhone, Add to Home
 page the whole screen, and earbuds are required because Safari routes answer audio to the earpiece
 while the mic is open.
 
+### Perception for a deployed web app
+
+A hosted web app (Vercel) can't run perception: it is a long-lived WebSocket server with model
+adapters, not a serverless function. Face enrollment, item detection, and danger events all go
+through it, so a deployment with no perception behind it answers "The perception service isn't
+reachable". Until it is hosted somewhere, run it from a laptop and give the deployment its URL:
+
+```bash
+pnpm perception:serve   # runs :8000 and prints PERCEPTION_URL and NEXT_PUBLIC_PERCEPTION_WS_URL
+```
+
+Set those two in the Vercel project and redeploy. The tunnel is outbound, so any network works, but
+the URL changes on every run. `services/perception/.env` has to carry the same `DEVICE_TOKEN_SECRET`
+as Vercel and the same Atlas `MONGODB_URI`, or the calls come back 401 or land in the wrong database.
+
 ## Development
 
 ```bash
