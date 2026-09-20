@@ -11,12 +11,14 @@
     "lint": "pnpm --filter web lint",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck && tsc --noEmit",
+    "perception:serve": "bash scripts/serve-perception.sh",
     "db:up": "docker compose up -d --wait mongo",
     "db:down": "docker compose down",
     "db:setup": "tsx scripts/db-setup.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:sweep": "tsx scripts/db-sweep.ts",
-    "bench:tts": "tsx scripts/bench-tts.ts"
+    "bench:tts": "tsx scripts/bench-tts.ts",
+    "scan:sim": "tsx scripts/scan-sim.ts"
   },
   "dependencies": {
     "@memory-glasses/db": "workspace:*",

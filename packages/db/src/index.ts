@@ -61,6 +61,7 @@ export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/inter
 export type { NewNotification } from "./repos/notifications";
 export type { PersonPatch, PublicPerson, RecognizedPerson } from "./repos/people";
 export type { SightingQuery } from "./repos/sightings";
+export type { ScanObservationInput, ScanPositionInput } from "./repos/scan-pins";
 
 export * from "./schema/common";
 export * from "./schema/items";
@@ -71,5 +72,6 @@ export * from "./schema/notifications";
 export * from "./schema/recordings";
 export * from "./schema/perception";
 export * from "./schema/safety";
+export * from "./schema/scan";
 export * from "./schema/tenancy";
 export * from "./schema/meta";

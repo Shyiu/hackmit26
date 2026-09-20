@@ -269,6 +269,38 @@ into a chest harness with the rear camera facing forward. On iPhone, Add to Home
 page the whole screen, and earbuds are required because Safari routes answer audio to the earpiece
 while the mic is open.
 
+### Perception for a deployed web app
+
+A hosted web app (Vercel) can't run perception: it is a long-lived WebSocket server with model
+adapters, not a serverless function. Face enrollment, item detection, and danger events all go
+through it, so a deployment with no perception behind it answers "The perception service isn't
+reachable". Until it is hosted somewhere, run it from a laptop and give the deployment its URL:
+
+```bash
+pnpm perception:serve   # runs :8000 and prints PERCEPTION_URL and NEXT_PUBLIC_PERCEPTION_WS_URL
+```
+
+Set those two in the Vercel project and redeploy. The tunnel is outbound, so any network works, but
+the URL changes on every run. `services/perception/.env` has to carry the same `DEVICE_TOKEN_SECRET`
+as Vercel and the same Atlas `MONGODB_URI`, or the calls come back 401 or land in the wrong database.
+
+### Hosting perception on Render
+
+For a deployment that doesn't depend on a laptop, [`render.yaml`](render.yaml) runs perception as a
+Docker service from [`services/perception/Dockerfile`](services/perception/Dockerfile). The web app
+stays on Vercel and Mongo stays on Atlas. In Render, New -> Blueprint, pick this repo, and fill in:
+
+- `MONGODB_URI` — the same Atlas URI the Vercel app uses
+- `DEVICE_TOKEN_SECRET` — byte-identical to Vercel's, or every proxied call is 401
+- `FACE_EMBEDDING_KEY` — a Fernet key that must stay the same across restarts
+  (`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`)
+
+Then set `PERCEPTION_URL=https://<service>.onrender.com` and
+`NEXT_PUBLIC_PERCEPTION_WS_URL=wss://<service>.onrender.com/ws/frames` in Vercel and redeploy;
+`NEXT_PUBLIC_*` is baked into the browser bundle, so a change to it needs that redeploy. On the free
+plan the service sleeps when idle and the first frame socket waits for it to wake, and the image
+ships the null detector and mock face adapters unless the `yoloe` or `faces` extras are installed.
+
 ## Development
 
 ```bash
