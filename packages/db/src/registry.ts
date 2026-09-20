@@ -368,7 +368,7 @@ export const collections = {
   people: defineCollection({
     name: "people",
     schema: personDocSchema,
-    writers: ["perception"],
+    writers: ["web", "perception"],
     indexes: [
       {
         name: "patient_people_by_name",

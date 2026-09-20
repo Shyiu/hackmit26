@@ -44,6 +44,7 @@ export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/inter
 export type { NewNotification } from "./repos/notifications";
 export { PUSH_SUBSCRIPTION_TTL_DAYS, type NewPushSubscription } from "./repos/push-subscriptions";
 export type { DangerEventQuery } from "./repos/danger-events";
+export type { PersonPatch, PublicPerson, RecognizedPerson } from "./repos/people";
 export type { SightingQuery } from "./repos/sightings";
 
 export * from "./schema/common";

@@ -101,8 +101,10 @@ scripts read the same file.
   `patientId`, and never add a code path that matches against anything but that patient's own
   enrolled set. See README.md "Faces, danger, and routines" and "Privacy and safety".
 - Face enrollment lives in the perception service, which owns the embedder and the encryption key.
-  `/api/people` proxies to it through `apps/web/src/lib/server/perception.ts`, at `PERCEPTION_URL`,
-  else the socket's host, else `http://127.0.0.1:8000`. The Faces page says so when it's down.
+  Enrolling and adding photos go through `apps/web/src/lib/server/perception.ts`, at `PERCEPTION_URL`,
+  else the socket's host, else `http://127.0.0.1:8000`. Listing, renaming, and removing people read
+  and write the `people` collection directly (`tenant.people`), so the Faces page works when
+  perception is down or unreachable from Vercel; the Add form reports the failure instead.
 - `CAREGIVER_EMAIL`/`CAREGIVER_PASSWORD` only seed the one demo pair (`pnpm db:seed`). Real caregiver
   signup is a separate flow (`POST /api/auth/signup`); don't assume there's exactly one caregiver
   account when writing a route or a test.
