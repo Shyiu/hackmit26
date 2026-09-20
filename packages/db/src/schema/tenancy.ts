@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { idSchema, type CaregiverId, type DeviceId, type PatientId } from "../ids";
+import { idSchema, type CaregiverId, type DeviceId, type PairingCodeId, type PatientId } from "../ids";
 import { captureSource, shortText, timestamps, unitInterval } from "./common";
 
 function isTimeZone(value: string): boolean {
@@ -92,3 +92,22 @@ export const deviceDocSchema = z.strictObject({
 });
 
 export type DeviceDoc = z.infer<typeof deviceDocSchema>;
+
+export const PAIRING_CODE_LENGTH = 6;
+export const PAIRING_CODE_MAX_ATTEMPTS = 5;
+
+export const pairingCodeDocSchema = z.strictObject({
+  _id: idSchema<PairingCodeId>(),
+  patientId: idSchema<PatientId>(),
+  createdBy: idSchema<CaregiverId>(),
+  /** sha256 hex of the 6 digits. The plain code is shown once and never stored. */
+  codeHash: z.string().regex(/^[0-9a-f]{64}$/),
+  /** Wrong guesses seen while this code was live. At PAIRING_CODE_MAX_ATTEMPTS it is burned. */
+  attempts: z.int().nonnegative(),
+  expiresAt: z.date(),
+  redeemedAt: z.date().nullable(),
+  deviceId: idSchema<DeviceId>().nullable(),
+  createdAt: z.date(),
+});
+
+export type PairingCodeDoc = z.infer<typeof pairingCodeDocSchema>;

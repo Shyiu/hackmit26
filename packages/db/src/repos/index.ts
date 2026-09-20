@@ -3,6 +3,7 @@ import type { PatientId } from "../ids";
 import { DEFAULT_PATIENT_SETTINGS } from "../schema/tenancy";
 import type { RepoContext } from "./context";
 import { devicesRepo } from "./devices";
+import { pairingCodesRepo } from "./pairing-codes";
 import { interactionsRepo } from "./interactions";
 import { itemsRepo } from "./items";
 import { notificationsRepo } from "./notifications";
@@ -37,6 +38,7 @@ export function tenantRepos(db: Db, patientId: PatientId, options: TenantOptions
     rooms: roomsRepo(ctx),
     notifications: notificationsRepo(ctx),
     devices: devicesRepo(ctx),
+    pairingCodes: pairingCodesRepo(ctx),
   };
 }
 

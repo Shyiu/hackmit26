@@ -414,6 +414,7 @@ Both services derive `patientId` from an authenticated caregiver session or scop
 { _id, patientId, email, passwordHash, name, createdAt }
 
 // devices: a patient's paired phones (/wear, /sim), each with its own scoped token
+// pairing_codes: short-lived caregiver-generated codes, redeemed once to create a device
 { _id, patientId, label, tokenHash, pairedAt, lastSeenAt }
 ```
 
@@ -455,6 +456,8 @@ Indexes, as declared in `packages/db/src/registry.ts`:
 | `notifications` | `{ patientId: 1, status: 1, showAt: 1 }` | the wear page's poll, optional |
 | `recordings` | `{ patientId: 1, startedAt: -1 }` | recordings list, optional |
 | `devices` | `{ patientId: 1, createdAt: -1 }` | a wearer's devices |
+| `pairing_codes` | `{ redeemedAt: 1, expiresAt: 1 }` | live codes for redemption |
+| `pairing_codes` | `{ patientId: 1, createdAt: -1 }` | a wearer's pairing codes |
 | `caregivers` | unique `{ email: 1 }` | login |
 | `people` | `{ patientId: 1, name: 1 }` | face enrollment list |
 | `danger_events` | `{ patientId: 1, status: 1, lastSeenAt: -1 }` | open hazards, dashboard alert badge |

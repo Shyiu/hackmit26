@@ -10,6 +10,7 @@ export type Id<TBrand extends string> = ObjectId & { readonly __brand: TBrand };
 export type PatientId = Id<"PatientId">;
 export type CaregiverId = Id<"CaregiverId">;
 export type DeviceId = Id<"DeviceId">;
+export type PairingCodeId = Id<"PairingCodeId">;
 export type ItemId = Id<"ItemId">;
 export type SightingId = Id<"SightingId">;
 export type RoomId = Id<"RoomId">;

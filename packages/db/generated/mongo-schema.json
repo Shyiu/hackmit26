@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "a4c7eaa9cbf04019b6709960aeb90341804788e4542fe5cd9dfb30d048cea4e6",
+  "fingerprint": "b495d992d6a3910b7647ce0de4417b23140ea325643e6560f5c9c26227bb5a9c",
   "collections": {
     "patients": {
       "validator": {
@@ -281,6 +281,101 @@
             "createdAt": -1
           },
           "unique": false
+        }
+      ]
+    },
+    "pairing_codes": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "createdBy": {
+              "bsonType": "objectId"
+            },
+            "codeHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "attempts": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            },
+            "redeemedAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "deviceId": {
+              "anyOf": [
+                {
+                  "bsonType": "objectId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "createdBy",
+            "codeHash",
+            "attempts",
+            "expiresAt",
+            "redeemedAt",
+            "deviceId",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
+        {
+          "name": "live_codes",
+          "key": {
+            "redeemedAt": 1,
+            "expiresAt": 1
+          },
+          "unique": false
+        },
+        {
+          "name": "patient_codes",
+          "key": {
+            "patientId": 1,
+            "createdAt": -1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
         }
       ]
     },
