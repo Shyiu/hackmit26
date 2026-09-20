@@ -1,7 +1,7 @@
 [project]
 name = "memory-glasses-perception"
 version = "0.0.0"
-description = "Takes frames from the headset, detects tracked items, and writes sightings to MongoDB"
+description = "Takes frames from the chest phone, detects tracked items, and writes sightings to MongoDB"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

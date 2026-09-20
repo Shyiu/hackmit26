@@ -27,7 +27,7 @@ from pymongo import ReturnDocument
 from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.errors import DuplicateKeyError
 
-CaptureSource = Literal["headset", "simulator", "glasses"]
+CaptureSource = Literal["chest", "simulator", "glasses"]
 CaptureState = Literal["paused", "live", "ended"]
 ObservationState = Literal["resting", "held", "moving", "in_use", "unknown"]
 BBox = tuple[float, float, float, float]

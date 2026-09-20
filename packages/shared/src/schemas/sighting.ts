@@ -35,7 +35,7 @@ export const sightingSchema = z.object({
   searchText: z.string().optional(),
   sentenceEmbedding: z.array(z.number()).length(1536).optional(),
   embeddingModel: z.string().optional(),
-  source: z.enum(["headset", "simulator", "glasses"]),
+  source: z.enum(["chest", "simulator", "glasses"]),
 });
 
 export type Sighting = z.infer<typeof sightingSchema>;

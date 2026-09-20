@@ -57,7 +57,7 @@ JPEG = b"\xff\xd8\xff\xe0" + bytes(60)
 
 @pytest.fixture(scope="module")
 async def wearer_db(db: Database) -> Database:
-    # The wearer and headset the fixture token names.
+    # The wearer and chest phone the fixture token names.
     seed = Seed(db)
     await seed.patient(PATIENT)
     await seed.device(PATIENT, DEVICE)
@@ -302,7 +302,7 @@ def test_frames_socket_runs_a_capture_session(
         ws.close()
         session = _wait_for(lambda: sessions.find_one({"_id": ObjectId(session_id), "state": "ended"}))
 
-    assert (session["patientId"], session["deviceId"], session["source"]) == (PATIENT, DEVICE, "headset")
+    assert (session["patientId"], session["deviceId"], session["source"]) == (PATIENT, DEVICE, "chest")
     assert (session["framesReceived"], session["framesDropped"], session["lastSeq"]) == (1, 1, 2)
     assert session["endedAt"] is not None
 
@@ -499,7 +499,7 @@ def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_fram
         db = sessions.database
         sighting = _wait_for(lambda: db["sightings"].find_one({"patientId": PATIENT, "status": "open"}))
         assert (sighting["itemId"], sighting["firstSeq"], sighting["lastSeq"]) == (keys_item, 1, 3)
-        assert (sighting["sessionId"], sighting["source"]) == (ObjectId(session_id), "headset")
+        assert (sighting["sessionId"], sighting["source"]) == (ObjectId(session_id), "chest")
         assert sighting["eventId"] == f"{session_id}:1"
         # The snapshot is a second write, after the sighting itself.
         item = _wait_for(

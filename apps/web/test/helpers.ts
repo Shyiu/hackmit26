@@ -41,7 +41,7 @@ export async function newHousehold(db: Db) {
     patientIds: [patient._id],
   });
   const repos = tenantRepos(db, patient._id);
-  const device = await repos.devices.register({ kind: "headset", label: "Phone" });
+  const device = await repos.devices.register({ kind: "chest", label: "Phone" });
   const cookie = await createSessionToken(caregiver);
   return { patient, caregiver, device, repos, cookie };
 }

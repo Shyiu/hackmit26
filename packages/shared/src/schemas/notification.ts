@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// Caregiver messages and reminders waiting for the headset HUD. Optional, after M3.
+// Caregiver messages and reminders waiting for the chest page. Optional, after M3.
 // Answer captions and sighting notifications are built on the client, not stored.
 export const notificationKindSchema = z.enum(["caregiver_message", "reminder", "danger_alert"]);
 

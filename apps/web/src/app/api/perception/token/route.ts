@@ -6,7 +6,7 @@ import { optionalEnv } from "@/lib/server/env";
 const TOKEN_TTL_SECONDS = 10 * 60;
 
 // Mints a short-lived token for the perception frame socket. A browser can't set
-// headers on a WebSocket, so the headset page sends it as the first message.
+// headers on a WebSocket, so the chest page sends it as the first message.
 export const GET = withTenant("any", async ({ principal, tenant }) => {
   let tokenVersion = 0;
   if (principal.kind === "device" && principal.deviceId) {

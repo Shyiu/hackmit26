@@ -77,7 +77,7 @@ export const caregiverDocSchema = z.strictObject({
 export type CaregiverDoc = z.infer<typeof caregiverDocSchema>;
 
 /**
- * A capture client: the headset page, the /sim page, or later the glasses app.
+ * A capture client: the /wear chest page, the /sim page, or later the glasses app.
  * Tokens carry `tokenVersion`; bumping it revokes every token already issued.
  */
 export const deviceDocSchema = z.strictObject({

@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "a4c7eaa9cbf04019b6709960aeb90341804788e4542fe5cd9dfb30d048cea4e6",
+  "fingerprint": "d0990b02f537813efa0a2c8879a02a62df4364c35e842309cd6cd9335441425d",
   "collections": {
     "patients": {
       "validator": {
@@ -213,7 +213,7 @@
             "kind": {
               "type": "string",
               "enum": [
-                "headset",
+                "chest",
                 "simulator",
                 "glasses"
               ]
@@ -457,7 +457,7 @@
                     "source": {
                       "type": "string",
                       "enum": [
-                        "headset",
+                        "chest",
                         "simulator",
                         "glasses"
                       ]
@@ -573,7 +573,7 @@
                     "source": {
                       "type": "string",
                       "enum": [
-                        "headset",
+                        "chest",
                         "simulator",
                         "glasses"
                       ]
@@ -732,7 +732,7 @@
             "source": {
               "type": "string",
               "enum": [
-                "headset",
+                "chest",
                 "simulator",
                 "glasses"
               ]
@@ -2558,7 +2558,7 @@
             "source": {
               "type": "string",
               "enum": [
-                "headset",
+                "chest",
                 "simulator",
                 "glasses"
               ]

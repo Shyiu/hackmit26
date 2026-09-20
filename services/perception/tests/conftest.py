@@ -157,8 +157,8 @@ class Seed:
             {
                 "_id": device_id or ObjectId(),
                 "patientId": patient_id,
-                "kind": "headset",
-                "label": "Test headset",
+                "kind": "chest",
+                "label": "Test chest phone",
                 "tokenVersion": token_version,
                 "lastSeenAt": None,
                 "revokedAt": now if revoked else None,

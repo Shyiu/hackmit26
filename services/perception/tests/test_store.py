@@ -138,6 +138,13 @@ async def test_validators_are_enforced(db: Database) -> None:
     assert caught.value.code == 121
 
 
+async def test_capture_session_stores_chest_source(scene: Scene) -> None:
+    session_id = await scene.store.open_capture_session(scene.patient_id, None, "chest")
+    session = await scene.db["capture_sessions"].find_one({"_id": session_id})
+    assert session is not None
+    assert session["source"] == "chest"
+
+
 async def test_capture_session_counts_frames_and_ends(scene: Scene) -> None:
     store, patient, session_id = scene.store, scene.patient_id, scene.session_id
     session = await scene.db["capture_sessions"].find_one({"_id": session_id})

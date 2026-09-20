@@ -347,7 +347,7 @@ Both services derive `patientId` from an authenticated caregiver session or scop
   nearbyObjects: ["coffee maker", "mug"],
   keyframeKey, thumbKey, // mint signed URLs on authorized reads
   searchText, sentenceEmbedding: [/* 1536; optional */], embeddingModel,
-  source: "chest" | "simulator" | "glasses" // the code still says "headset"; rename it
+  source: "chest" | "simulator" | "glasses"
 }
 
 // rooms and room_refs: caregiver-enrolled rooms and their CLIP reference frames

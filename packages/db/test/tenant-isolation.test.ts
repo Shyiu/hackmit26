@@ -77,12 +77,12 @@ describe("tenant isolation", () => {
   });
 
   it("devices: another wearer's device can't be looked up, touched, or revoked", async () => {
-    const headset = await a.devices.register({ kind: "headset", label: "Phone" });
-    expect(await b.devices.getActive(headset._id)).toBeNull();
-    await b.devices.touch(headset._id);
-    expect(await b.devices.revoke(headset._id)).toBeNull();
+    const chest = await a.devices.register({ kind: "chest", label: "Phone" });
+    expect(await b.devices.getActive(chest._id)).toBeNull();
+    await b.devices.touch(chest._id);
+    expect(await b.devices.revoke(chest._id)).toBeNull();
     expect(await b.devices.list()).toEqual([]);
-    const stored = await collection(env.db, "devices").findOne({ _id: headset._id });
+    const stored = await collection(env.db, "devices").findOne({ _id: chest._id });
     expect(stored?.revokedAt).toBeNull();
     expect(stored?.lastSeenAt).toBeNull();
   });

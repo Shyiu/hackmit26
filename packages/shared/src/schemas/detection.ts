@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-// What the perception service sends back on /ws/frames for each frame, so the
-// headset can label items. Boxes are [x, y, w, h], normalized to the frame.
+// What the perception service sends back on /ws/frames for each frame, so
+// the chest phone can label items. Boxes are [x, y, w, h], normalized to the frame.
 export const detectionSchema = z.object({
   itemId: z.string(),
   label: z.string(),

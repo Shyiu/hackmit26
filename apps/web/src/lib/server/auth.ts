@@ -20,7 +20,7 @@ import { getDb } from "./db";
 import { requireEnv } from "./env";
 
 // Two ways in, per README "Caregiver dashboard": a caregiver session cookie,
-// which the /headset and /sim pages also ride on once the caregiver signs in
+// which the /wear and /sim pages also ride on once the caregiver signs in
 // on the phone, and a bearer device token for native clients later. Either
 // way the wearer comes from a signed credential, never from a request body.
 

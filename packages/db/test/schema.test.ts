@@ -4,6 +4,9 @@ import { z } from "zod";
 import { idSchema, newId, type ItemId, type PatientId } from "../src/ids";
 import { toMongoJsonSchema } from "../src/json-schema";
 import { collection } from "../src/registry";
+import { captureSource } from "../src/schema/common";
+import { sightingDocSchema } from "../src/schema/sightings";
+import { deviceDocSchema } from "../src/schema/tenancy";
 import { schemaPlan, schemaStatus, syncDatabase } from "../src/setup";
 import { openTestDb } from "./helpers";
 
@@ -19,6 +22,12 @@ function keywordsIn(node: unknown, found = new Set<string>()): Set<string> {
 }
 
 describe("toMongoJsonSchema", () => {
+  it("uses chest as the capture source and rejects the legacy value", () => {
+    expect(captureSource.options).toEqual(["chest", "simulator", "glasses"]);
+    expect(deviceDocSchema.shape.kind.safeParse("headset").success).toBe(false);
+    expect(sightingDocSchema.shape.source.safeParse("headset").success).toBe(false);
+  });
+
   it("emits only keywords MongoDB accepts", () => {
     for (const planned of schemaPlan().collections) {
       const keywords = keywordsIn(planned.validator);
