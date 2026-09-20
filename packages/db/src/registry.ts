@@ -9,7 +9,13 @@ import { recordingDocSchema } from "./schema/recordings";
 import { roomDocSchema, roomRefDocSchema } from "./schema/rooms";
 import { dangerEventDocSchema, frameObservationDocSchema, personDocSchema } from "./schema/safety";
 import { sightingDocSchema } from "./schema/sightings";
-import { caregiverDocSchema, deviceDocSchema, pairingCodeDocSchema, patientDocSchema } from "./schema/tenancy";
+import {
+  caregiverDocSchema,
+  caregiverPairingCodeDocSchema,
+  deviceDocSchema,
+  pairingCodeDocSchema,
+  patientDocSchema,
+} from "./schema/tenancy";
 
 type Leaf = string | number | boolean | null | undefined | Date | ObjectId;
 type Shallower = [never, 0, 1, 2, 3];
@@ -178,6 +184,19 @@ export const collections = {
         name: "patient_codes",
         key: { patientId: 1, createdAt: -1 },
         purpose: "a wearer's pairing codes, newest first",
+      },
+    ],
+  }),
+
+  caregiverPairingCodes: defineCollection({
+    name: "caregiverPairingCodes",
+    schema: caregiverPairingCodeDocSchema,
+    writers: ["web"],
+    indexes: [
+      {
+        name: "patient_codes",
+        key: { patientId: 1, createdAt: -1 },
+        purpose: "a wearer's live codes, newest first",
       },
     ],
   }),

@@ -113,6 +113,19 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
   errorMessageSchema,
 ]);
 
+// POST /config/classes on the perception service, called by the web app after a
+// caregiver edits items. The tenant comes from the token, never the body.
+export const reloadClassesRequestSchema = z
+  .object({ version: z.number().int().nonnegative().optional() })
+  .strict();
+export const reloadClassesResponseSchema = z
+  .object({
+    patientId: objectIdHex,
+    classes: z.array(z.string().min(1).max(200)),
+    version: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export type HelloMessage = z.infer<typeof helloMessageSchema>;
 export type CaptureCommand = z.infer<typeof captureCommandSchema>;
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
@@ -125,3 +138,5 @@ export type Face = z.infer<typeof faceSchema>;
 export type FacesMessage = z.infer<typeof facesMessageSchema>;
 export type PerceptionErrorCode = z.infer<typeof perceptionErrorCodeSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
+export type ReloadClassesRequest = z.infer<typeof reloadClassesRequestSchema>;
+export type ReloadClassesResponse = z.infer<typeof reloadClassesResponseSchema>;

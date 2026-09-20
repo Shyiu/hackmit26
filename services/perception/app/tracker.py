@@ -14,6 +14,7 @@ database.
 
 from __future__ import annotations
 
+import asyncio
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -22,10 +23,8 @@ from bson import ObjectId
 
 from .config import Settings
 from .protocol import Detection
-from .store import BBox, CaptureSource, ObservationStore
-
-HIGH_CONFIDENCE = 0.5
-LOW_CONFIDENCE = 0.1
+from .safety.images import LocalFrameStore
+from .store import BBox, CaptureSource, ObservationStore, OpenedSighting
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +34,11 @@ class TrackerConfig:
     refresh_interval: timedelta = timedelta(milliseconds=500)
     lost_after: timedelta = timedelta(seconds=3)
     match_iou: float = 0.3
+    # A detection at or above high_confidence can start a brand-new track; one
+    # between low_confidence and high_confidence can only keep an existing track
+    # alive (ByteTrack's second-stage match), never start one on its own.
+    high_confidence: float = 0.5
+    low_confidence: float = 0.1
 
     @classmethod
     def from_settings(cls, settings: Settings) -> TrackerConfig:
@@ -44,6 +48,8 @@ class TrackerConfig:
             refresh_interval=timedelta(milliseconds=settings.refresh_interval_ms),
             lost_after=timedelta(seconds=settings.track_lost_seconds),
             match_iou=settings.track_match_iou,
+            high_confidence=settings.track_high_confidence,
+            low_confidence=settings.track_low_confidence,
         )
 
 
@@ -140,7 +146,7 @@ class SightingTracker:
         events: list[SightingEvent] = []
         unmatched = self._associate(detections, observed_at, seq)
         for detection in unmatched:
-            if detection.confidence >= HIGH_CONFIDENCE:
+            if detection.confidence >= self.config.high_confidence:
                 self._tracks.append(self._start(detection, observed_at, seq))
         for track in self._tracks:
             if track.last_seq != seq:
@@ -184,8 +190,9 @@ class SightingTracker:
         return events
 
     def _associate(self, detections: list[Detection], observed_at: datetime, seq: int) -> list[Detection]:
-        high = [d for d in detections if d.confidence >= HIGH_CONFIDENCE]
-        low = [d for d in detections if LOW_CONFIDENCE <= d.confidence < HIGH_CONFIDENCE]
+        high_confidence, low_confidence = self.config.high_confidence, self.config.low_confidence
+        high = [d for d in detections if d.confidence >= high_confidence]
+        low = [d for d in detections if low_confidence <= d.confidence < high_confidence]
         free = list(self._tracks)
         # Stage one: tracks against confident detections. Stage two: what's
         # left of the tracks against the faint ones, which keeps a track alive
@@ -265,19 +272,21 @@ class SightingWriter:
         session_id: ObjectId,
         device_id: ObjectId | None,
         source: CaptureSource,
+        frame_store: LocalFrameStore | None = None,
     ) -> None:
         self._store = store
         self._patient_id = patient_id
         self._session_id = session_id
         self._device_id = device_id
         self._source = source
+        self._frame_store = frame_store
         self._sightings: dict[int, ObjectId] = {}
 
     def event_id(self, track_id: int) -> str:
         # Stable per track, so a replayed open changes nothing.
         return f"{self._session_id}:{track_id}"
 
-    async def apply(self, events: list[SightingEvent]) -> None:
+    async def apply(self, events: list[SightingEvent], frame_jpeg: bytes | None = None) -> None:
         for event in events:
             match event:
                 case SightingOpened():
@@ -298,6 +307,10 @@ class SightingWriter:
                         confidence=event.confidence,
                     )
                     self._sightings[event.track_id] = opened.sighting_id
+                    if frame_jpeg is not None and opened.created and self._frame_store is not None:
+                        # A replayed open reuses the earlier keyframe; only a genuinely
+                        # new sighting needs one enqueued for the vision model.
+                        await self._enqueue_keyframe(self._frame_store, opened, event, frame_jpeg)
                 case SightingRefreshed():
                     sighting_id = self._sightings.get(event.track_id)
                     if sighting_id is not None:
@@ -314,3 +327,17 @@ class SightingWriter:
                     sighting_id = self._sightings.pop(event.track_id, None)
                     if sighting_id is not None:
                         await self._store.close_sighting(self._patient_id, sighting_id)
+
+    async def _enqueue_keyframe(
+        self, frame_store: LocalFrameStore, opened: OpenedSighting, event: SightingOpened, frame_jpeg: bytes
+    ) -> None:
+        stored = await asyncio.to_thread(frame_store.put, self._patient_id, frame_jpeg, event.observed_at)
+        await self._store.enqueue_description(
+            self._patient_id,
+            ObjectId(event.item_id),
+            opened.sighting_id,
+            opened.observation_version,
+            stored.key,
+            event.bbox,
+            event.observed_at,
+        )

@@ -1,6 +1,6 @@
 "use client";
 
-import { Ellipsis, Glasses, X } from "lucide-react";
+import { Ellipsis, Glasses, Laptop, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useEffectEvent, useState } from "react";
@@ -10,47 +10,52 @@ import { CaptureBadge } from "./capture-badge";
 import { isActive, PRIMARY_LINKS, SECONDARY_LINKS } from "./nav-links";
 import { navRowClass, SignOutButton } from "./sign-out-button";
 
-// Desktop: a sticky sidebar with every page.
+// The tiny muted heading over each group of sidebar rows.
+function GroupLabel({ children }: { children: string }) {
+  return <p className="px-2 pt-3 pb-1 text-xs font-medium text-muted-foreground/80">{children}</p>;
+}
+
+// Desktop: a narrow sidebar on the page tint, with the wordmark and the camera
+// state at the top and every page grouped below it.
 export function Sidebar() {
   const pathname = usePathname();
   return (
-    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-6 border-r border-border/70 bg-white px-4 py-7 md:flex">
-      <Link href="/dashboard" className="px-3 text-sm" aria-label="Memoir home">
+    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col px-2 py-2 md:flex">
+      <Link
+        href="/dashboard"
+        className="flex h-8 items-center gap-2 rounded-md px-2 transition-colors hover:bg-row-hover"
+        aria-label="Memoir home"
+      >
         <Wordmark />
       </Link>
-      <CaptureBadge className="mx-3 self-start" />
-      <nav className="flex flex-col gap-1">
-        {[...PRIMARY_LINKS, ...SECONDARY_LINKS].map(({ href, label, icon: Icon }) => (
+      <CaptureBadge className="mx-2 mt-1.5 self-start" />
+      <nav className="mt-2 flex flex-col">
+        {PRIMARY_LINKS.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href} className={navRowClass(isActive(pathname, href))}>
-            <Icon className="size-4" />
+            <Icon className="size-4 shrink-0" />
+            {label}
+          </Link>
+        ))}
+        <GroupLabel>More</GroupLabel>
+        {SECONDARY_LINKS.map(({ href, label, icon: Icon }) => (
+          <Link key={href} href={href} className={navRowClass(isActive(pathname, href))}>
+            <Icon className="size-4 shrink-0" />
             {label}
           </Link>
         ))}
       </nav>
-      <div className="mt-auto flex flex-col gap-1">
+      <div className="mt-auto flex flex-col">
         <Link href="/wear" className={navRowClass(false)}>
-          <Glasses className="size-4" />
+          <Glasses className="size-4 shrink-0" />
           Open the wear page
+        </Link>
+        <Link href="/sim" className={navRowClass(false)}>
+          <Laptop className="size-4 shrink-0" />
+          Simulator
         </Link>
         <SignOutButton className={navRowClass(false)} />
       </div>
     </aside>
-  );
-}
-
-// Phones: a slim top bar under the status bar. Home draws its own header.
-export function MobileHeader() {
-  const pathname = usePathname();
-  if (pathname === "/dashboard") return <div className="pt-safe md:hidden" />;
-  return (
-    <header className="sticky top-0 z-30 border-b bg-background/90 pt-safe backdrop-blur md:hidden">
-      <div className="flex h-14 items-center justify-between gap-3 px-4">
-        <Link href="/dashboard" className="text-[0.8rem]" aria-label="Memoir home">
-          <Wordmark />
-        </Link>
-        <CaptureBadge />
-      </div>
-    </header>
   );
 }
 
@@ -70,14 +75,13 @@ export function TabBar() {
     return () => window.removeEventListener("keydown", handle);
   }, []);
 
-  // The active tab sits in a soft brand pill; the rest keep tinted icons.
+  // The active tab is marked by the icon and label going brand, not by a pill.
   const tabClass = (active: boolean) =>
     cn(
-      "my-1.5 flex flex-1 flex-col items-center justify-center gap-1 rounded-[1.4rem] text-xs font-medium transition-colors",
-      active ? "bg-brand-soft text-brand-deep" : "text-muted-foreground",
+      "flex flex-1 flex-col items-center justify-center gap-1 rounded-md text-xs font-medium transition-colors",
+      active ? "text-brand-deep" : "text-muted-foreground",
     );
-  const iconClass = (active: boolean) =>
-    cn("size-7", active ? "fill-butter text-brand" : "fill-transparent text-brand/45");
+  const iconClass = (active: boolean) => cn("size-5", active ? "text-brand" : "text-muted-foreground");
 
   return (
     <>
@@ -86,44 +90,48 @@ export function TabBar() {
           <button
             type="button"
             aria-label="Close"
-            className="absolute inset-0 bg-black/40 animate-in fade-in"
+            className="absolute inset-0 bg-foreground/30 animate-in fade-in"
             onClick={() => setMoreOpen(false)}
           />
-          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t bg-background px-3 pt-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom">
-            <div className="mb-2 flex items-center justify-between px-3">
+          <div className="absolute inset-x-0 bottom-0 rounded-t-lg border-t border-hairline bg-panel px-3 pt-3 pb-[calc(5rem+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom">
+            <div className="mb-1 flex items-center justify-between px-2 pb-1">
               <span className="text-sm font-semibold">More</span>
               <button
                 type="button"
                 aria-label="Close"
-                className="flex size-10 items-center justify-center rounded-full hover:bg-accent"
+                className="flex size-9 items-center justify-center rounded-md hover:bg-row-hover"
                 onClick={() => setMoreOpen(false)}
               >
-                <X className="size-5" />
+                <X className="size-4" />
               </button>
             </div>
-            <nav className="flex flex-col gap-1">
+            <nav className="flex flex-col">
               {SECONDARY_LINKS.map(({ href, label, icon: Icon }) => (
                 <Link
                   key={href}
                   href={href}
                   onClick={() => setMoreOpen(false)}
-                  className={navRowClass(isActive(pathname, href))}
+                  className={cn(navRowClass(isActive(pathname, href)), "h-10")}
                 >
-                  <Icon className="size-5" />
+                  <Icon className="size-4 shrink-0" />
                   {label}
                 </Link>
               ))}
-              <Link href="/wear" className={navRowClass(false)}>
-                <Glasses className="size-5" />
+              <Link href="/wear" className={cn(navRowClass(false), "h-10")}>
+                <Glasses className="size-4 shrink-0" />
                 Open the wear page
               </Link>
-              <SignOutButton className={cn(navRowClass(false), "w-full")} />
+              <Link href="/sim" onClick={() => setMoreOpen(false)} className={cn(navRowClass(false), "h-10")}>
+                <Laptop className="size-4 shrink-0" />
+                Simulator
+              </Link>
+              <SignOutButton className={cn(navRowClass(false), "h-10")} />
             </nav>
           </div>
         </div>
       )}
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border/60 bg-background/95 pb-safe shadow-[0_-4px_20px_-8px_rgb(20_45_120/0.12)] backdrop-blur md:hidden">
-        <div className="flex h-20 gap-1 px-2">
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-hairline bg-panel/95 pb-safe backdrop-blur md:hidden">
+        <div className="flex h-16 gap-1 px-2">
           {PRIMARY_LINKS.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
@@ -141,7 +149,7 @@ export function TabBar() {
             onClick={() => setMoreOpen((open) => !open)}
             className={tabClass(moreOpen || moreActive)}
           >
-            <Ellipsis className={cn("size-7", moreOpen || moreActive ? "text-brand" : "text-brand/45")} />
+            <Ellipsis className={iconClass(moreOpen || moreActive)} />
             More
           </button>
         </div>

@@ -1,6 +1,7 @@
 import { TIMING_STAGES, type TimingStage } from "@memory-glasses/db";
+import { Gauge } from "lucide-react";
 import Link from "next/link";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { milliseconds } from "@/lib/format";
 import { dashboardTenant } from "@/lib/server/dashboard";
 import { cn } from "@/lib/utils";
@@ -30,20 +31,23 @@ export default async function LatencyPage({ searchParams }: PageProps<"/dashboar
   const stats = await tenant.interactions.latencyStats({ since: new Date(now.getTime() - days * 24 * 60 * 60 * 1000) });
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <PageHeader
         title="Latency"
+        icon={Gauge}
         description={`P50 and P95 per stage over ${stats.interactions} answered question${stats.interactions === 1 ? "" : "s"}.`}
         action={
-          <nav aria-label="Time window" className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1 sm:w-64">
+          <nav aria-label="Time window" className="flex gap-0.5 rounded-md bg-muted p-0.5">
             {WINDOWS.map((window) => (
               <Link
                 key={window}
                 href={`/dashboard/latency?days=${window}`}
                 aria-current={window === days ? "page" : undefined}
                 className={cn(
-                  "flex min-h-11 items-center justify-center rounded-md text-sm font-medium transition-colors",
-                  window === days ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  "flex h-6 items-center justify-center rounded-[0.3rem] px-2 text-xs font-medium transition-colors",
+                  window === days
+                    ? "bg-panel text-foreground shadow-[0_1px_2px_rgb(20_45_120/0.12)]"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {window === 1 ? "24 hours" : `${window} days`}
@@ -52,9 +56,9 @@ export default async function LatencyPage({ searchParams }: PageProps<"/dashboar
           </nav>
         }
       />
-
-      <div className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10">
-        <div className="hidden grid-cols-[1fr_6rem_6rem_6rem] gap-4 px-4 py-2 text-xs font-medium text-muted-foreground md:grid">
+      <PageBody>
+      <div className="flex flex-col divide-y divide-hairline overflow-hidden rounded-lg border border-hairline">
+        <div className="hidden grid-cols-[1fr_6rem_6rem_6rem] gap-4 bg-row-hover/60 px-3 py-1.5 text-xs font-medium text-muted-foreground md:grid">
           <span>Stage</span>
           <span className="text-right">P50</span>
           <span className="text-right">P95</span>
@@ -67,13 +71,13 @@ export default async function LatencyPage({ searchParams }: PageProps<"/dashboar
             <div
               key={stage}
               className={cn(
-                "grid grid-cols-3 gap-x-4 gap-y-2 px-4 py-3 md:grid-cols-[1fr_6rem_6rem_6rem] md:items-center",
-                stage === "total" && "bg-muted/40",
+                "grid grid-cols-3 gap-x-4 gap-y-2 px-3 py-2.5 md:grid-cols-[1fr_6rem_6rem_6rem] md:items-center",
+                stage === "total" && "bg-muted/50 font-medium",
               )}
             >
               <div className="col-span-3 md:col-span-1">
-                <p className="font-medium">{label.name}</p>
-                <p className="text-sm text-muted-foreground">{label.hint}</p>
+                <p className="text-sm font-medium">{label.name}</p>
+                <p className="text-xs text-muted-foreground">{label.hint}</p>
               </div>
               <Stat label="P50" value={milliseconds(row.p50)} />
               <Stat label="P95" value={milliseconds(row.p95)} />
@@ -82,11 +86,12 @@ export default async function LatencyPage({ searchParams }: PageProps<"/dashboar
           );
         })}
       </div>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         Stage percentiles don&apos;t add up to the total&apos;s percentile, so Total is measured on its own. Stages with no
         samples haven&apos;t been built or haven&apos;t run in this window.
       </p>
-    </div>
+      </PageBody>
+    </>
   );
 }
 
@@ -94,7 +99,7 @@ function Stat({ label, value, muted }: { label: string; value: string; muted?: b
   return (
     <div className="flex flex-col md:text-right">
       <span className="text-xs text-muted-foreground md:sr-only">{label}</span>
-      <span className={cn("text-base tabular-nums", muted && "text-muted-foreground")}>{value}</span>
+      <span className={cn("text-sm tabular-nums", muted && "text-muted-foreground")}>{value}</span>
     </div>
   );
 }

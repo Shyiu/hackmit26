@@ -4,7 +4,7 @@ Takes JPEG frames from the headset page over a WebSocket, runs tracked-item and 
 
 ## Status
 
-The frame socket, device tokens, capture sessions, the YOLOE-26 detector, the tracker that turns detections into sightings, and the MongoDB write path in `app/store.py` work and are tested. Without the model assets the service boots with `NullDetector`, which finds nothing. The vision model that describes keyframes is M1. `WS /ws/debug` and `POST /config/classes` are stubs. Face enrollment and matching, single-frame hazard rules, VLM confirmation, and danger-event persistence run behind mock adapters by default; their real models are optional extras, loaded lazily.
+The frame socket, device tokens, capture sessions, the YOLOE-26 detector, the tracker that turns detections into sightings, and the MongoDB write path in `app/store.py` work and are tested. Without the model assets the service boots with `NullDetector`, which finds nothing. The vision model that describes keyframes is M1. `WS /ws/debug` is a stub. `POST /config/classes` (api-scope token) re-reads the wearer's active items and swaps in the new class prompts for every open frame socket of that wearer; `/health` lists the loaded class-list version per wearer. Face enrollment and matching, single-frame hazard rules, VLM confirmation, and danger-event persistence run behind mock adapters by default; their real models are optional extras, loaded lazily.
 
 ## Run
 
@@ -85,6 +85,8 @@ curl -H "Authorization: Bearer $TOKEN" 'http://localhost:8000/danger-events?stat
 curl -X PATCH -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"status":"acknowledged","acknowledgedBy":"caregiver"}' \
   http://localhost:8000/danger-events/<event-id>
+curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{}' http://localhost:8000/config/classes
 ```
 
 ### Face recognition
@@ -195,3 +197,7 @@ Late and replayed writes can't undo newer evidence:
 - A description reaches the item only while the item still shows the same version, sighting and keyframe revision. Otherwise it only enriches the old sighting, and the item's last resting spot if that is still the described keyframe.
 - Snapshot writes leave the item's `updatedAt` alone. It marks caregiver edits, and the web app refuses a save when it moved.
 - A worker finishes only the attempt it claimed. The job's `attempts` count is the fencing token, and `runAfter` doubles as the lease expiry.
+
+## Description worker
+
+`app/description_worker.py` runs as a background task in the same process. It claims one due job at a time, loads the keyframe from `FRAME_IMAGE_DIR`, and sends it with the box and the item's name to the vision model (`app/vision.py`, `OPENAI_API_KEY` or `VLM_API_KEY`; without a key `MockDescriptionVLM` answers `unknown`). The model returns room, surface, relation, state, the location fragment, nearby objects, and `item_visible`. A box the model cannot confirm as the named item is recorded as state `unknown`, so the wearer hears "I could not tell where" rather than a description of the wrong object.

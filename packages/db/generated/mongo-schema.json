@@ -1,7 +1,7 @@
 {
   "comment": "Generated from packages/db/src/registry.ts by `pnpm --filter @memory-glasses/db export-schema`. Don't edit.",
   "version": 1,
-  "fingerprint": "b495d992d6a3910b7647ce0de4417b23140ea325643e6560f5c9c26227bb5a9c",
+  "fingerprint": "81ea4f37ee1bb1416d404dcad4e0ee163dd39f877282b4adcebbdad35c68580f",
   "collections": {
     "patients": {
       "validator": {
@@ -84,6 +84,9 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
+                },
+                "faceAnnounceSoundEnabled": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -96,7 +99,8 @@
                 "retentionDays",
                 "staleAfterMinutes",
                 "wakeWordEnabled",
-                "wakeWordSensitivity"
+                "wakeWordSensitivity",
+                "faceAnnounceSoundEnabled"
               ],
               "additionalProperties": false
             },
@@ -361,6 +365,89 @@
           },
           "unique": false
         },
+        {
+          "name": "patient_codes",
+          "key": {
+            "patientId": 1,
+            "createdAt": -1
+          },
+          "unique": false
+        },
+        {
+          "name": "expires_at_ttl",
+          "key": {
+            "expiresAt": 1
+          },
+          "unique": false,
+          "expireAfterSeconds": 86400
+        }
+      ]
+    },
+    "caregiverPairingCodes": {
+      "validator": {
+        "$jsonSchema": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "bsonType": "objectId"
+            },
+            "patientId": {
+              "bsonType": "objectId"
+            },
+            "codeHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "attempts": {
+              "minimum": 0,
+              "bsonType": [
+                "int",
+                "long",
+                "double"
+              ],
+              "multipleOf": 1
+            },
+            "expiresAt": {
+              "bsonType": "date"
+            },
+            "redeemedAt": {
+              "anyOf": [
+                {
+                  "bsonType": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "redeemedBy": {
+              "anyOf": [
+                {
+                  "bsonType": "objectId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "bsonType": "date"
+            }
+          },
+          "required": [
+            "_id",
+            "patientId",
+            "codeHash",
+            "attempts",
+            "expiresAt",
+            "redeemedAt",
+            "redeemedBy",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "indexes": [
         {
           "name": "patient_codes",
           "key": {
@@ -1266,7 +1353,9 @@
                     "unknown",
                     "unseen",
                     "ambiguous",
-                    "not_understood"
+                    "not_understood",
+                    "person_recalled",
+                    "no_one_recalled"
                   ]
                 },
                 {
@@ -1573,7 +1662,8 @@
               "enum": [
                 "caregiver_message",
                 "reminder",
-                "danger_alert"
+                "danger_alert",
+                "person_recognized"
               ]
             },
             "text": {
@@ -1619,6 +1709,9 @@
               "bsonType": "date"
             },
             "dangerEventId": {
+              "bsonType": "objectId"
+            },
+            "personId": {
               "bsonType": "objectId"
             }
           },

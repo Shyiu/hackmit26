@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { idSchema, type CaregiverId, type DeviceId, type PairingCodeId, type PatientId } from "../ids";
+import {
+  idSchema,
+  type CaregiverId,
+  type CaregiverPairingCodeId,
+  type DeviceId,
+  type PairingCodeId,
+  type PatientId,
+} from "../ids";
 import { captureSource, shortText, timestamps, unitInterval } from "./common";
 
 function isTimeZone(value: string): boolean {
@@ -29,6 +36,9 @@ export const patientSettingsSchema = z.strictObject({
   staleAfterMinutes: z.int().min(1).max(24 * 60),
   wakeWordEnabled: z.boolean(),
   wakeWordSensitivity: unitInterval,
+  /** Off by default: a recognized face is always a silent notification; this only
+   * adds a short chime on top. Never speech -- see README "Faces, danger, and routines". */
+  faceAnnounceSoundEnabled: z.boolean(),
 });
 
 export type PatientSettings = z.infer<typeof patientSettingsSchema>;
@@ -44,6 +54,7 @@ export const DEFAULT_PATIENT_SETTINGS: PatientSettings = {
   staleAfterMinutes: 15,
   wakeWordEnabled: false,
   wakeWordSensitivity: 0.5,
+  faceAnnounceSoundEnabled: false,
 };
 
 /** The wearer. Every tenant-owned document points here through `patientId`. */
@@ -92,6 +103,28 @@ export const deviceDocSchema = z.strictObject({
 });
 
 export type DeviceDoc = z.infer<typeof deviceDocSchema>;
+
+// A caregiver joining an existing wearer, README "What /wear and /sim call on
+// first run" adjacent: same hash/timing-safe-compare/expiry shape as a device
+// pairing code (see redeemCaregiverPairingCode in ../pairing.ts), but redeemed
+// by a second caregiver's own account instead of minting a device token.
+export const CAREGIVER_PAIRING_CODE_LENGTH = 6;
+export const CAREGIVER_PAIRING_CODE_MAX_ATTEMPTS = 5;
+
+export const caregiverPairingCodeDocSchema = z.strictObject({
+  _id: idSchema<CaregiverPairingCodeId>(),
+  patientId: idSchema<PatientId>(),
+  /** sha256 hex of the 6 digits. The plain code is shown once and never stored. */
+  codeHash: z.string().regex(/^[0-9a-f]{64}$/),
+  /** Wrong guesses seen while this code was live. At the max attempts it is burned. */
+  attempts: z.int().nonnegative(),
+  expiresAt: z.date(),
+  redeemedAt: z.date().nullable(),
+  redeemedBy: idSchema<CaregiverId>().nullable(),
+  createdAt: z.date(),
+});
+
+export type CaregiverPairingCodeDoc = z.infer<typeof caregiverPairingCodeDocSchema>;
 
 export const PAIRING_CODE_LENGTH = 6;
 export const PAIRING_CODE_MAX_ATTEMPTS = 5;

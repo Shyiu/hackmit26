@@ -23,6 +23,7 @@ export type DescriptionJobId = Id<"DescriptionJobId">;
 export type PersonId = Id<"PersonId">;
 export type FrameObservationId = Id<"FrameObservationId">;
 export type DangerEventId = Id<"DangerEventId">;
+export type CaregiverPairingCodeId = Id<"CaregiverPairingCodeId">;
 
 const OBJECT_ID_HEX = /^[0-9a-f]{24}$/i;
 
