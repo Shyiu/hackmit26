@@ -1,11 +1,5 @@
 import "server-only";
-import {
-  locationStatus,
-  type AnswerTemplate,
-  type ItemDoc,
-  type ItemResolution,
-  type PatientSettings,
-} from "@memory-glasses/db";
+import { type AnswerTemplate, type ItemDoc, type ItemResolution, type PatientSettings } from "@memory-glasses/db";
 import type { LastSeenPerson } from "@/lib/server/perception";
 import { relativeTime } from "@/lib/relative-time";
 
@@ -93,7 +87,6 @@ export function composeItemAddedAnswer(item: ItemDoc): Answer {
 
 function describeItem(item: ItemDoc, settings: PatientSettings, now: Date): Answer {
   const snapshot = item.lastSighting;
-  const them = item.plural ? "they" : "it";
   const wereAt = item.plural ? "they were" : "it was";
   const say = (template: AnswerTemplate, text: string): Answer => ({ template, text, itemId: item._id });
   // PLAN.md "the answer": an optional second sentence suggests a known usual
@@ -103,26 +96,16 @@ function describeItem(item: ItemDoc, settings: PatientSettings, now: Date): Answ
 
   if (!snapshot) return say("unseen", `I haven't seen your ${item.name} in my available history.${suggestUsual}`);
   const when = relativeTime(snapshot.lastSeenAt, now);
-  const status = locationStatus(snapshot);
-  switch (status) {
-    case "observed": {
-      const stale = now.getTime() - snapshot.lastSeenAt.getTime() > settings.staleAfterMinutes * 60_000;
-      // A fresh sighting answers on its own; only a stale one gets the hint.
-      const text = `I last saw your ${item.name} ${snapshot.sentence}, ${when}.`;
-      return say(stale ? "stale" : "fresh", stale ? text + suggestUsual : text);
-    }
-    case "held":
-      return say("held", `I last saw your ${item.name} in your hand, ${when}.${suggestUsual}`);
-    case "moved":
-      // Already two sentences; the usual spot would make it three.
-      return say("moved", `I saw your ${item.name} being moved. I could not tell where ${them} ended up.`);
-    case "uncertain":
-      return say("unknown", `I saw your ${item.name}, but I could not tell where ${wereAt}.${suggestUsual}`);
-    case "unseen":
-      return say("unseen", `I haven't seen your ${item.name} in my available history.${suggestUsual}`);
-    default: {
-      const _exhaustive: never = status;
-      return _exhaustive;
-    }
+
+  // The answer comes from what the vision model actually saw in the keyframe
+  // (room, surface, relation to nearby objects -- see vision.py's prompt), not
+  // from the tracker's held/moving/resting motion classification. Whatever the
+  // item was doing, a described frame beats a canned status line.
+  if (snapshot.descriptionStatus === "ready" && snapshot.sentence) {
+    const stale = now.getTime() - snapshot.lastSeenAt.getTime() > settings.staleAfterMinutes * 60_000;
+    // A fresh sighting answers on its own; only a stale one gets the hint.
+    const text = `I last saw your ${item.name} ${snapshot.sentence}, ${when}.`;
+    return say(stale ? "stale" : "fresh", stale ? text + suggestUsual : text);
   }
+  return say("unknown", `I saw your ${item.name}, but I could not tell where ${wereAt}.${suggestUsual}`);
 }

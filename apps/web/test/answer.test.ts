@@ -54,8 +54,11 @@ describe("composeAnswer usual-spot suggestion", () => {
     const stale = describe_(item({ usualSpots: [spot], lastSighting: snapshot() }));
     expect(stale.template).toBe("stale");
     expect(stale.text).toContain("It's usually on the kitchen counter.");
-    const held = describe_(item({ usualSpots: [spot], lastSighting: snapshot({ state: "held" }) }));
-    expect(held.text).toContain("It's usually on the kitchen counter.");
+    const heldNoDescription = describe_(
+      item({ usualSpots: [spot], lastSighting: snapshot({ state: "held", descriptionStatus: "pending", sentence: null }) }),
+    );
+    expect(heldNoDescription.template).toBe("unknown");
+    expect(heldNoDescription.text).toContain("It's usually on the kitchen counter.");
     const uncertain = describe_(
       item({ usualSpots: [spot], lastSighting: snapshot({ descriptionStatus: "pending", sentence: null }) }),
     );
@@ -63,14 +66,12 @@ describe("composeAnswer usual-spot suggestion", () => {
     expect(uncertain.text).toContain("It's usually on the kitchen counter.");
   });
 
-  it("stays quiet on fresh and moved answers, and on weak history", () => {
+  it("stays quiet on fresh answers and on weak history", () => {
     const fresh = describe_(
       item({ usualSpots: [spot], lastSighting: snapshot({ lastSeenAt: new Date(now.getTime() - 60_000) }) }),
     );
     expect(fresh.template).toBe("fresh");
     expect(fresh.text).not.toContain("usually");
-    const moved = describe_(item({ usualSpots: [spot], lastSighting: snapshot({ state: "moving" }) }));
-    expect(moved.text).not.toContain("usually");
     // Below the share and sample floors.
     const weak = describe_(
       item({ usualSpots: [{ ...spot, share: 0.3 }], lastSighting: snapshot({ state: "held" }) }),
@@ -80,6 +81,16 @@ describe("composeAnswer usual-spot suggestion", () => {
       item({ usualSpots: [{ ...spot, samples: 2 }], lastSighting: snapshot({ state: "held" }) }),
     );
     expect(few.text).not.toContain("usually");
+  });
+
+  it("answers from the described frame regardless of held or moving state", () => {
+    const recent = { lastSeenAt: new Date(now.getTime() - 10_000) };
+    const held = describe_(item({ lastSighting: snapshot({ state: "held", ...recent }) }));
+    expect(held.template).toBe("fresh");
+    expect(held.text).toBe("I last saw your keys on the hallway table, just now.");
+    const moving = describe_(item({ lastSighting: snapshot({ state: "moving", ...recent }) }));
+    expect(moving.template).toBe("fresh");
+    expect(moving.text).toBe("I last saw your keys on the hallway table, just now.");
   });
 });
 
