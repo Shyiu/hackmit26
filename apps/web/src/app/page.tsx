@@ -17,14 +17,14 @@ export default function Home() {
         </div>
       </header>
       <nav className="grid grid-cols-2 gap-3">
-        <Tile href="/wear" title="Wear" icon={Glasses} tone="terracotta" />
-        <Tile href="/dashboard" title="Dashboard" icon={LayoutDashboard} tone="lavender" />
+        <Tile href="/wear" title="Wear" icon={Glasses} tone="brand" />
+        <Tile href="/dashboard" title="Dashboard" icon={LayoutDashboard} tone="navy" />
         <Tile href="/sim" title="Simulator" icon={Laptop} tone="sky" />
         <Tile href="/signup" title="Sign up" icon={UserPlus} tone="butter" />
       </nav>
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/login" className="font-semibold text-terracotta-deep">
+        <Link href="/login" className="font-semibold text-brand-deep">
           Sign in
         </Link>
       </p>

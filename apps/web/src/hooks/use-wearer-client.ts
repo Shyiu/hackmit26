@@ -97,12 +97,19 @@ function useWearerSettings() {
 
   useEffect(() => {
     let cancelled = false;
+    let needsSignIn = false;
     async function load() {
+      if (cancelled || needsSignIn) return;
       try {
         const response = await fetch("/api/settings", { cache: "no-store" });
         if (cancelled) return;
         if (response.status === 401) {
+          needsSignIn = true;
+          window.clearInterval(timer);
+          setSettings(null);
           setSignedIn(false);
+          const next = window.location.pathname + window.location.search;
+          window.location.replace(`/login?next=${encodeURIComponent(next)}`);
           return;
         }
         if (!response.ok) return;
@@ -114,8 +121,8 @@ function useWearerSettings() {
         // Offline for a moment; the next poll catches up.
       }
     }
-    void load();
     const timer = window.setInterval(() => void load(), 60_000);
+    void load();
     return () => {
       cancelled = true;
       window.clearInterval(timer);

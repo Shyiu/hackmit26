@@ -31,6 +31,12 @@ export async function perceptionFetch(patientId: PatientId, path: string, init: 
     throw new HttpError(502, "The perception service isn't reachable. Start it with pnpm start.");
   }
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new HttpError(
+        502,
+        "The perception service rejected the app's token. Set the same DEVICE_TOKEN_SECRET in apps/web/.env.local and services/perception/.env, then restart both servers.",
+      );
+    }
     const body = (await response.json().catch(() => null)) as { detail?: unknown; error?: { message?: unknown } } | null;
     const message = body?.error?.message ?? body?.detail;
     throw new HttpError(

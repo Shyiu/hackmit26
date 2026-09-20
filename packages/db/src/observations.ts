@@ -1,9 +1,10 @@
 import type { Db } from "mongodb";
 import { parseDocument } from "./errors";
-import { newId, type CaptureSessionId, type ItemId, type PatientId, type SightingId } from "./ids";
+import { newId, type CaptureSessionId, type DangerEventId, type ItemId, type PatientId, type SightingId } from "./ids";
 import { collection } from "./registry";
 import type { CaptureSource, ObservationState } from "./schema/common";
 import type { SightingSnapshot } from "./schema/items";
+import { dangerEventDocSchema, type DangerEventDoc } from "./schema/safety";
 import { sightingDocSchema, type SightingDoc } from "./schema/sightings";
 import { DEFAULT_PATIENT_SETTINGS } from "./schema/tenancy";
 
@@ -104,4 +105,56 @@ export async function seedObservation(
     },
   );
   return { sighting, snapshot };
+}
+
+export type SeedDangerEvent = {
+  patientId: PatientId;
+  kind: DangerEventDoc["kind"];
+  hazardLabel?: string | null;
+  severity?: DangerEventDoc["severity"];
+  confidence?: number;
+  verification?: DangerEventDoc["verification"];
+  status?: DangerEventDoc["status"];
+  lastSeenAt: Date;
+  retentionDays?: number;
+};
+
+/**
+ * Writes one hazard event the way perception's safety/store.py leaves it: raised,
+ * unacknowledged, notification still pending. For seeds and tests only.
+ */
+export async function seedDangerEvent(db: Db, input: SeedDangerEvent): Promise<DangerEventDoc> {
+  const retentionMs = (input.retentionDays ?? DEFAULT_PATIENT_SETTINGS.retentionDays) * DAY_MS;
+  const event = parseDocument(dangerEventDocSchema, {
+    _id: newId<DangerEventId>(),
+    patientId: input.patientId,
+    kind: input.kind,
+    hazardLabel: input.hazardLabel ?? null,
+    severity: input.severity ?? "medium",
+    confidence: input.confidence ?? 0.8,
+    verification: input.verification ?? "unverified",
+    evidenceScope: "single_frame",
+    status: input.status ?? "open",
+    firstSeenAt: new Date(input.lastSeenAt.getTime() - 4_000),
+    lastSeenAt: input.lastSeenAt,
+    bbox: [0.3, 0.4, 0.2, 0.2],
+    frameSize: [1280, 720],
+    keyframeKey: `seed/danger/${newId().toHexString()}.jpg`,
+    frameObservationIds: [],
+    evidence: {
+      detectorName: "seed",
+      detectorConfidence: input.confidence ?? 0.8,
+      vlmModel: null,
+      vlmConfidence: null,
+      observableEvidence: [],
+    },
+    acknowledgedAt: null,
+    acknowledgedBy: null,
+    notification: { status: "pending", notificationId: null },
+    createdAt: input.lastSeenAt,
+    updatedAt: input.lastSeenAt,
+    expiresAt: new Date(input.lastSeenAt.getTime() + retentionMs),
+  });
+  await collection(db, "dangerEvents").insertOne(event);
+  return event;
 }

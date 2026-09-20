@@ -36,6 +36,7 @@ export type { ItemPatch, ItemResolution, NewItem } from "./repos/items";
 export type { InteractionOutcome, LatencyStats, StageStats } from "./repos/interactions";
 export type { NewNotification } from "./repos/notifications";
 export { recordingChunkKey, type AddChunkResult, type NewRecording, type NewRecordingChunk } from "./repos/recordings";
+export type { DangerEventQuery } from "./repos/danger-events";
 export type { SightingQuery } from "./repos/sightings";
 
 export * from "./schema/common";
