@@ -10,6 +10,7 @@ import { notificationsRepo } from "./notifications";
 import { patientRepo } from "./patients";
 import { peopleRepo } from "./people";
 import { roomsRepo } from "./rooms";
+import { scanPinsRepo } from "./scan-pins";
 import { sightingsRepo } from "./sightings";
 
 export type TenantOptions = {
@@ -41,6 +42,7 @@ export function tenantRepos(db: Db, patientId: PatientId, options: TenantOptions
     devices: devicesRepo(ctx),
     dangerEvents: dangerEventsRepo(ctx),
     people: peopleRepo(ctx),
+    scanPins: scanPinsRepo(ctx),
   };
 }
 

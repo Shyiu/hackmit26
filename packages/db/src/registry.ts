@@ -8,6 +8,7 @@ import { captureSessionDocSchema, descriptionJobDocSchema } from "./schema/perce
 import { recordingDocSchema } from "./schema/recordings";
 import { roomDocSchema, roomRefDocSchema } from "./schema/rooms";
 import { dangerEventDocSchema, frameObservationDocSchema, personDocSchema } from "./schema/safety";
+import { scanPinDocSchema } from "./schema/scan";
 import { sightingDocSchema } from "./schema/sightings";
 import {
   caregiverDocSchema,
@@ -394,6 +395,25 @@ export const collections = {
         name: "open_by_last_seen",
         key: { patientId: 1, status: 1, lastSeenAt: -1 },
         purpose: "open hazards, dashboard alert badge",
+      },
+    ],
+  }),
+
+  scanPins: defineCollection({
+    name: "scanPins",
+    schema: scanPinDocSchema,
+    writers: ["web"],
+    indexes: [
+      {
+        name: "item_scene_unique",
+        key: { patientId: 1, itemId: 1, sceneId: 1 },
+        unique: true,
+        purpose: "one pin per item per scene, and an item's pins across scenes",
+      },
+      {
+        name: "scene_pins",
+        key: { patientId: 1, sceneId: 1 },
+        purpose: "every pin the 3D viewer draws in one scene",
       },
     ],
   }),
