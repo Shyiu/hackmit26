@@ -157,3 +157,84 @@ async def test_safety_api_auth_and_local_path_guards(db: Database, tmp_path) -> 
             ).json()
             == []
         )
+
+
+async def test_people_patch_and_photos(db: Database, tmp_path) -> None:
+    patient_id, token = await _patient(db)
+    _other_id, other_token = await _patient(db)
+    settings = Settings(
+        mongodb_uri="mongodb://127.0.0.1:27017/?directConnection=true",
+        mongodb_db=db.name,
+        device_token_secret="x" * 32,
+        frame_image_dir=str(tmp_path),
+    )
+    bearer = {"Authorization": f"Bearer {token}"}
+    with TestClient(create_app(settings)) as client:
+        enrollment = client.post(
+            "/people",
+            headers=bearer,
+            files={"photos": ("face.jpg", _jpeg(), "image/jpeg")},
+            data={"name": "Alex", "consentedBy": "caregiver"},
+        )
+        assert enrollment.status_code == 201, enrollment.text
+        person_id = enrollment.json()["_id"]
+        assert len(enrollment.json()["referenceImageKeys"]) == 1
+
+        updated = client.patch(
+            f"/people/{person_id}", headers=bearer, json={"name": "Alexander", "relation": "son"}
+        )
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["name"] == "Alexander"
+        assert updated.json()["relation"] == "son"
+        assert "faceEmbeddings" not in updated.json()
+
+        assert client.patch(f"/people/{person_id}", headers=bearer, json={}).status_code == 422
+        assert client.patch(f"/people/{person_id}", headers=bearer, json={"name": "  "}).status_code == 422
+
+        added = client.post(
+            f"/people/{person_id}/photos",
+            headers=bearer,
+            files=[("photos", ("a.jpg", _jpeg(), "image/jpeg")), ("photos", ("b.jpg", _jpeg(), "image/jpeg"))],
+        )
+        assert added.status_code == 200, added.text
+        assert len(added.json()["referenceImageKeys"]) == 3
+
+        too_many = client.post(
+            f"/people/{person_id}/photos",
+            headers=bearer,
+            files=[("photos", (f"p{i}.jpg", _jpeg(), "image/jpeg")) for i in range(6)],
+        )
+        assert too_many.status_code == 422
+
+        other_bearer = {"Authorization": f"Bearer {other_token}"}
+        assert (
+            client.patch(f"/people/{person_id}", headers=other_bearer, json={"name": "X"}).status_code
+            == 404
+        )
+        assert (
+            client.post(
+                f"/people/{person_id}/photos",
+                headers=other_bearer,
+                files={"photos": ("x.jpg", _jpeg(), "image/jpeg")},
+            ).status_code
+            == 404
+        )
+        listed = client.get("/people", headers=bearer).json()
+        assert listed[0]["name"] == "Alexander"
+
+        # The 20-photo cap: 3 on file, batches of five then two to reach 20, then refused.
+        for batch in (5, 5, 5, 2):
+            response = client.post(
+                f"/people/{person_id}/photos",
+                headers=bearer,
+                files=[("photos", (f"e{i}.jpg", _jpeg(), "image/jpeg")) for i in range(batch)],
+            )
+            assert response.status_code == 200, response.text
+        assert (
+            client.post(
+                f"/people/{person_id}/photos",
+                headers=bearer,
+                files={"photos": ("last.jpg", _jpeg(), "image/jpeg")},
+            ).status_code
+            == 422
+        )

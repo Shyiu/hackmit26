@@ -133,6 +133,20 @@ class SafetyService:
         consented_by: str,
         photos: list[bytes | tuple[str, bytes]],
     ) -> dict:
+        keys, embeddings = await self._embed_photos(patient_id, photos)
+        return await self.store.enroll_person(
+            patient_id,
+            name,
+            relation,
+            consented_by,
+            keys,
+            embeddings,
+            self.adapters.face_embedder.model,
+        )
+
+    async def _embed_photos(
+        self, patient_id: ObjectId, photos: list[bytes | tuple[str, bytes]]
+    ) -> tuple[list[str], list]:
         embeddings = []
         keys = []
         now = datetime.now(UTC)
@@ -153,12 +167,18 @@ class SafetyService:
                 face = max(found, key=lambda item: item[0].bbox.w * item[0].bbox.h)
                 embeddings.append(face[1])
             keys.append(await asyncio.to_thread(self.frame_store.put_reference, patient_id, photo, now))
-        return await self.store.enroll_person(
-            patient_id,
-            name,
-            relation,
-            consented_by,
-            keys,
-            embeddings,
-            self.adapters.face_embedder.model,
-        )
+        return keys, embeddings
+
+    async def add_photos(
+        self,
+        patient_id: ObjectId,
+        person_id: ObjectId,
+        photos: list[bytes | tuple[str, bytes]],
+    ) -> dict | None:
+        person = await self.store.get_person(patient_id, person_id)
+        if person is None:
+            return None
+        if len(person["referenceImageKeys"]) + len(photos) > 20:
+            raise ValueError("a person can have at most 20 reference photos")
+        keys, embeddings = await self._embed_photos(patient_id, photos)
+        return await self.store.add_person_photos(patient_id, person_id, keys, embeddings)

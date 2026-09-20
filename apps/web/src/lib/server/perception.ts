@@ -44,7 +44,7 @@ export async function perceptionFetch(patientId: PatientId, path: string, init: 
     const body = (await response.json().catch(() => null)) as { detail?: unknown; error?: { message?: unknown } } | null;
     const message = body?.error?.message ?? body?.detail;
     throw new HttpError(
-      response.status === 422 ? 422 : 502,
+      response.status === 422 ? 422 : response.status === 404 ? 404 : 502,
       typeof message === "string" ? message : `The perception service answered ${response.status}`,
     );
   }

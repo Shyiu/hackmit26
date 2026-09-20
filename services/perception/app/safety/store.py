@@ -18,6 +18,13 @@ from .models import Candidate, EnrolledPerson, FrameAnalysis, Gallery
 log = logging.getLogger("perception.safety")
 
 
+class _Unset:
+    pass
+
+
+_UNSET = _Unset()
+
+
 class SafetyStore:
     def __init__(self, db: AsyncDatabase[dict[str, Any]], observations: ObservationStore, settings):
         self._db = db
@@ -60,6 +67,69 @@ class SafetyStore:
             "expiresAt": expires,
         }
         await self._people.insert_one(doc)
+        self.forget_gallery(patient_id)
+        return self._public_person(doc)
+
+    async def get_person(self, patient_id: ObjectId, person_id: ObjectId) -> dict[str, Any] | None:
+        doc = await self._people.find_one({"_id": person_id, "patientId": patient_id})
+        return self._public_person(doc) if doc is not None else None
+
+    async def update_person(
+        self,
+        patient_id: ObjectId,
+        person_id: ObjectId,
+        *,
+        name: str | None = None,
+        relation: str | None | _Unset = _UNSET,
+    ) -> dict[str, Any] | None:
+        filter_ = {"_id": person_id, "patientId": patient_id}
+        changes: dict[str, Any] = {}
+        if name is not None:
+            changes["name"] = name
+        if not isinstance(relation, _Unset):
+            changes["relation"] = relation
+        if changes:
+            doc = await self._people.find_one_and_update(
+                filter_, {"$set": changes}, return_document=ReturnDocument.AFTER
+            )
+        else:
+            doc = await self._people.find_one(filter_)
+        if doc is None:
+            return None
+        self.forget_gallery(patient_id)
+        return self._public_person(doc)
+
+    async def add_person_photos(
+        self,
+        patient_id: ObjectId,
+        person_id: ObjectId,
+        reference_image_keys: list[str],
+        embeddings: list[Any],
+    ) -> dict[str, Any] | None:
+        doc = await self._people.find_one({"_id": person_id, "patientId": patient_id})
+        if doc is None:
+            return None
+        if len(doc["referenceImageKeys"]) + len(reference_image_keys) > 20:
+            raise ValueError("a person can have at most 20 reference photos")
+        doc = await self._people.find_one_and_update(
+            {"_id": person_id, "patientId": patient_id},
+            {
+                "$push": {
+                    "referenceImageKeys": {"$each": reference_image_keys},
+                    "faceEmbeddings": {
+                        "$each": [
+                            base64.b64encode(
+                                encrypt_embedding(embedding, self._settings.fernet())
+                            ).decode()
+                            for embedding in embeddings
+                        ]
+                    },
+                }
+            },
+            return_document=ReturnDocument.AFTER,
+        )
+        if doc is None:
+            return None
         self.forget_gallery(patient_id)
         return self._public_person(doc)
 
