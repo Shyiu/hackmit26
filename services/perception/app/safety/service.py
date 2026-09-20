@@ -147,9 +147,11 @@ class SafetyService:
             found = await asyncio.to_thread(
                 detect_and_embed, self.adapters, array, filename=filename, for_enrollment=True
             )
-            if len(found) != 1:
-                raise ValueError("each photo must contain exactly one face")
-            embeddings.append(found[0][1])
+            # Save every photo even when detection misses. With multiple faces,
+            # use the largest rather than enrolling several identities as one person.
+            if found:
+                face = max(found, key=lambda item: item[0].bbox.w * item[0].bbox.h)
+                embeddings.append(face[1])
             keys.append(await asyncio.to_thread(self.frame_store.put_reference, patient_id, photo, now))
         return await self.store.enroll_person(
             patient_id,
