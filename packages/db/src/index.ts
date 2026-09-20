@@ -34,7 +34,10 @@ export { createCaregiver, createPatient, findCaregiverByEmail, recordLogin } fro
 export {
   addPatientToCaregiver,
   createCaregiverPairingCode,
+  createDevicePairingCode,
+  markPairingCodeRedeemedBy,
   redeemCaregiverPairingCode,
+  redeemDevicePairingCode,
   type AttachPatientResult,
   type RedeemCaregiverCodeResult,
 } from "./pairing";

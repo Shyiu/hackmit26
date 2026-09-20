@@ -552,7 +552,11 @@ Next.js:
 |---|---|
 | `POST /api/ask` | Takes `{ transcript, requestId }`, returns `X-Interaction-Id` and `Server-Timing` before the body; deduplicates by wearer and request ID. With a TTS provider configured the body is streamed `audio/pcm` (s16le, mono, 24 kHz, declared in `X-Audio-*` headers) and the text is polled from `GET /api/interactions/:id`; with none, or when the provider refuses the request, it returns the interaction as JSON |
 | `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout` | Real caregiver accounts. Signup creates the caregiver and their patient profile together; login sets a signed session cookie scoped to that `patientId` |
+| `POST /api/devices/pairing-codes` | Caregiver-only. Creates a short-lived pairing code for a chest phone or simulator |
 | `POST /api/devices/pair` | Redeems a caregiver-generated pairing code for a device token scoped to the caregiver's `patientId`. What `/wear` and `/sim` call on first run instead of sharing the caregiver's login |
+| `GET /api/devices` | Lists the caregiver's paired phones |
+| `POST /api/devices/:id/revoke` | Revokes one of the caregiver's paired phones |
+| `POST /api/devices/unpair` | Clears the current phone's device credential and revokes it when it is a paired device |
 | `GET /api/health` | Unauthenticated. Whether the database answers and its validators are current |
 | `GET /api/stt/token` | Mints a short-lived Deepgram key so the client streams audio to Deepgram directly and skips a hop. 503 without `DEEPGRAM_API_KEY`, and the page uses the browser's recognizer |
 | `GET, PATCH /api/settings` | The wearer's settings. The wear page reads speaking rate and recording permission; the caregiver edits them |
