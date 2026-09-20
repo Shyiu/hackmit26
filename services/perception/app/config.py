@@ -32,10 +32,12 @@ class Settings(TokenSettings):
     # Carries credentials on Atlas, so it stays out of reprs and logs.
     mongodb_uri: str = Field(repr=False)
     mongodb_db: str = "memory_glasses"
-    # For the description worker. Unused until M1.
+    # For the description worker.
     openai_api_key: str | None = Field(default=None, repr=False)
     # The lease owner written on claimed description jobs. The schema caps it at 100 characters.
     worker_id: str = Field(default_factory=default_worker_id, min_length=1, max_length=100)
+    # How long the description worker sleeps after finding no due job.
+    description_poll_interval_s: float = Field(default=1.0, gt=0.0)
 
     # The detector. "auto" runs YOLOE when ultralytics and the checkpoint are on
     # this machine and falls back to NullDetector otherwise, so the service boots anywhere.
@@ -59,6 +61,10 @@ class Settings(TokenSettings):
     refresh_interval_ms: int = Field(default=500, ge=0)
     track_lost_seconds: float = Field(default=3.0, gt=0.0)
     track_match_iou: float = Field(default=0.3, gt=0.0, le=1.0)
+    # A detection at or above this can start a brand-new track. One between
+    # track_low_confidence and this can only refresh a track that already exists.
+    track_high_confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    track_low_confidence: float = Field(default=0.1, ge=0.0, le=1.0)
 
     safety_enabled: bool = True
     safety_sample_every_n_frames: int = Field(default=3, ge=1)
@@ -83,6 +89,10 @@ class Settings(TokenSettings):
     # Once a recognized person is announced to the wearer, how long before the
     # same person can be announced again.
     face_announce_cooldown_s: float = Field(default=120.0, gt=0.0)
+    # How long a matched face stays the answer to "who is this" after being seen.
+    # Separate from face_announce_cooldown_s, which gates the proactive notification,
+    # not how long the wearer can still ask about who they just saw.
+    person_recall_window_s: float = Field(default=600.0, gt=0.0)
     face_embedding_key: str | None = Field(default=None, repr=False)
     vlm: Literal["mock", "openai", "off"] = "mock"
     vlm_model: str = "gpt-5.6-luna"
@@ -93,7 +103,10 @@ class Settings(TokenSettings):
     safety_hazard_labels_extra: str = ""
     safety_mock_labels: str = ""
     safety_mock_faces: int = Field(default=0, ge=0)
-    frame_image_dir: str = "./data/frames"
+    # The root LocalFrameStore writes under: it builds "frames/..." and "people/..."
+    # keys itself, so this must NOT already end in "/frames" or every keyframe write
+    # doubles the segment and every description job fails with file-not-found.
+    frame_image_dir: str = "./data"
     allow_local_path_ingest: bool = False
     ingest_allowed_dir: str | None = None
     danger_event_merge_window_s: int = Field(default=30, ge=1)

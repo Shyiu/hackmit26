@@ -354,6 +354,10 @@ class ObservationStore:
             async for doc in cursor
         ]
 
+    async def item_name(self, patient_id: ObjectId, item_id: ObjectId) -> str | None:
+        item = await self._items.find_one({"_id": item_id, "patientId": patient_id}, {"name": 1})
+        return item["name"] if item else None
+
     async def queue_depth(self) -> int:
         """Queued description jobs across every wearer, for /health."""
         return await self._jobs.count_documents({"status": "queued"})

@@ -5,16 +5,17 @@ import { cn } from "@/lib/utils";
 
 export type TileTone = "brand" | "navy" | "sky" | "butter" | "ice" | "royal";
 
-// Each tone is a soft tinted card with a rounded blob rising from the
-// bottom-right corner, and the icon standing on it. Blues do the work; butter
-// is the single warm accent.
-const TONES: Record<TileTone, { card: string; blob: string; icon: string; ink?: string; fade?: string }> = {
-  brand: { card: "bg-[#e4edff]", blob: "from-[#7fa2ec] to-[#2f5fd0]", icon: "text-white" },
-  navy: { card: "bg-[#dde4f5]", blob: "from-[#4a68b8] to-[#14286b]", icon: "text-white" },
-  sky: { card: "bg-[#e3f3fc]", blob: "from-[#9fd6f3] to-[#3d9ad1]", icon: "text-white" },
-  butter: { card: "bg-[#fdf3c9]", blob: "from-[#fbe391] to-[#f0bf3a]", icon: "text-[#1b3a8f]" },
-  royal: { card: "bg-[#a9c3f3]", blob: "from-[#7fa2ec] to-[#2f5fd0]", icon: "text-white", ink: "text-[#0f1b3d]", fade: "text-white/60" },
-  ice: { card: "bg-[#f0f5fd]", blob: "from-[#c4d6f6] to-[#8fb0ea]", icon: "text-white" },
+// Each tone is a colored icon chip on an otherwise plain card. The blues do the
+// work and butter is the single warm accent, same as before — but the color now
+// lives in a 24px square instead of a gradient blob, so the cards sit quietly
+// next to the lists on every other page.
+const TONES: Record<TileTone, { chip: string; hover: string }> = {
+  brand: { chip: "bg-[#2f5fd0] text-white", hover: "hover:border-[#2f5fd0]/40" },
+  navy: { chip: "bg-[#14286b] text-white", hover: "hover:border-[#14286b]/40" },
+  sky: { chip: "bg-[#3d9ad1] text-white", hover: "hover:border-[#3d9ad1]/40" },
+  butter: { chip: "bg-[#f7d774] text-[#3a2c00]", hover: "hover:border-[#f0bf3a]/60" },
+  royal: { chip: "bg-[#7fa2ec] text-white", hover: "hover:border-[#7fa2ec]/50" },
+  ice: { chip: "bg-[#bcd0f7] text-[#14286b]", hover: "hover:border-[#8fb0ea]/50" },
 };
 
 export function Tile({
@@ -32,98 +33,58 @@ export function Tile({
   size?: "large" | "small" | "wide" | "square";
   children?: ReactNode;
 }) {
-  const colors = TONES[tone];
-  // Wide and square are the dashboard's flat buttons: a barely rounded corner,
-  // a one-line title, and the icon large and faint behind it so every button
-  // reads the same whatever the title's length.
-  if (size === "wide" || size === "square") {
-    const wide = size === "wide";
+  const { chip, hover } = TONES[tone];
+  const base =
+    "group flex min-w-0 items-center gap-2.5 rounded-lg border border-hairline bg-panel px-3 transition-colors focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none";
+
+  // Wide is the page's one full-width destination; square is a compact button.
+  if (size === "wide") {
     return (
-      <Link
-        href={href}
-        className={cn(
-          "group relative flex min-w-0 items-center overflow-hidden rounded-[0.5rem] transition duration-200 active:scale-[0.98] focus-visible:ring-3 focus-visible:ring-ring/60 focus-visible:outline-none",
-          wide ? "h-20 justify-start px-5" : "aspect-square justify-center px-1",
-          colors.card,
-        )}
-      >
-        <Icon
-          aria-hidden
-          strokeWidth={1.5}
-          className={cn(
-            "absolute",
-            colors.fade ?? "text-white/70",
-            wide ? "top-1/2 right-4 size-16 -translate-y-1/2" : "top-1/2 left-1/2 size-14 -translate-x-1/2 -translate-y-1/2",
-          )}
-        />
-        <span
-          className={cn(
-            "relative z-10 font-semibold tracking-tight whitespace-nowrap",
-            colors.ink ?? "text-foreground",
-            wide ? "text-xl" : "text-[0.8rem]",
-          )}
-        >
-          {title}
-        </span>
+      <Link href={href} className={cn(base, hover, "h-12")}>
+        <IconChip icon={Icon} className={chip} />
+        <span className="text-sm font-semibold">{title}</span>
       </Link>
     );
   }
-  const large = size === "large";
+  if (size === "square") {
+    return (
+      <Link href={href} className={cn(base, hover, "h-16 flex-col justify-center gap-1.5 px-2")}>
+        <IconChip icon={Icon} className={chip} />
+        <span className="truncate text-xs font-medium">{title}</span>
+      </Link>
+    );
+  }
   return (
-    <Link
-      href={href}
-      className={cn(
-        "group relative flex min-w-0 overflow-hidden rounded-[1.75rem] p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-12px_rgb(20_45_120/0.35)] active:scale-[0.98] focus-visible:ring-3 focus-visible:ring-ring/60 focus-visible:outline-none sm:p-5",
-        large ? "aspect-[1.45/1]" : "aspect-[1/1]",
-        colors.card,
-      )}
-    >
-      <div className="relative z-10 flex flex-col gap-1">
-        <span
-          className={cn(
-            "font-semibold tracking-tight text-foreground text-balance",
-            large ? "text-[1.35rem] leading-tight sm:text-2xl" : "text-lg leading-tight sm:text-xl",
-          )}
-        >
-          {title}
-        </span>
-        {children && <span className="text-sm text-foreground/60">{children}</span>}
-      </div>
-      <span
-        aria-hidden
-        className={cn(
-          "absolute rounded-full bg-gradient-to-br transition-transform duration-300 group-hover:scale-105",
-          large ? "-right-6 -bottom-20 size-36 sm:-bottom-24 sm:size-48" : "-right-7 -bottom-12 size-28 sm:size-32",
-          colors.blob,
-        )}
-      />
-      <Icon
-        aria-hidden
-        strokeWidth={1.75}
-        className={cn(
-          "absolute drop-shadow-sm transition-transform duration-300 group-hover:-translate-y-0.5",
-          large ? "right-5 bottom-3 size-12 sm:size-16" : "right-3 bottom-3 size-10 sm:size-12",
-          colors.icon,
-        )}
-      />
+    <Link href={href} className={cn(base, hover, "flex-col items-start justify-center gap-1.5 py-3")}>
+      <IconChip icon={Icon} className={chip} />
+      <span className="text-sm font-semibold">{title}</span>
+      {children && <span className="text-xs text-muted-foreground">{children}</span>}
     </Link>
+  );
+}
+
+function IconChip({ icon: Icon, className }: { icon: LucideIcon; className: string }) {
+  return (
+    <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-[0.3rem]", className)}>
+      <Icon className="size-3.5" strokeWidth={2} />
+    </span>
   );
 }
 
 export type Shortcut = { href: string; label: string; icon: LucideIcon; muted?: boolean };
 
-// A row of smaller destinations in one raised card.
+// A row of smaller destinations, as one bordered strip of cells.
 export function ShortcutStrip({ shortcuts }: { shortcuts: Shortcut[] }) {
   return (
-    <nav className="grid grid-cols-5 gap-1 rounded-3xl bg-card px-1 py-4 shadow-[0_4px_20px_-6px_rgb(20_45_120/0.15)] ring-1 ring-foreground/5">
+    <nav className="grid grid-cols-5 divide-x divide-hairline overflow-hidden rounded-lg border border-hairline">
       {shortcuts.map(({ href, label, icon: Icon, muted }) => (
         <Link
           key={href}
           href={href}
-          className="flex flex-col items-center gap-1.5 rounded-2xl px-1 py-1 text-center text-xs leading-tight font-medium text-foreground/80 hover:bg-muted sm:text-sm"
+          className="flex h-14 flex-col items-center justify-center gap-1 px-1 text-center text-xs font-medium text-muted-foreground transition-colors hover:bg-row-hover hover:text-foreground sm:h-11 sm:flex-row sm:gap-1.5"
         >
-          <Icon className={cn("size-7", muted ? "text-brand/50" : "text-brand")} strokeWidth={2} />
-          {label}
+          <Icon className={cn("size-3.5 shrink-0", muted ? "text-brand/50" : "text-brand")} />
+          <span className="truncate">{label}</span>
         </Link>
       ))}
     </nav>
@@ -132,14 +93,14 @@ export function ShortcutStrip({ shortcuts }: { shortcuts: Shortcut[] }) {
 
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex items-end justify-between gap-3">
-      <h2 className="text-2xl font-bold tracking-tight">{children}</h2>
+    <div className="flex items-center justify-between gap-3">
+      <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{children}</h2>
       {action}
     </div>
   );
 }
 
-// A ticket: a stub on the left, a perforated edge, and one action on the right.
+// A row with an icon, two lines of text, and one action at the end.
 export function TicketCard({
   icon: Icon,
   title,
@@ -152,25 +113,19 @@ export function TicketCard({
   action: ReactNode;
 }) {
   return (
-    <div className="relative flex items-stretch rounded-3xl bg-card shadow-[0_4px_20px_-6px_rgb(20_45_120/0.18)] ring-1 ring-foreground/5">
-      <div className="flex min-w-0 flex-1 items-center gap-3 p-4">
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#7fa2ec] to-[#1b3a8f] text-white shadow-inner">
-          <Icon className="size-6" />
-        </span>
-        <div className="min-w-0">
-          <p className="line-clamp-2 text-base leading-snug font-semibold sm:text-lg">{title}</p>
-          <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
-        </div>
+    <div className="flex items-center gap-3 rounded-lg border border-hairline bg-panel px-3 py-2.5">
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-brand text-white">
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-2 text-sm font-semibold">{title}</p>
+        <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
       </div>
-      <div className="relative flex w-24 shrink-0 items-center justify-center border-l-2 border-dashed border-border sm:w-32">
-        <span aria-hidden className="absolute -top-3 -left-3 size-6 rounded-full bg-background shadow-[inset_0_-2px_3px_rgb(20_45_120/0.12)]" />
-        <span aria-hidden className="absolute -bottom-3 -left-3 size-6 rounded-full bg-background shadow-[inset_0_2px_3px_rgb(20_45_120/0.12)]" />
-        {action}
-      </div>
+      <div className="shrink-0">{action}</div>
     </div>
   );
 }
 
-// A link styled as the outlined pill the ticket and deal cards use.
+// A link styled as the small accent button the ticket cards use.
 export const pillLinkClass =
-  "inline-flex h-10 items-center justify-center rounded-full bg-butter px-5 text-sm font-semibold text-[#3a2c00] transition-colors hover:bg-[#f2cb55]";
+  "inline-flex h-6 items-center justify-center rounded-md bg-butter px-2.5 text-xs font-medium text-[#3a2c00] transition-colors hover:bg-[#f2cb55]";

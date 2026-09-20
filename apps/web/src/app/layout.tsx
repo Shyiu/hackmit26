@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Inter is the app-chrome face: it holds up at the 12–13px the dashboard runs at.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const monoCode = Geist_Mono({
+  variable: "--font-mono-code",
   subsets: ["latin"],
 });
 
@@ -28,17 +29,14 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f6fa" },
     { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
   ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="en" className={`${inter.variable} ${monoCode.variable} h-full antialiased`}>
       <body className="flex min-h-dvh flex-col">{children}</body>
     </html>
   );

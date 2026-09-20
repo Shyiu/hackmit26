@@ -5,6 +5,7 @@ import {
   type DangerEventId,
   type NotificationId,
   type PatientId,
+  type PersonId,
 } from "../ids";
 import { notificationKind, notificationStatus } from "./common";
 
@@ -25,6 +26,9 @@ export const notificationDocSchema = z.strictObject({
   createdAt: z.date(),
   expiresAt: z.date(),
   dangerEventId: idSchema<DangerEventId>().optional(),
+  /** Set only on a `person_recognized` notification, so its Mongo-backed
+   * cooldown (services/perception/app/safety/store.py) can scope by person. */
+  personId: idSchema<PersonId>().optional(),
 });
 
 export type NotificationDoc = z.infer<typeof notificationDocSchema>;

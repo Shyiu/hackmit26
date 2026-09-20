@@ -126,6 +126,68 @@ async def list_people(request: Request):
     return _jsonable(await _services(request).safety.store.list_people(patient_id))
 
 
+# Registered before /people/{person_id} below: Starlette matches by path template
+# first, so "last-seen" would otherwise be swallowed as {person_id} and 405 on GET
+# before ever reaching this route.
+@router.get("/people/last-seen")
+async def last_seen_person(request: Request):
+    patient_id = ObjectId(_claims(request, "api").pid)
+    services = _services(request)
+    person = await services.safety.store.latest_recognized_person(
+        patient_id, datetime.now(UTC), services.settings.person_recall_window_s
+    )
+    if person is None:
+        raise HTTPException(404, "Nobody recognized recently")
+    return _jsonable(person)
+
+
+@router.patch("/people/{person_id}")
+async def update_person(person_id: str, request: Request):
+    patient_id = ObjectId(_claims(request, "api").pid)
+    body = await request.json()
+    changes: dict[str, Any] = {}
+    if "name" in body:
+        name = body["name"]
+        if not isinstance(name, str) or not name.strip() or len(name.strip()) > 60:
+            raise HTTPException(422, "Give a name of up to 60 characters")
+        changes["name"] = name.strip()
+    if "relation" in body:
+        relation = body["relation"]
+        if relation is None:
+            changes["relation"] = None
+        elif isinstance(relation, str) and len(relation) <= 60:
+            changes["relation"] = relation or None
+        else:
+            raise HTTPException(422, "Keep the relation under 60 characters")
+    if not changes:
+        raise HTTPException(422, "nothing to update")
+    person = await _services(request).safety.store.update_person(
+        patient_id, _object_id(person_id), **changes
+    )
+    if person is None:
+        raise HTTPException(404, "Not found")
+    return _jsonable(person)
+
+
+@router.post("/people/{person_id}/photos", status_code=200)
+async def add_person_photos(person_id: str, request: Request):
+    patient_id = ObjectId(_claims(request, "api").pid)
+    form = await request.form()
+    photos = form.getlist("photos")
+    if not photos or len(photos) > 5:
+        raise HTTPException(422, "one to five photos are required")
+    data = [(getattr(photo, "filename", "") or "", await photo.read()) for photo in photos]
+    try:
+        person = await _services(request).safety.add_photos(
+            patient_id, _object_id(person_id), data
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    if person is None:
+        raise HTTPException(404, "Not found")
+    return _jsonable(person)
+
+
 @router.delete("/people/{person_id}", status_code=204)
 async def delete_person(person_id: str, request: Request):
     patient_id = ObjectId(_claims(request, "api").pid)

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import tempfile
 import threading
 import time
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -68,7 +70,13 @@ async def wearer_db(db: Database) -> Database:
 
 
 def _client(db_name: str, uri: str = TEST_URI, detector: Detector | None = None) -> TestClient:
-    settings = Settings(mongodb_uri=uri, mongodb_db=db_name, device_token_secret=SECRET)
+    settings = Settings(
+        mongodb_uri=uri,
+        mongodb_db=db_name,
+        device_token_secret=SECRET,
+        # An opened sighting writes a keyframe file; give each client its own scratch directory.
+        frame_image_dir=tempfile.mkdtemp(prefix="perception-frames-"),
+    )
     # The fixture token was minted for a fixed moment, so the app reads that as now.
     return TestClient(create_app(settings, detector=detector, token_clock=lambda: FIXTURE["validAt"]))
 
@@ -188,6 +196,7 @@ def test_health_reports_the_database_and_the_queue(client: TestClient) -> None:
         "detector": "null",
         "db": "ok",
         "queueDepth": 0,
+        "classes": {},
         "safety": {
             "detector": "mock",
             "faceDetector": "mock",
@@ -206,6 +215,7 @@ def test_health_says_when_the_database_is_unreachable(wearer_db: Database) -> No
         "detector": "null",
         "db": "unreachable",
         "queueDepth": None,
+        "classes": {},
         "safety": {
             "detector": "mock",
             "faceDetector": "mock",
@@ -215,8 +225,81 @@ def test_health_says_when_the_database_is_unreachable(wearer_db: Database) -> No
     }
 
 
-def test_config_classes_is_not_built_yet(client: TestClient) -> None:
-    assert client.post("/config/classes").status_code == 501
+def test_config_classes_requires_an_api_token(client: TestClient) -> None:
+    assert client.post("/config/classes").status_code == 401
+    assert (
+        client.post(
+            "/config/classes",
+            headers={"Authorization": f"Bearer {_token(scope='frames')}"},
+        ).status_code
+        == 403
+    )
+
+
+def test_config_classes_reloads_items_and_is_tenant_scoped(
+    client: TestClient, keys_item: ObjectId, wearer_db: Database
+) -> None:
+    api_headers = {"Authorization": f"Bearer {_token(scope='api')}"}
+    first = client.post("/config/classes", headers=api_headers)
+    assert first.status_code == 200
+    assert first.json() == {"patientId": str(PATIENT), "classes": ["keys"], "version": 1}
+
+    now = datetime.now(UTC)
+    inserted_item: ObjectId
+    mongo = MongoClient(TEST_URI, tz_aware=True)
+    with mongo:
+        inserted_item = (
+            mongo[wearer_db.name]["items"]
+            .insert_one(
+                {
+                    "_id": ObjectId(),
+                    "patientId": PATIENT,
+                    "name": "reading glasses",
+                    "plural": False,
+                    "aliases": ["specs"],
+                    "lookupKeys": ["reading glasses", "specs"],
+                    "detectorPrompts": ["glasses"],
+                    "referenceImageKeys": [],
+                    "active": True,
+                    "observationVersion": 0,
+                    "lastSighting": None,
+                    "lastRestingSighting": None,
+                    "usualSpots": [],
+                    "createdAt": now,
+                    "updatedAt": now,
+                }
+            )
+            .inserted_id
+        )
+    second = client.post("/config/classes", headers=api_headers)
+    assert second.status_code == 200
+    assert second.json() == {
+        "patientId": str(PATIENT),
+        "classes": ["keys", "glasses"],
+        "version": 2,
+    }
+    assert client.get("/health").json()["classes"][str(PATIENT)] == 2
+
+    other = client.post(
+        "/config/classes",
+        headers={"Authorization": f"Bearer {_token(pid=str(OTHER_PATIENT), scope='api')}"},
+    )
+    assert other.status_code == 200
+    assert other.json() == {"patientId": str(OTHER_PATIENT), "classes": [], "version": 1}
+    assert client.get("/health").json()["classes"][str(PATIENT)] == 2
+    mongo = MongoClient(TEST_URI, tz_aware=True)
+    with mongo:
+        assert mongo[wearer_db.name]["items"].delete_one({"_id": inserted_item}).deleted_count == 1
+
+
+def test_config_classes_accepts_requested_version_and_rejects_invalid_version(
+    client: TestClient, keys_item: ObjectId
+) -> None:
+    headers = {"Authorization": f"Bearer {_token(scope='api')}"}
+    response = client.post("/config/classes", headers=headers, json={"version": 7})
+    assert response.status_code == 200
+    assert response.json()["version"] == 7
+    assert client.post("/config/classes", headers=headers, json={"version": "x"}).status_code == 422
 
 
 @pytest.mark.parametrize(
@@ -508,6 +591,13 @@ def test_detections_reach_the_socket_reply_and_a_sighting_opens_after_three_fram
         assert item is not None
         if disconnect_during_write:
             assert write_finished.wait(5)
+        # The description worker in the same process may already be draining this job, so its
+        # status isn't asserted here — only that a keyframe was queued and actually saved.
+        job = _wait_for(
+            lambda: db["description_jobs"].find_one({"patientId": PATIENT, "sightingId": sighting["_id"]})
+        )
+        assert job["bbox"] == [0.4, 0.3, 0.2, 0.2]
+        assert Path(client.app.state.services.frame_store.directory / job["keyframeKey"]).is_file()
         ws.close()
         release_write.set()
         _wait_for(lambda: db["sightings"].find_one({"_id": sighting["_id"], "status": "closed"}))

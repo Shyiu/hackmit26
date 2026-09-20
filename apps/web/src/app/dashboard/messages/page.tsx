@@ -1,7 +1,9 @@
 import type { NotificationDoc } from "@memory-glasses/db";
+import { MessageSquare } from "lucide-react";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MessageForm } from "@/components/dashboard/message-form";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { PageBody, PageHeader } from "@/components/dashboard/page-header";
+import { EmptyState, Section, listBlockClass } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { dayAndTime } from "@/lib/format";
 import { dashboardTenant } from "@/lib/server/dashboard";
@@ -19,39 +21,37 @@ export default async function MessagesPage() {
   const now = new Date();
 
   return (
-    <div className="flex flex-col gap-8">
+    <>
       <AutoRefresh intervalMs={5000} />
       <PageHeader
         title="Messages"
+        icon={MessageSquare}
         description="The wear page reads these to the wearer, one at a time, never over an answer."
       />
-      <div className="grid gap-8 lg:grid-cols-2">
-        <section className="flex max-w-xl flex-col gap-3">
-          <h2 className="text-lg font-semibold">New</h2>
+      <PageBody>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Section title="New">
           <MessageForm />
-        </section>
+        </Section>
 
-        <section className="flex min-w-0 flex-col gap-3">
-          <h2 className="text-lg font-semibold">Recent</h2>
+        <Section title="Recent">
           {notifications.length === 0 ? (
-            <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Nothing sent yet.
-            </p>
+            <EmptyState>Nothing sent yet.</EmptyState>
           ) : (
-            <ol className="flex flex-col gap-2">
+            <ol className={listBlockClass}>
               {notifications.map((notification) => (
                 <li
                   key={notification._id.toHexString()}
-                  className="flex flex-col gap-2 rounded-xl p-4 ring-1 ring-foreground/10"
+                  className="flex flex-col gap-1 px-3 py-2.5 transition-colors hover:bg-row-hover"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                     <span>
                       {notification.kind === "reminder" ? "Reminder for " : "Message, "}
                       {dayAndTime(notification.showAt, settings.timezone)}
                     </span>
                     {statusBadge(notification, now)}
                   </div>
-                  <p className="text-base">{notification.text}</p>
+                  <p className="text-sm">{notification.text}</p>
                   {notification.shownAt && (
                     <p className="text-xs text-muted-foreground">
                       Spoken {dayAndTime(notification.shownAt, settings.timezone)}
@@ -61,8 +61,9 @@ export default async function MessagesPage() {
               ))}
             </ol>
           )}
-        </section>
+        </Section>
       </div>
-    </div>
+      </PageBody>
+    </>
   );
 }

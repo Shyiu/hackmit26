@@ -1,6 +1,8 @@
 import type { InteractionDoc, ItemDoc } from "@memory-glasses/db";
+import { MessagesSquare } from "lucide-react";
 import { AutoRefresh } from "@/components/auto-refresh";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { PageBody, PageHeader } from "@/components/dashboard/page-header";
+import { EmptyState, Section, listBlockClass } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { dayAndTime, dayKey, milliseconds, weekdayShort } from "@/lib/format";
 import { INTERACTION_LABELS, INTERACTION_VARIANTS } from "@/lib/interaction-status";
@@ -23,34 +25,29 @@ export default async function QuestionsPage() {
   const counts = countByDay(interactions, items, now, settings.timezone);
 
   return (
-    <div className="flex flex-col gap-8">
+    <>
       <AutoRefresh />
-      <PageHeader title="Questions" description="What the wearer asked and what they heard." />
-
-      <section className="flex flex-col gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Questions per day</h2>
-          <p className="text-sm text-muted-foreground">
-            A count for each of the last {DAYS} days. It&apos;s a count only, not a measure of health.
-          </p>
-        </div>
+      <PageHeader
+        title="Questions"
+        icon={MessagesSquare}
+        description="What the wearer asked and what they heard."
+      />
+      <PageBody>
+      <Section title={`Questions per day, last ${DAYS} days`}>
         <CountGrid counts={counts} />
-      </section>
+      </Section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Log</h2>
+      <Section title="Log">
         {interactions.length === 0 ? (
-          <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-            No questions yet. They show up here as soon as the wearer asks.
-          </p>
+          <EmptyState>No questions yet. They show up here as soon as the wearer asks.</EmptyState>
         ) : (
-          <ol className="flex flex-col gap-2">
+          <ol className={listBlockClass}>
             {interactions.map((interaction) => (
               <li
                 key={interaction._id.toHexString()}
-                className="flex flex-col gap-2 rounded-xl p-4 ring-1 ring-foreground/10"
+                className="flex flex-col gap-1.5 px-3 py-2.5 transition-colors hover:bg-row-hover"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                   <time dateTime={interaction.askedAt.toISOString()}>
                     {dayAndTime(interaction.askedAt, settings.timezone)} · {relativeTime(interaction.askedAt, now)}
                   </time>
@@ -58,16 +55,16 @@ export default async function QuestionsPage() {
                     {INTERACTION_LABELS[interaction.status]}
                   </Badge>
                 </div>
-                <p className="text-base font-medium">“{interaction.transcript}”</p>
+                <p className="text-sm font-medium">“{interaction.transcript}”</p>
                 {interaction.answerText && (
-                  <p className="border-l-2 pl-3 text-base text-muted-foreground">{interaction.answerText}</p>
+                  <p className="border-l-2 border-hairline pl-2.5 text-sm text-muted-foreground">{interaction.answerText}</p>
                 )}
                 {interaction.error && (
-                  <p className="text-sm text-destructive">
+                  <p className="text-xs text-destructive">
                     {interaction.error.code}: {interaction.error.message}
                   </p>
                 )}
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground/80">
                   {interaction.itemId ? (names.get(interaction.itemId.toHexString()) ?? "an archived item") : "no item"}
                   {interaction.path && ` · ${interaction.path} path`}
                   {` · ${milliseconds(interaction.timingsMs.total)} total`}
@@ -76,8 +73,9 @@ export default async function QuestionsPage() {
             ))}
           </ol>
         )}
-      </section>
-    </div>
+      </Section>
+      </PageBody>
+    </>
   );
 }
 
@@ -114,7 +112,7 @@ function CountGrid({ counts }: { counts: Counts }) {
     <div
       role="table"
       aria-label="Questions per day per item"
-      className="grid grid-cols-[minmax(4.5rem,1fr)_repeat(7,minmax(0,2.75rem))] gap-1 text-sm"
+      className="grid grid-cols-[minmax(4.5rem,1fr)_repeat(7,minmax(0,2.5rem))] gap-1 text-sm"
     >
       <div role="row" className="contents">
         <span role="columnheader">
@@ -135,7 +133,7 @@ function CountGrid({ counts }: { counts: Counts }) {
             <span
               role="cell"
               key={counts.days[index]?.key}
-              className="flex h-10 items-center justify-center rounded-md tabular-nums"
+              className="flex h-8 items-center justify-center rounded-[0.25rem] tabular-nums"
               style={{
                 backgroundColor:
                   count === 0 ? undefined : `color-mix(in oklch, var(--brand) ${15 + (count / max) * 55}%, transparent)`,

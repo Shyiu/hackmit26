@@ -1,4 +1,5 @@
-import { PageHeader } from "@/components/dashboard/page-header";
+import { ScanFace } from "lucide-react";
+import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { AddPersonForm, PeopleList } from "@/components/dashboard/people-controls";
 import { HttpError } from "@/lib/server/api";
 import { dashboardTenant } from "@/lib/server/dashboard";
@@ -16,13 +17,14 @@ export default async function PeoplePage() {
   }
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <>
       <PageHeader
         title="Faces"
+        icon={ScanFace}
         description="People the camera should recognize. It only ever matches against the people listed here."
       />
-
-      <div className="flex flex-col gap-2 rounded-xl bg-muted/60 p-4 text-sm">
+      <PageBody width="md">
+      <div className="flex flex-col gap-2 rounded-lg border border-hairline bg-muted/60 p-3 text-sm">
         <p>
           <span className="font-medium">A test page for now.</span> Add someone, stream from the phone, and their row
           shows when the camera last matched them and how closely. A match of 0.45 or more names them.
@@ -32,6 +34,7 @@ export default async function PeoplePage() {
 
       <AddPersonForm />
       <PeopleList initial={people} />
-    </div>
+      </PageBody>
+    </>
   );
 }

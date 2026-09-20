@@ -12,13 +12,13 @@ import { Field, FormMessage, SwitchRow } from "./field";
 export type Settings = Required<UpdateSettings>;
 
 const selectClass =
-  "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm pointer-coarse:h-11 dark:bg-input/30";
+  "h-8 w-full min-w-0 rounded-md border border-input bg-panel px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm pointer-coarse:h-11 dark:bg-input/30";
 const rangeClass = "h-11 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50";
 
 function Group({ title, children }: { title: ReactNode; children: ReactNode }) {
   return (
-    <fieldset className="flex flex-col gap-4 rounded-xl p-4 ring-1 ring-foreground/10">
-      <legend className="px-1 text-sm font-semibold">{title}</legend>
+    <fieldset className="flex flex-col gap-3 rounded-lg border border-hairline p-3.5">
+      <legend className="px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{title}</legend>
       {children}
     </fieldset>
   );
@@ -129,6 +129,13 @@ export function SettingsForm({ initial, timeZones }: { initial: Settings; timeZo
           onCheckedChange={(checked) => set("recordingAllowed", checked)}
         />
         <SwitchRow
+          id="face-announce-sound"
+          label="Sound when someone is recognized"
+          hint="Off by default: recognizing a face always logs a silent notification. This only adds a short chime on top -- the wearer's phone never says the name out loud; ask “who is this” for that."
+          checked={values.faceAnnounceSoundEnabled}
+          onCheckedChange={(checked) => set("faceAnnounceSoundEnabled", checked)}
+        />
+        <SwitchRow
           id="wake-word"
           label={
             <span className="flex items-center gap-2">
@@ -215,7 +222,7 @@ export function SettingsForm({ initial, timeZones }: { initial: Settings; timeZo
         </Field>
       </Group>
 
-      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] flex flex-col gap-2 rounded-xl bg-background/95 py-2 backdrop-blur md:static md:bg-transparent md:p-0">
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] -mx-4 flex flex-col gap-2 border-t border-hairline bg-panel px-4 py-3 md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
         {message && <FormMessage tone={message.tone}>{message.text}</FormMessage>}
         <Button type="submit" size="lg" disabled={pending} className="w-full sm:w-auto sm:self-start">
           {pending ? "Saving..." : "Save settings"}
