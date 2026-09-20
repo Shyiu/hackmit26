@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import base64
+import logging
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from bson import ObjectId
+from cryptography.fernet import InvalidToken
 from pymongo import ReturnDocument
 from pymongo.asynchronous.database import AsyncDatabase
 
 from ..store import ObservationStore, to_ms
 from .crypto import decrypt_embedding, encrypt_embedding
-from .models import Candidate, EnrolledPerson, FrameAnalysis
+from .models import Candidate, EnrolledPerson, FrameAnalysis, Gallery
+
+log = logging.getLogger("perception.safety")
 
 
 class SafetyStore:
@@ -22,6 +27,9 @@ class SafetyStore:
         self._frames = db["frame_observations"]
         self._events = db["danger_events"]
         self._notifications = db["notifications"]
+        # Decrypted galleries by wearer and embedding model, so a frame costs no query and no
+        # Fernet pass. In this process only, and dropped whenever that wearer's people change.
+        self._galleries: dict[tuple[ObjectId, str], tuple[float, Gallery]] = {}
 
     async def enroll_person(
         self,
@@ -52,6 +60,7 @@ class SafetyStore:
             "expiresAt": expires,
         }
         await self._people.insert_one(doc)
+        self.forget_gallery(patient_id)
         return self._public_person(doc)
 
     @staticmethod
@@ -66,20 +75,45 @@ class SafetyStore:
 
     async def delete_person(self, patient_id: ObjectId, person_id: ObjectId) -> bool:
         result = await self._people.delete_one({"_id": person_id, "patientId": patient_id})
+        self.forget_gallery(patient_id)
         return result.deleted_count == 1
+
+    def forget_gallery(self, patient_id: ObjectId) -> None:
+        for key in [key for key in self._galleries if key[0] == patient_id]:
+            del self._galleries[key]
+
+    async def gallery(self, patient_id: ObjectId, embedding_model: str) -> Gallery:
+        """The wearer's own enrolled set, never anyone else's. Rebuilt after the TTL, which is
+        what picks up a retention sweep or a second service process."""
+        key = (patient_id, embedding_model)
+        cached = self._galleries.get(key)
+        ttl = self._settings.face_gallery_ttl_s
+        if cached is not None and time.monotonic() - cached[0] < ttl:
+            return cached[1]
+        gallery = Gallery.build(await self.enrolled_embeddings(patient_id), embedding_model)
+        self._galleries[key] = (time.monotonic(), gallery)
+        return gallery
 
     async def enrolled_embeddings(self, patient_id: ObjectId) -> tuple[EnrolledPerson, ...]:
         people: list[EnrolledPerson] = []
         async for doc in self._people.find({"patientId": patient_id}):
-            embeddings = tuple(
-                decrypt_embedding(base64.b64decode(payload), self._settings.fernet())
-                for payload in doc["faceEmbeddings"]
-            )
+            try:
+                embeddings = tuple(
+                    decrypt_embedding(base64.b64decode(payload), self._settings.fernet())
+                    for payload in doc["faceEmbeddings"]
+                )
+            except InvalidToken:
+                # Enrolled under another FACE_EMBEDDING_KEY. One such person must not fail the
+                # whole frame; they need enrolling again.
+                log.warning("person %s can't be decrypted with this FACE_EMBEDDING_KEY", doc["_id"])
+                continue
             people.append(
                 EnrolledPerson(
                     person_id=doc["_id"],
                     embeddings=embeddings,
                     embedding_model=doc["embeddingModel"],
+                    name=doc.get("name", ""),
+                    relation=doc.get("relation"),
                 )
             )
         return tuple(people)
