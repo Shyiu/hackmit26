@@ -2,11 +2,11 @@
 
 A wearable camera that helps people with dementia find misplaced items, reminds them before they'd
 forget something (medication before bed, keys before the door), recognizes caregiver-enrolled faces,
-and alerts the caregiver if the wearer is in danger or out of the approved area. The hackathon build
+and alerts the caregiver if the wearer is out of the approved area. The hackathon build
 runs on a phone worn on the chest (ADR 0003); Ray-Ban Meta is a later client. The chest page is
 `/wear`; `/headset` redirects there. One Next.js app serves both the wearer
-pages and the caregiver dashboard, behind real per-family accounts: face recognition, danger
-detection, and proactive reminders are MVP scope now, not stretch goals, and every family's data is
+pages and the caregiver dashboard, behind real per-family accounts: face recognition and
+proactive reminders are MVP scope now, not stretch goals, and every family's data is
 isolated by `patientId`, never by a single seeded login. PLAN.md is the source of truth for the
 spec, architecture, data model, current status, and build order. Read it first.
 
@@ -69,9 +69,9 @@ scripts read the same file.
 - `services/perception` writes sightings and item snapshots itself. Its write rules (version checks,
   keyframe guards, job leases) live in `app/store.py`, tested against the generated validators.
 - Dashboard pages live under `apps/web/src/app/dashboard/*`, one folder per nav item, including the
-  newer `people` (face enrollment), `alerts` (danger/lost log), and `routines` (proactive reminders)
+  newer `people` (face enrollment) and `routines` (proactive reminders)
   tabs from PLAN.md "Caregiver dashboard".
-- `notifications.kind` values `danger_alert` and `lost_alert` are pushed to the caregiver immediately
+- The `notifications.kind` value `lost_alert` is pushed to the caregiver immediately
   over Web Push, not just queued for the normal two-second poll. Don't downgrade a new alert-like
   notification kind to poll-only without adding its push path too.
 - A link that looks like a button is `next/link` styled with `buttonVariants()`. The Base UI
@@ -99,7 +99,7 @@ scripts read the same file.
 - `people` (face reference photos and embeddings) is consent-sensitive in a way `items` isn't: it
   identifies specific real people. Never send it to a third-party API, never widen a query to cross
   `patientId`, and never add a code path that matches against anything but that patient's own
-  enrolled set. See PLAN.md "Faces, danger, and routines" and "Privacy and safety".
+  enrolled set. See PLAN.md "Faces and routines" and "Privacy and safety".
 - Face enrollment lives in the perception service, which owns the embedder and the encryption key.
   Enrolling and adding photos go through `apps/web/src/lib/server/perception.ts`, at `PERCEPTION_URL`,
   else the socket's host, else `http://127.0.0.1:8000`. Listing, renaming, and removing people read

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client/api";
+import { shrinkFormPhotos } from "@/lib/client/photo";
 import type { EnrolledPerson } from "@/lib/server/perception";
 import { Field, FormMessage } from "./field";
 
@@ -22,6 +23,7 @@ export function AddPersonForm() {
     try {
       const body = new FormData(event.currentTarget);
       body.set("consent", consent ? "yes" : "no");
+      await shrinkFormPhotos(body);
       await apiFetch("/api/people", { method: "POST", body });
       form.current?.reset();
       setConsent(false);
@@ -92,6 +94,7 @@ function EditPersonForm({
     setError(null);
     try {
       const body = new FormData(event.currentTarget);
+      await shrinkFormPhotos(body);
       const updated = await apiFetch<EnrolledPerson>(`/api/people/${person.id}`, { method: "PATCH", body });
       onSaved({ ...person, ...updated });
     } catch (caught) {

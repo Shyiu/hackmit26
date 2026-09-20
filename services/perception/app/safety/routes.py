@@ -161,9 +161,7 @@ async def update_person(person_id: str, request: Request):
             raise HTTPException(422, "Keep the relation under 60 characters")
     if not changes:
         raise HTTPException(422, "nothing to update")
-    person = await _services(request).safety.store.update_person(
-        patient_id, _object_id(person_id), **changes
-    )
+    person = await _services(request).safety.store.update_person(patient_id, _object_id(person_id), **changes)
     if person is None:
         raise HTTPException(404, "Not found")
     return _jsonable(person)
@@ -178,9 +176,7 @@ async def add_person_photos(person_id: str, request: Request):
         raise HTTPException(422, "one to five photos are required")
     data = [(getattr(photo, "filename", "") or "", await photo.read()) for photo in photos]
     try:
-        person = await _services(request).safety.add_photos(
-            patient_id, _object_id(person_id), data
-        )
+        person = await _services(request).safety.add_photos(patient_id, _object_id(person_id), data)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     if person is None:
@@ -204,24 +200,3 @@ async def list_frames(request: Request, limit: int = 50, before: str | None = No
         patient_id, min(limit, 100), before_at
     )
     return _jsonable(docs)
-
-
-@router.get("/danger-events")
-async def list_events(request: Request, status: str = "open", limit: int = 50):
-    patient_id = ObjectId(_claims(request, "api").pid)
-    docs = await _services(request).safety.store.list_danger_events(patient_id, status, min(limit, 100))
-    return _jsonable(docs)
-
-
-@router.patch("/danger-events/{event_id}")
-async def update_event(event_id: str, request: Request):
-    patient_id = ObjectId(_claims(request, "api").pid)
-    body = await request.json()
-    if body.get("status") not in {"open", "acknowledged", "dismissed", "escalated", "closed"}:
-        raise HTTPException(422, "invalid status")
-    doc = await _services(request).safety.store.update_danger_event_status(
-        patient_id, _object_id(event_id), body["status"], body.get("acknowledgedBy")
-    )
-    if doc is None:
-        raise HTTPException(404, "Not found")
-    return _jsonable(doc)

@@ -37,10 +37,9 @@ from app.protocol import (
     encode_frame,
     parse_server_message,
 )
-from app.safety.adapters.mock import MockDetector, MockFaceDetector, MockFaceEmbedder, MockVLM
+from app.safety.adapters.mock import MockFaceDetector, MockFaceEmbedder
 from app.safety.adapters.registry import Adapters
 from app.safety.models import BBox, FaceBox
-from app.safety.models import Detection as SafetyDetection
 from app.store import ObservationStore
 from app.tokens import DeviceTokenClaims, sign_device_token
 
@@ -215,10 +214,8 @@ def test_health_reports_the_database_and_the_queue(client: TestClient) -> None:
         "queueDepth": 0,
         "classes": {},
         "safety": {
-            "detector": "mock",
             "faceDetector": "mock",
             "faceEmbedder": "mock",
-            "vlm": "mock",
         },
     }
 
@@ -234,10 +231,8 @@ def test_health_says_when_the_database_is_unreachable(wearer_db: Database) -> No
         "queueDepth": None,
         "classes": {},
         "safety": {
-            "detector": "mock",
             "faceDetector": "mock",
             "faceEmbedder": "mock",
-            "vlm": "mock",
         },
     }
 
@@ -443,10 +438,8 @@ def test_live_frames_name_an_enrolled_face_and_say_when_it_leaves(
         frame_image_dir=str(tmp_path),
     )
     safety_adapters = Adapters(
-        detector=MockDetector([]),
         face_detector=_DarkFrameFaces(),
         face_embedder=MockFaceEmbedder(),
-        vlm=None,
     )
     api_token = sign_device_token(
         DeviceTokenClaims.model_validate({**FIXTURE["claims"], "sub": None, "scope": "api"}), SECRET
@@ -496,12 +489,8 @@ def test_live_frame_runs_safety_after_detections(wearer_db: Database, tmp_path: 
         frame_image_dir=str(tmp_path),
     )
     safety_adapters = Adapters(
-        detector=MockDetector(
-            [SafetyDetection(label="knife", confidence=0.9, bbox=BBox(x=0, y=0, w=1, h=1))]
-        ),
         face_detector=MockFaceDetector(faces=0),
         face_embedder=MockFaceEmbedder(),
-        vlm=MockVLM(),
     )
     mongo = MongoClient(TEST_URI, tz_aware=True)
     with TestClient(
@@ -525,12 +514,6 @@ def test_live_frame_runs_safety_after_detections(wearer_db: Database, tmp_path: 
                 lambda: mongo[wearer_db.name]["frame_observations"].find_one({"patientId": PATIENT})
             )
             assert found is not None
-            event = _wait_for(
-                lambda: mongo[wearer_db.name]["danger_events"].find_one(
-                    {"patientId": PATIENT, "status": "open"}
-                )
-            )
-            assert event is not None
     mongo.close()
 
 

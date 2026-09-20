@@ -1,10 +1,10 @@
 # Perception service
 
-Takes JPEG frames from the headset page over a WebSocket, runs tracked-item and safety adapters, and writes capture sessions, sightings, frame observations, and conservative danger events to MongoDB. The design is in the root README under "Perception pipeline".
+Takes JPEG frames from the headset page over a WebSocket, runs tracked-item and face adapters, and writes capture sessions, sightings, and frame observations to MongoDB. The design is in the root README under "Perception pipeline".
 
 ## Status
 
-The frame socket, device tokens, capture sessions, the YOLOE-26 detector, the tracker that turns detections into sightings, and the MongoDB write path in `app/store.py` work and are tested. Without the model assets the service boots with `NullDetector`, which finds nothing. The vision model that describes keyframes is M1. `WS /ws/debug` is a stub. `POST /config/classes` (api-scope token) re-reads the wearer's active items and swaps in the new class prompts for every open frame socket of that wearer; `/health` lists the loaded class-list version per wearer. Face enrollment and matching, single-frame hazard rules, VLM confirmation, and danger-event persistence run behind mock adapters by default; their real models are optional extras, loaded lazily.
+The frame socket, device tokens, capture sessions, the YOLOE-26 detector, the tracker that turns detections into sightings, and the MongoDB write path in `app/store.py` work and are tested. Without the model assets the service boots with `NullDetector`, which finds nothing. The vision model that describes keyframes is M1. `WS /ws/debug` is a stub. `POST /config/classes` (api-scope token) re-reads the wearer's active items and swaps in the new class prompts for every open frame socket of that wearer; `/health` lists the loaded class-list version per wearer. Face enrollment and matching run behind mock adapters by default; their real models are optional extras, loaded lazily.
 
 ## Run
 
@@ -56,18 +56,16 @@ The store and app tests run against a real MongoDB. Each test module gets a fres
 
 ## Safety pipeline
 
-Safety analysis runs in a worker thread, on a worker task of its own, so neither the frame socket nor the item detector waits for it. Every live frame is offered to it and it takes the newest one. Faces go first: the frame is decoded, faces are found and matched against the wearer's own encrypted enrollments, and a `faces` message goes back on the socket before anything else runs. Then come the hazard detector, the declarative rules, and one optional VLM confirmation. Every `SAFETY_SAMPLE_EVERY_N_FRAMES`th frame is persisted as a `frame_observations` document, and so is any frame that raised a candidate. A candidate creates or refreshes a `danger_events` record and a `danger_alert` notification. Events are single-frame “worth checking” signals, never proof that someone did something dangerous and never an emergency classifier.
+Safety analysis runs in a worker thread, on a worker task of its own, so neither the frame socket nor the item detector waits for it. Every live frame is offered to it and it takes the newest one. Faces go first: the frame is decoded, faces are found and matched against the wearer's own encrypted enrollments, and a `faces` message goes back on the socket. Every `SAFETY_SAMPLE_EVERY_N_FRAMES`th frame is persisted as a `frame_observations` document, and so is any frame whose analysis failed.
 
 The default mock path needs no model weights. Configure the service with lowercase settings fields through uppercase environment variables:
 
 | Adapter | Default | Optional installation |
 |---|---|---|
-| Object detector | `SAFETY_DETECTOR=mock` | `uv sync --extra dfine` for D-FINE (Apache-2.0) |
 | Face detector/embedder | `FACE_DETECTOR=mock`, `FACE_EMBEDDER=mock` | `uv sync --extra faces` for InsightFace/ONNX |
-| VLM | `VLM=mock` | `VLM=openai` with `VLM_API_KEY` |
 | YOLOE | off | `uv sync --extra yoloe`; Ultralytics is AGPL-3.0 |
 
-D-FINE and its default path are Apache-2.0. InsightFace code is MIT, while its model packages are intended for non-commercial research use. YOLOE/Ultralytics is AGPL-3.0; a network-served application using it must satisfy the AGPL or use an Ultralytics enterprise licence. Keep it off for the hackathon unless licensing is reviewed.
+InsightFace code is MIT, while its model packages are intended for non-commercial research use. YOLOE/Ultralytics is AGPL-3.0; a network-served application using it must satisfy the AGPL or use an Ultralytics enterprise licence. Keep it off for the hackathon unless licensing is reviewed.
 
 ## HTTP API
 
@@ -81,10 +79,6 @@ curl -H "Authorization: Bearer $FRAME_TOKEN" \
   http://localhost:8000/frames
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/people
 curl -H "Authorization: Bearer $TOKEN" 'http://localhost:8000/frame-observations?limit=50'
-curl -H "Authorization: Bearer $TOKEN" 'http://localhost:8000/danger-events?status=open'
-curl -X PATCH -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"status":"acknowledged","acknowledgedBy":"caregiver"}' \
-  http://localhost:8000/danger-events/<event-id>
 curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{}' http://localhost:8000/config/classes
 ```
@@ -107,22 +101,9 @@ What keeps it fast: detection and embedding share one InsightFace pass, and the 
 
 Enroll people with `POST /people` and multipart fields `name`, `consentedBy`, optional `relation`, and one or more `photos`. Each photo must contain exactly one face. Face embeddings are encrypted at rest and are never returned by the API. Raw images stay under `FRAME_IMAGE_DIR`; only object keys are stored in MongoDB. Phone photos are turned upright from their EXIF flag first. Obtain explicit consent before enrollment and apply the configured retention window. Set a durable `FACE_EMBEDDING_KEY`: without one the key lasts as long as the process, and a person enrolled under another key is skipped with a warning until they are enrolled again. The route needs a device token with `api` scope; the web app mints one with `mintDeviceToken({ scope: "api" })`, and `scripts/enroll_face.py` signs its own.
 
-## Evaluation
-
-Run the mock evaluation fixture or another labeled image directory:
-
-```bash
-uv run python scripts/evaluate.py tests/fixtures/eval_sample \
-  --labels tests/fixtures/eval_sample/labels.json
-```
-
-`labels.json` maps each image filename to a list of expected categories, for example
-`{"knife_01.png": ["weapon"], "plain.png": []}`. The report includes per-category and overall
-precision, recall, false-positive count, and average, P50, and P95 processing time in milliseconds.
-
 ## Extension points
 
-The mock adapters support deterministic filename/label hints and are intended for offline evaluation. Keep evaluation fixtures and adapter contracts stable while measuring category precision/recall and latency. Add temporal confirmation, pose, action classification, or additional detector providers as new lazy adapters and fields under the existing observation/event evidence shape; do not merge the safety adapter seam into `app.detector.Detector`.
+The mock adapters are deterministic and need no model weights. Add new face providers as lazy adapters behind the existing protocols; do not merge the safety adapter seam into `app.detector.Detector`.
 
 `tests/test_contract.py` and `tests/test_tokens.py` run the shared fixtures in `packages/shared/fixtures/`, the same files the zod tests use.
 
@@ -149,7 +130,7 @@ The mock adapters support deterministic filename/label hints and are intended fo
 | `MONGODB_TEST_URI` | `mongodb://127.0.0.1:27017/?directConnection=true` | Tests only |
 | `SAFETY_ENABLED` | `true` | Enables safety processing |
 | `SAFETY_SAMPLE_EVERY_N_FRAMES` | `3` | How often an analyzed frame is stored. Every live frame is analyzed |
-| `SAFETY_DETECTOR`, `FACE_DETECTOR`, `FACE_EMBEDDER`, `VLM` | `mock` | Safety adapter switches. `SAFETY_DETECTOR` is separate from the item `DETECTOR` |
+| `FACE_DETECTOR`, `FACE_EMBEDDER` | `mock` | Face adapter switches |
 | `FACE_EMBEDDING_KEY` | none | Durable Fernet key; a process-local key is used otherwise |
 | `INSIGHTFACE_MODEL` | `buffalo_l` | The model pack. `buffalo_s` is smaller and faster |
 | `FACE_PROVIDERS` | `auto` | onnxruntime providers, comma separated. `auto` takes CUDA or CoreML, else CPU |
