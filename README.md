@@ -318,6 +318,10 @@ M1's target is one of each trigger kind, chosen for how easy they are to demo: a
 
 The dashboard's Map tab shows a 3D reconstruction of the room with an arrow at the spot where each item was last seen. The room is drawn as a textured mesh or a light Gaussian splat. `ScanViewer` (`apps/web/src/components/scan/scan-viewer.tsx`) fetches everything itself, from `/api/scan/*` and `/scan/room/scene.json`.
 
+![The Map tab: the room as a mesh and a splat, then a live scan growing](docs/media/room-scan-3d.gif)
+
+The full clip is [docs/media/room-scan-3d.mp4](docs/media/room-scan-3d.mp4): the bundled room first, then a live scan at 6x, fed by `pnpm scan:sim` with real frames of the room.
+
 There are two kinds of scene:
 
 - **Static**, `sceneId: "room-demo"`. A prebuilt mesh (`mesh.glb`) and a light splat (`splat.spz`) of the same room, bundled under `apps/web/public/scan/room/` with `scene.json`. This is the demo video's scene. Pin positions are in the GLB's y-up frame.
