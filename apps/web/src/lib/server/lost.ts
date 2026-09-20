@@ -1,8 +1,8 @@
 import "server-only";
 
 import type { PatientDoc, PatientSettings, TenantRepos } from "@memory-glasses/db";
-import { metersOutside } from "@/lib/geofence";
 import type { ReportLocation } from "@memory-glasses/shared";
+import { metersOutside } from "@/lib/geofence";
 
 export const LOST_ALERT_DEDUPE_MS = 10 * 60 * 1000;
 

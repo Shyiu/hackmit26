@@ -2,6 +2,7 @@ import "server-only";
 import {
   collection,
   ConflictError,
+  DEFAULT_PATIENT_SETTINGS,
   describeValidationFailure,
   InvalidInputError,
   MongoServerSelectionError,
@@ -12,7 +13,6 @@ import {
   type PatientSettings,
   type TenantRepos,
 } from "@memory-glasses/db";
-import { DEFAULT_PATIENT_SETTINGS } from "@memory-glasses/db";
 import { NextResponse, type NextRequest } from "next/server";
 import type { z } from "zod";
 import { principalFromRequest, SESSION_COOKIE, type Principal } from "./auth";
