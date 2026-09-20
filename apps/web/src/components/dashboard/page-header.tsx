@@ -1,12 +1,11 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { CaptureBadge } from "./capture-badge";
 
-// Linear's two-tier header: a title bar that sticks to the top of the panel
-// (on phones the slim MobileHeader already holds that spot),
-// and a thinner context row under it for the page's one-line explanation.
-// Both are full-bleed and hairline-separated, so the body below can be padded
-// on its own.
+// The one bar at the top of every page. On desktop it carries a second tier for
+// the page's one-line explanation; on a phone that row is dropped and the camera
+// state moves in beside the actions, so there's a single bar instead of two.
 export function PageHeader({
   title,
   description,
@@ -19,14 +18,18 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="z-20 bg-panel/85 backdrop-blur md:sticky md:top-0 md:rounded-t-lg">
+    <div className="sticky top-0 z-20 bg-panel/85 pt-safe backdrop-blur md:rounded-t-lg md:pt-0">
       <div className="flex h-12 items-center gap-2 border-b border-hairline px-4 md:px-5">
         {Icon && <Icon className="size-4 shrink-0 text-muted-foreground" />}
         <h1 className="min-w-0 truncate text-sm font-semibold tracking-tight">{title}</h1>
-        {action && <div className="ml-auto flex shrink-0 items-center gap-1.5">{action}</div>}
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {action}
+          {/* Desktop keeps this in the sidebar, where there's room for it. */}
+          <CaptureBadge compact className="md:hidden" />
+        </div>
       </div>
       {description && (
-        <p className="flex min-h-8 items-center border-b border-hairline px-4 text-xs text-muted-foreground md:px-5">
+        <p className="hidden min-h-8 items-center border-b border-hairline px-4 text-xs text-muted-foreground md:flex md:px-5">
           {description}
         </p>
       )}

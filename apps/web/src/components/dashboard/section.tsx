@@ -16,8 +16,12 @@ export function Section({ title, action, children }: { title: string; action?: R
 }
 
 // Linear's list: a hairline-bordered block of rows, each divided from the next
-// and lit only on hover.
-export const rowListClass = "flex flex-col divide-y divide-hairline overflow-hidden rounded-lg border border-hairline";
+// and lit only on hover. It runs to both edges on a phone, where a rounded box
+// inside the page's own padding reads as a card inside a card.
+export const listBlockClass =
+  "-mx-4 flex flex-col divide-y divide-hairline border-y border-hairline md:mx-0 md:overflow-hidden md:rounded-lg md:border";
+
+export const rowListClass = listBlockClass;
 
 export const rowLinkClass =
   "flex items-center justify-between gap-4 px-3 py-2.5 text-sm transition-colors hover:bg-row-hover focus-visible:bg-row-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring";

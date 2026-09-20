@@ -2,7 +2,7 @@ import type { InteractionDoc, ItemDoc } from "@memory-glasses/db";
 import { MessagesSquare } from "lucide-react";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
-import { EmptyState, Section } from "@/components/dashboard/section";
+import { EmptyState, Section, listBlockClass } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { dayAndTime, dayKey, milliseconds, weekdayShort } from "@/lib/format";
 import { INTERACTION_LABELS, INTERACTION_VARIANTS } from "@/lib/interaction-status";
@@ -41,7 +41,7 @@ export default async function QuestionsPage() {
         {interactions.length === 0 ? (
           <EmptyState>No questions yet. They show up here as soon as the wearer asks.</EmptyState>
         ) : (
-          <ol className="flex flex-col divide-y divide-hairline overflow-hidden rounded-lg border border-hairline">
+          <ol className={listBlockClass}>
             {interactions.map((interaction) => (
               <li
                 key={interaction._id.toHexString()}

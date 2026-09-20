@@ -1,7 +1,7 @@
 import { Video } from "lucide-react";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
-import { EmptyState, Section } from "@/components/dashboard/section";
+import { EmptyState, Section, listBlockClass } from "@/components/dashboard/section";
 import { relativeTime } from "@/lib/relative-time";
 import { dashboardTenant } from "@/lib/server/dashboard";
 
@@ -29,7 +29,7 @@ export default async function LivePage() {
           {items.length === 0 ? (
             <EmptyState>No items yet.</EmptyState>
           ) : (
-            <ul className="flex flex-col divide-y divide-hairline overflow-hidden rounded-lg border border-hairline">
+            <ul className={listBlockClass}>
               {items.map((item) => (
                 <li
                   key={item._id.toHexString()}

@@ -6,7 +6,7 @@ import { ArchiveItemButton } from "@/components/dashboard/archive-item-button";
 import { BackLink } from "@/components/dashboard/back-link";
 import { ItemForm } from "@/components/dashboard/item-form";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
-import { Section } from "@/components/dashboard/section";
+import { Section, listBlockClass } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusDot } from "@/components/dashboard/status-dot";
@@ -90,7 +90,7 @@ export default async function ItemPage({ params }: PageProps<"/dashboard/items/[
           {sightings.length === 0 ? (
             <p className="text-sm text-muted-foreground">No sightings in the retention window.</p>
           ) : (
-            <ol className="flex flex-col divide-y divide-hairline overflow-hidden rounded-lg border border-hairline">
+            <ol className={listBlockClass}>
               {sightings.map((sighting) => (
                 <li
                   key={sighting._id.toHexString()}

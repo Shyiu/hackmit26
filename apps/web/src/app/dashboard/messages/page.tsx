@@ -3,7 +3,7 @@ import { MessageSquare } from "lucide-react";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { MessageForm } from "@/components/dashboard/message-form";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
-import { EmptyState, Section } from "@/components/dashboard/section";
+import { EmptyState, Section, listBlockClass } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { dayAndTime } from "@/lib/format";
 import { dashboardTenant } from "@/lib/server/dashboard";
@@ -38,7 +38,7 @@ export default async function MessagesPage() {
           {notifications.length === 0 ? (
             <EmptyState>Nothing sent yet.</EmptyState>
           ) : (
-            <ol className="flex flex-col divide-y divide-hairline overflow-hidden rounded-lg border border-hairline">
+            <ol className={listBlockClass}>
               {notifications.map((notification) => (
                 <li
                   key={notification._id.toHexString()}

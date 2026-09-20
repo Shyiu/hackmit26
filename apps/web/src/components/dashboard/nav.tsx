@@ -1,6 +1,6 @@
 "use client";
 
-import { Ellipsis, Glasses, X } from "lucide-react";
+import { Ellipsis, Glasses, Laptop, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useEffectEvent, useState } from "react";
@@ -49,23 +49,13 @@ export function Sidebar() {
           <Glasses className="size-4 shrink-0" />
           Open the wear page
         </Link>
+        <Link href="/sim" className={navRowClass(false)}>
+          <Laptop className="size-4 shrink-0" />
+          Simulator
+        </Link>
         <SignOutButton className={navRowClass(false)} />
       </div>
     </aside>
-  );
-}
-
-// Phones: a slim top bar under the status bar, over the page's own header.
-export function MobileHeader() {
-  return (
-    <header className="sticky top-0 z-30 border-b border-hairline bg-panel/90 pt-safe backdrop-blur md:hidden">
-      <div className="flex h-12 items-center justify-between gap-3 px-4">
-        <Link href="/dashboard" aria-label="Memoir home">
-          <Wordmark />
-        </Link>
-        <CaptureBadge compact />
-      </div>
-    </header>
   );
 }
 
@@ -103,8 +93,8 @@ export function TabBar() {
             className="absolute inset-0 bg-foreground/30 animate-in fade-in"
             onClick={() => setMoreOpen(false)}
           />
-          <div className="absolute inset-x-0 bottom-0 rounded-t-lg border-t border-hairline bg-panel px-2 pt-2 pb-[calc(5rem+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom">
-            <div className="mb-1 flex items-center justify-between px-2">
+          <div className="absolute inset-x-0 bottom-0 rounded-t-lg border-t border-hairline bg-panel px-3 pt-3 pb-[calc(5rem+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom">
+            <div className="mb-1 flex items-center justify-between px-2 pb-1">
               <span className="text-sm font-semibold">More</span>
               <button
                 type="button"
@@ -121,17 +111,21 @@ export function TabBar() {
                   key={href}
                   href={href}
                   onClick={() => setMoreOpen(false)}
-                  className={navRowClass(isActive(pathname, href))}
+                  className={cn(navRowClass(isActive(pathname, href)), "h-10")}
                 >
                   <Icon className="size-4 shrink-0" />
                   {label}
                 </Link>
               ))}
-              <Link href="/wear" className={navRowClass(false)}>
+              <Link href="/wear" className={cn(navRowClass(false), "h-10")}>
                 <Glasses className="size-4 shrink-0" />
                 Open the wear page
               </Link>
-              <SignOutButton className={navRowClass(false)} />
+              <Link href="/sim" onClick={() => setMoreOpen(false)} className={cn(navRowClass(false), "h-10")}>
+                <Laptop className="size-4 shrink-0" />
+                Simulator
+              </Link>
+              <SignOutButton className={cn(navRowClass(false), "h-10")} />
             </nav>
           </div>
         </div>

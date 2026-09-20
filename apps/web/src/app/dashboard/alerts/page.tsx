@@ -3,7 +3,7 @@ import { TriangleAlert } from "lucide-react";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { AcknowledgeAlertButton } from "@/components/dashboard/acknowledge-alert-button";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
-import { EmptyState, Section } from "@/components/dashboard/section";
+import { EmptyState, Section, listBlockClass } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { dayAndTime } from "@/lib/format";
 import { dashboardTenant } from "@/lib/server/dashboard";
@@ -63,7 +63,7 @@ export default async function AlertsPage() {
           {events.length === 0 ? (
             <EmptyState>No hazards seen. Events show up here when the camera spots something risky.</EmptyState>
           ) : (
-            <ol className="flex flex-col divide-y divide-hairline overflow-hidden rounded-lg border border-hairline">
+            <ol className={listBlockClass}>
               {events.map((event) => (
                 <li
                   key={event._id.toHexString()}
@@ -116,7 +116,7 @@ export default async function AlertsPage() {
           {alerts.length === 0 ? (
             <EmptyState>No alerts have been sent yet.</EmptyState>
           ) : (
-            <ol className="flex flex-col divide-y divide-hairline overflow-hidden rounded-lg border border-hairline">
+            <ol className={listBlockClass}>
               {alerts.map((notification) => (
                 <li
                   key={notification._id.toHexString()}

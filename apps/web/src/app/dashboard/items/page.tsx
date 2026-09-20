@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils";
 
 // The columns the list keeps on wide screens. Name grows, the rest are fixed so
 // every row lines up the way Linear's issue list does.
-const COLUMNS = "md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_8rem_10rem] md:items-center md:gap-4";
+const COLUMNS =
+  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_8rem_10rem] md:gap-4";
 
 export default async function ItemsPage() {
   const { tenant } = await dashboardTenant("/dashboard/items");
@@ -38,8 +39,8 @@ export default async function ItemsPage() {
         {items.length === 0 ? (
           <EmptyState>No items yet. Add the things the wearer looks for most, like keys or glasses.</EmptyState>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-hairline">
-            <ListHeader className={cn("hidden md:flex", COLUMNS)}>
+          <div className="-mx-4 border-y border-hairline md:mx-0 md:overflow-hidden md:rounded-lg md:border">
+            <ListHeader className={cn(COLUMNS, "hidden md:grid")}>
               <span>Name</span>
               <span>Where</span>
               <span>Status</span>
@@ -53,7 +54,7 @@ export default async function ItemsPage() {
                     <Link
                       href={`/dashboard/items/${item._id.toHexString()}`}
                       className={cn(
-                        "group flex flex-col gap-1 px-3 py-2.5 text-sm transition-colors hover:bg-row-hover focus-visible:bg-row-hover focus-visible:outline-none",
+                        "group px-4 py-2.5 text-sm transition-colors hover:bg-row-hover focus-visible:bg-row-hover focus-visible:outline-none md:px-3",
                         COLUMNS,
                       )}
                     >
@@ -65,12 +66,14 @@ export default async function ItemsPage() {
                           </span>
                         )}
                       </span>
-                      <span className="min-w-0 truncate text-muted-foreground">{whereLine(item.lastSighting)}</span>
-                      <StatusDot status={status} className="text-muted-foreground" />
-                      <span className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <span className="flex items-center justify-end gap-2 text-xs text-muted-foreground md:order-4 md:justify-between">
                         {item.lastSighting ? relativeTime(item.lastSighting.lastSeenAt, now) : "Never seen"}
                         <ChevronRight className="hidden size-3.5 transition-transform group-hover:translate-x-0.5 md:block" />
                       </span>
+                      <span className="min-w-0 truncate text-muted-foreground md:order-2">
+                        {whereLine(item.lastSighting)}
+                      </span>
+                      <StatusDot status={status} className="justify-self-end text-xs text-muted-foreground md:order-3 md:justify-self-start md:text-sm" />
                     </Link>
                   </li>
                 );
