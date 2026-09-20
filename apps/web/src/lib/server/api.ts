@@ -126,6 +126,7 @@ export function withTenant<TParams extends Record<string, string> = Record<strin
       const settings = await settingsFor(principal.patientId);
       if (!settings) return problem(403, "That wearer no longer exists");
       const tenant = tenantRepos(getDb(), principal.patientId, { retentionDays: settings.retentionDays });
+      if (principal.kind === "device") void tenant.devices.touch(principal.deviceId).catch(() => {});
       return await handler({ request, params: await context.params, principal, tenant, settings });
     } catch (error) {
       return errorResponse(error);
