@@ -57,11 +57,27 @@ export const DEFAULT_PATIENT_SETTINGS: PatientSettings = {
   faceAnnounceSoundEnabled: false,
 };
 
+/**
+ * The wearer's own sign-in, present when the wearer made the account themselves.
+ * A wearer a caregiver created from signup has none and reaches /wear through a
+ * device pairing code instead.
+ */
+export const wearerAccountSchema = z.strictObject({
+  email: z.email().max(254),
+  /** The one device this account signs in on, so nothing else can act as the wearer. */
+  deviceId: idSchema<DeviceId>().nullable(),
+  /** `scrypt$N$r$p$salt$hash`, base64url, like the caregiver's. Never leaves the server. */
+  passwordHash: z.string().min(40).max(300),
+});
+
+export type WearerAccount = z.infer<typeof wearerAccountSchema>;
+
 /** The wearer. Every tenant-owned document points here through `patientId`. */
 export const patientDocSchema = z.strictObject({
   _id: idSchema<PatientId>(),
   /** What the family calls them, for the dashboard. Never spoken to the wearer. */
   displayName: shortText,
+  account: wearerAccountSchema.optional(),
   settings: patientSettingsSchema,
   /** Bumped by every item, room, or settings write. Caches key on it. */
   configVersion: z.int().nonnegative(),

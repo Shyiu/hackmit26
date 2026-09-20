@@ -536,7 +536,9 @@ Next.js:
 | Route | Does |
 |---|---|
 | `POST /api/ask` | Takes `{ transcript, requestId }`, returns `X-Interaction-Id` and `Server-Timing` before the body; deduplicates by wearer and request ID. With a TTS provider configured the body is streamed `audio/pcm` (s16le, mono, 24 kHz, declared in `X-Audio-*` headers) and the text is polled from `GET /api/interactions/:id`; with none, or when the provider refuses the request, it returns the interaction as JSON |
-| `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout` | Real caregiver accounts. Signup creates the caregiver and their patient profile together; login sets a signed session cookie scoped to that `patientId` |
+| `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout` | Real caregiver accounts. Signup creates the caregiver and their patient profile together; login sets a signed session cookie scoped to that `patientId`. Login also answers a wearer's own account, and says which kind signed in and where it belongs |
+| `POST /api/auth/wearer-signup` | A wearer signing themselves up, with no caregiver yet. Returns the 6-digit code a caregiver redeems at `POST /api/auth/attach-patient`; with an email and password it also gives the wearer an account and signs this phone in as a device |
+| `GET, POST /api/auth/caregiver-link` | The wearer's own side of `/wearer-connect`: whether a caregiver has joined them yet, and a fresh code when the last one expired. Only the device the wearer's account signed in on can ask for a code, and only until a caregiver joins |
 | `POST /api/devices/pairing-codes` | Caregiver-only. Creates a short-lived pairing code for a chest phone or simulator |
 | `POST /api/devices/pair` | Redeems a caregiver-generated pairing code for a device token scoped to the caregiver's `patientId`. What `/wear` and `/sim` call on first run instead of sharing the caregiver's login |
 | `GET /api/devices` | Lists the caregiver's paired phones |

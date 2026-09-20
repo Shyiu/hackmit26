@@ -140,7 +140,15 @@ export const collections = {
     name: "patients",
     schema: patientDocSchema,
     writers: ["web"],
-    indexes: [],
+    indexes: [
+      {
+        name: "account_email_unique",
+        key: { "account.email": 1 },
+        unique: true,
+        partialFilterExpression: { "account.email": { $exists: true } },
+        purpose: "wearer sign-in lookup, one wearer account per email",
+      },
+    ],
   }),
 
   caregivers: defineCollection({
