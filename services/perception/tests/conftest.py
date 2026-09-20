@@ -109,6 +109,8 @@ class Seed:
                     "recordingAllowed": False,
                     "retentionDays": retention_days,
                     "staleAfterMinutes": 15,
+                    "geofence": None,
+                    "locationStaleAfterMinutes": 15,
                     "wakeWordEnabled": False,
                     "wakeWordSensitivity": 0.5,
                 },
