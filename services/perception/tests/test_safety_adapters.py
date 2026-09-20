@@ -12,10 +12,8 @@ def test_default_adapters_are_lazy_mocks():
     for module in ("torch", "transformers", "ultralytics", "insightface"):
         sys.modules.pop(module, None)
     adapters = build_adapters(settings())
-    assert adapters.detector.name == "mock"
     assert adapters.face_detector.name == "mock"
     assert adapters.face_embedder.name == "mock"
-    assert adapters.vlm.name == "mock"
     assert all(
         module not in sys.modules for module in ("torch", "transformers", "ultralytics", "insightface")
     )

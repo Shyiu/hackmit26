@@ -14,7 +14,7 @@ from ..config import Settings
 from .adapters.registry import Adapters
 from .images import LocalFrameStore
 from .models import FaceObservation, FrameAnalysis
-from .pipeline import detect_and_embed, find_hazards, match_faces
+from .pipeline import detect_and_embed, match_faces
 from .store import SafetyStore
 
 log = logging.getLogger("perception.safety")
@@ -42,7 +42,7 @@ class SafetyService:
         on_faces: Callable[[list[FaceObservation]], Awaitable[None]] | None = None,
     ) -> FrameAnalysis:
         """The model work, with nothing written. `on_faces` is awaited the moment faces are
-        matched, before the hazard detector and the VLM start."""
+        matched."""
         gallery = await self.store.gallery(patient_id, self.adapters.face_embedder.model)
         work = await asyncio.to_thread(
             match_faces,
@@ -56,7 +56,7 @@ class SafetyService:
             await on_faces(list(work.analysis.faces))
         if work.array is not None:
             await self._announce_recognized(patient_id, work.analysis.faces)
-        return await asyncio.to_thread(find_hazards, work, adapters=self.adapters, settings=self.settings)
+        return work.analysis
 
     async def _announce_recognized(self, patient_id: ObjectId, faces: list[FaceObservation]) -> None:
         """Queues a silent `person_recognized` notification the instant an enrolled face
@@ -91,9 +91,6 @@ class SafetyService:
         frame_id = await self.store.record_frame_observation(
             patient_id, device_id, session_id, captured_at, stored.key, analysis
         )
-        event_ids = await self.store.upsert_danger_events(
-            patient_id, frame_id, stored.key, captured_at, analysis
-        )
         return {
             "_id": frame_id,
             "patientId": patient_id,
@@ -102,7 +99,6 @@ class SafetyService:
             "capturedAt": captured_at,
             "imageKey": stored.key,
             **analysis.to_observation_fields(),
-            "dangerEventIds": event_ids,
         }
 
     async def process(

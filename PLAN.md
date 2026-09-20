@@ -1,12 +1,12 @@
 # Memoir (working title)
 
-A wearable camera that remembers where things are, notices when someone's about to forget something, and watches for danger, for people living with dementia.
+A wearable camera that remembers where things are and notices when someone's about to forget something, for people living with dementia.
 
 The wearer asks out loud, "Where are my keys?" About a second later they hear, "I last saw your keys on the kitchen counter, next to the coffee maker, about twenty minutes ago." They don't have to ask, either: the system reminds them to take their evening medication before bed, and to grab their keys as they head for the door. If the camera sees a hand near a hot stove, or the wearer leaves the approved area alone, the caregiver's phone gets an immediate alert with sound. The caregiver can also enroll photos of family members and other caregivers so the system recognizes who's around.
 
 The product belongs on glasses, and Ray-Ban Meta was the platform we planned around. We can't get a pair for the hackathon, and a 3D-printed VR headset was tried on paper and dropped. So this build runs on a phone worn on the chest. Its rear camera faces forward and streams what's in front of the wearer, the phone records that view, and answers come back as speech in the wearer's ear. The live view with item labels shows on the caregiver dashboard. Ray-Ban Meta stays in the plan as a second client on the same contract, for when we have the hardware.
 
-**Status: early build.** The database is built: `packages/db` holds the MongoDB schemas, validators, indexes, and repositories, tested against a real MongoDB. The API routes read and write through it behind caregiver sessions and device tokens. Caregivers sign up at `/signup`, which creates their account (scrypt password hash) and one wearer for their family; the seeded demo caregiver still signs in with `CAREGIVER_EMAIL` and `CAREGIVER_PASSWORD`. `/wear` is the chest page: a dim screen where a tap anywhere asks a question. Speech to text runs on Deepgram when `DEEPGRAM_API_KEY` is set and falls back to the browser's recognizer when it isn't. `POST /api/ask` answers from the item snapshots. With `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` set, the answer streams back as 24 kHz PCM from ElevenLabs Flash v2.5 behind the `TTSProvider` seam in `apps/web/src/lib/server/tts/`, the phone plays it chunk by chunk and polls the interaction for the caption, and `pnpm bench:tts` measures time to first audio; without a key the route returns JSON and the browser's speech synthesis speaks it at the wearer's rate. Either way the answer is shown as a caption and playback timing goes back to the server. The page streams 1280 px JPEG frames to the perception socket at 3 fps when capture is resumed, and speaks queued caregiver messages. `/sim` runs the same client on a flat page with hold-to-ask and a typed question. The caregiver dashboard is built for phones and desktops: items, item detail and editing, questions, live status, messages, faces, latency, settings. The Faces page (`/dashboard/people`) enrolls people from photos through `/api/people`, which proxies to the perception service, and shows when the camera last matched each one; it took the Rooms slot in the nav for testing, and the rooms page is still at `/dashboard/rooms`. `apps/ios` is a Capacitor shell that loads the deployed web app ([ADR 0004](docs/decisions/0004-ios-shell-with-capacitor.md)). `services/perception` runs YOLOE-26 on each frame with the wearer's item names as prompts when its model assets are on disk (`NullDetector` otherwise), tracks detections across frames, and writes sightings. A confirmed sighting's keyframe is queued and picked up by a background description worker in the same process, which calls an OpenAI vision model for room/surface/relation/state and writes it back onto the sighting and the item's snapshot (a generic "I don't know" instead, without `OPENAI_API_KEY`). `/ws/debug` isn't built, so the dashboard live view has no video yet. The same service has face enrollment and matching and single-frame hazard events (`people`, `danger_events`) behind mock adapters by default. Geofencing and the routine/reminder engine described below are freshly scoped for this MVP and nothing for them is built yet. This document is the build plan, so edit it freely. See README.md for the product overview.
+**Status: early build.** The database is built: `packages/db` holds the MongoDB schemas, validators, indexes, and repositories, tested against a real MongoDB. The API routes read and write through it behind caregiver sessions and device tokens. Caregivers sign up at `/signup`, which creates their account (scrypt password hash) and one wearer for their family; the seeded demo caregiver still signs in with `CAREGIVER_EMAIL` and `CAREGIVER_PASSWORD`. `/wear` is the chest page: a dim screen where a tap anywhere asks a question. Speech to text runs on Deepgram when `DEEPGRAM_API_KEY` is set and falls back to the browser's recognizer when it isn't. `POST /api/ask` answers from the item snapshots. With `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` set, the answer streams back as 24 kHz PCM from ElevenLabs Flash v2.5 behind the `TTSProvider` seam in `apps/web/src/lib/server/tts/`, the phone plays it chunk by chunk and polls the interaction for the caption, and `pnpm bench:tts` measures time to first audio; without a key the route returns JSON and the browser's speech synthesis speaks it at the wearer's rate. Either way the answer is shown as a caption and playback timing goes back to the server. The page streams 1280 px JPEG frames to the perception socket at 3 fps when capture is resumed, and speaks queued caregiver messages. `/sim` runs the same client on a flat page with hold-to-ask and a typed question. The caregiver dashboard is built for phones and desktops: items, item detail and editing, questions, live status, messages, faces, latency, settings. The Faces page (`/dashboard/people`) enrolls people from photos through `/api/people`, which proxies to the perception service, and shows when the camera last matched each one; it took the Rooms slot in the nav for testing, and the rooms page is still at `/dashboard/rooms`. `apps/ios` is a Capacitor shell that loads the deployed web app ([ADR 0004](docs/decisions/0004-ios-shell-with-capacitor.md)). `services/perception` runs YOLOE-26 on each frame with the wearer's item names as prompts when its model assets are on disk (`NullDetector` otherwise), tracks detections across frames, and writes sightings. A confirmed sighting's keyframe is queued and picked up by a background description worker in the same process, which calls an OpenAI vision model for room/surface/relation/state and writes it back onto the sighting and the item's snapshot (a generic "I don't know" instead, without `OPENAI_API_KEY`). `/ws/debug` isn't built, so the dashboard live view has no video yet. The same service has face enrollment and matching (`people`, `frame_observations`) behind mock adapters by default. Geofencing and the routine/reminder engine described below are freshly scoped for this MVP and nothing for them is built yet. This document is the build plan, so edit it freely. See README.md for the product overview.
 
 ## The problem
 
@@ -21,16 +21,16 @@ A camera the person already wears can watch where objects end up. The wearer doe
 3. Record what the chest camera sees, and show that live view with item labels on the caregiver dashboard.
 4. Give caregivers a dashboard that shows where things are, what the wearer asked, and how often.
 5. Remind the wearer, unprompted, before they'd otherwise forget: medication before bed, keys before the door, and other caregiver-defined routines.
-6. Recognize caregiver-enrolled faces, so the system knows who's with the wearer, and alert the caregiver immediately if the wearer looks to be in danger (a hand near a hot stove) or out of the approved area alone.
+6. Recognize caregiver-enrolled faces, so the system knows who's with the wearer, and alert the caregiver immediately if the wearer is out of the approved area alone.
 7. Keep every wearer/caregiver pair's data separate behind real accounts, so the same deployment can serve more than one family.
 8. Run the full demo without the chest mount, using a laptop webcam or a phone held in the hand, so a broken mount can't sink the project.
 
-The hackathon MVP is three validated objects, one enrolled instance per category, phone browser capture from the chest, local recording, push-to-talk, spoken answers in earbuds, basic keyframe descriptions, exact item lookup, one TTS provider, a minimal dashboard with the live view, face matching against a handful of enrolled people, one hazard-object danger check, a geofence-based lost alert, and a caregiver-defined routine or two (one time-based, one leaving-the-house). Get the loop working on a flat page by hour eight, then put the phone on the chest. Item labels on the dashboard live view follow in M5. Room enrollment, visual enrollment beyond faces, semantic search, the LLM question path, and uploaded recordings are optional follow-ons; their sections below describe the roadmap, not requirements for the core demo.
+The hackathon MVP is three validated objects, one enrolled instance per category, phone browser capture from the chest, local recording, push-to-talk, spoken answers in earbuds, basic keyframe descriptions, exact item lookup, one TTS provider, a minimal dashboard with the live view, face matching against a handful of enrolled people, a geofence-based lost alert, and a caregiver-defined routine or two (one time-based, one leaving-the-house). Get the loop working on a flat page by hour eight, then put the phone on the chest. Item labels on the dashboard live view follow in M5. Room enrollment, visual enrollment beyond faces, semantic search, the LLM question path, and uploaded recordings are optional follow-ons; their sections below describe the roadmap, not requirements for the core demo.
 
 Not in v1:
 
 - Medical claims or diagnosis of any kind. A pill organizer sighting or a completed medication routine does not prove medication was taken.
-- Automatic emergency response. Danger and lost alerts go to the caregiver, who decides whether to act; nothing in this system calls 911 or anyone else on its own.
+- Automatic emergency response. Lost alerts go to the caregiver, who decides whether to act; nothing in this system calls 911 or anyone else on its own.
 - Turn-by-turn guidance to the item.
 - World-anchored AR. Labels sit in screen space over the dashboard's live video. Pinning a marker to a spot in the room needs camera pose from ARKit or ARCore, which means a native app.
 - Ray-Ban Meta support. We have no hardware. The contract leaves room for it.
@@ -116,8 +116,8 @@ flowchart LR
   end
   E[Earbuds] <-- "answers, chimes" --> P
   P -- "JPEG frames, 2 to 5 fps" --> V[Perception service<br/>FastAPI + YOLOE-26 + tracker]
-  V -- "detections, faces, hazards, annotated frames" --> W
-  V -- "sightings, danger_events" --> M[(MongoDB Atlas<br/>+ Vector Search)]
+  V -- "detections, faces, annotated frames" --> W
+  V -- "sightings, frame_observations" --> M[(MongoDB Atlas<br/>+ Vector Search)]
   V -- "keyframes, face-blurred" --> S[(Object storage)]
   V -- "keyframe, write time only" --> O[OpenAI<br/>vision + embeddings]
   P -- "mic audio" --> D[Deepgram streaming STT]
@@ -129,7 +129,7 @@ flowchart LR
   W -- "answer text" --> T[ElevenLabs or Deepgram TTS]
   T -- "audio stream" --> W
   W -- "audio stream, caption, proactive reminders" --> P
-  W -- "danger_alert, lost_alert: Web Push" --> C
+  W -- "lost_alert: Web Push" --> C
   C[Caregiver browser<br/>live view with labels] --> W
   G[Ray-Ban Meta + DAT app<br/>later] -. "same two endpoints" .-> W
 ```
@@ -138,8 +138,8 @@ Two deployable pieces for the hackathon, and a third later:
 
 | Piece | Stack | Job |
 |---|---|---|
-| `apps/web` | Next.js App Router, TypeScript, Tailwind, shadcn/ui, MongoDB Node driver | The `/wear` chest page, the flat `/sim` fallback, the caregiver dashboard, the REST API, the `/api/ask` voice endpoint, the routine evaluator, and Web Push for danger/lost alerts |
-| `services/perception` | Python, FastAPI, pymongo, optional detector/face/VLM adapters | Takes frames, detects and tracks items, matches faces against enrolled people, writes sightings, frame observations, and conservative danger events |
+| `apps/web` | Next.js App Router, TypeScript, Tailwind, shadcn/ui, MongoDB Node driver | The `/wear` chest page, the flat `/sim` fallback, the caregiver dashboard, the REST API, the `/api/ask` voice endpoint, the routine evaluator, and Web Push for lost alerts |
+| `services/perception` | Python, FastAPI, pymongo, optional detector/face adapters | Takes frames, detects and tracks items, matches faces against enrolled people, writes sightings and frame observations |
 | `apps/ios` | Capacitor 8 (Swift Package Manager), later Swift, ARKit, Meta DAT, AVAudioEngine | Today a WKWebView that loads the deployed web app from `CAP_SERVER_URL`, grants the camera and mic to that origin only, and keeps the screen on. Native capture with the screen locked, hardware-button push-to-talk, a local wake word, and the Ray-Ban Meta client get added here in Swift. See ADR 0004 |
 
 One design rule makes the latency goal reachable. **Do the expensive work when an item is seen, not when it's asked about.** Vision descriptions and optional room classification/embeddings happen at write time in the background. Once enrichment finishes, the answer is one indexed read away. Earlier questions get a conservative pending-description answer.
@@ -274,21 +274,15 @@ Vision calls are capped per item per minute so a cluttered desk can't run up the
 
 The MVP vision model may name a room type or return `unknown`. Optional room enrollment stores CLIP reference frames under family-provided names. Evaluate similarity thresholds, margins between competing rooms, and temporal consistency; top-five majority vote alone must not force unfamiliar scenes into known rooms. Classification of uploaded frames is descriptive and cannot enforce pre-upload privacy.
 
-## Faces, danger, and routines
+## Faces and routines
 
-These three features moved from stretch goals to MVP scope. They share one property the rest of the perception pipeline doesn't have: each one can page a caregiver immediately, out of band from the dashboard's normal poll. That path reuses the notification/device-token plumbing built for caregiver messages, just with new `notifications.kind` values (`danger_alert`, `lost_alert`, `proactive_reminder`) and no caregiver keystroke in the loop.
+These features moved from stretch goals to MVP scope. They share one property the rest of the perception pipeline doesn't have: each one can page a caregiver immediately, out of band from the dashboard's normal poll. That path reuses the notification/device-token plumbing built for caregiver messages, just with new `notifications.kind` values (`lost_alert`, `proactive_reminder`) and no caregiver keystroke in the loop.
 
 ### Face matching
 
 The caregiver app enrolls people, not just items: a name, a relation ("daughter", "home health aide"), and a few reference photos, taken and uploaded with that person's own consent, the same way the item cards work but for faces. The perception service embeds each reference photo once at enrollment and stores the embedding, then runs a face detector on sampled keyframes (not every frame; this is a background enrichment step like the vision description job, not a fast-path cost) and compares any detected face against the wearer's enrolled set. A match above threshold, with a clear margin over the next-best candidate, attaches a `personId` and name to the sighting. Below threshold, or with a close second candidate, the face is recorded as "someone unfamiliar" and nothing more; the system never guesses a name it isn't confident of, and it never checks a face against anything outside the caregiver's own enrolled set.
 
-This is for two things, and only two: giving the wearer's dashboard a "who was with you" record, and giving the danger/lost logic below a way to tell "alone" from "with someone the family knows." It is not a general stranger-recognition system, and the "Not in v1" list above is explicit that unenrolled faces stay anonymous.
-
-### Danger detection
-
-A second open-vocabulary prompt list, parallel to the tracked-item list, names hazards: stove burner, open flame, boiling pot, knife. The tracker treats a hazard the same way it treats an item, except a hazard sighting is checked against the wearer's hand position (from the same frame's detections, or a lightweight pose estimate if plain bounding-box overlap proves too noisy in testing) rather than logged as a location. A hand overlapping a hazard box for more than a short confirmation window, initially the same three-usable-frames rule the tracker uses for items, opens a `danger_events` record and fires an immediate push notification to every caregiver device, with a distinct sound from the ordinary notification chime. The dashboard's live view highlights the hazard and the hand together so a caregiver checking in can see exactly what triggered it.
-
-One hazard type is the M1 target: a hot stove or pot, chosen because it's demonstrable and because it's the scenario in the prompt this feature exists to answer. Treat every other hazard as a later addition once that one is measured for false positive rate on a real stovetop. A danger alert is a "worth checking" signal, not a diagnosis or a 911 call; the caregiver decides what to do; see "Not in v1" and "Privacy and safety."
+This is for two things, and only two: giving the wearer's dashboard a "who was with you" record, and giving the lost logic below a way to tell "alone" from "with someone the family knows." It is not a general stranger-recognition system, and the "Not in v1" list above is explicit that unenrolled faces stay anonymous.
 
 ### Lost detection
 
@@ -363,17 +357,17 @@ Both services derive `patientId` from an authenticated caregiver session or scop
   playbackReportedAt // absent until client telemetry arrives
 }
 
-// notifications: caregiver messages, reminders, and the three system-generated
+// notifications: caregiver messages, reminders, and the two system-generated
 // kinds below, all waiting to be spoken and/or pushed. Captions and sighting
 // notifications are built on the client and never stored here.
 {
   _id, patientId, createdAt, expiresAt,
-  kind: "caregiver_message" | "reminder" | "proactive_reminder" | "danger_alert" | "lost_alert",
+  kind: "caregiver_message" | "reminder" | "proactive_reminder" | "lost_alert",
   text: "Lunch is at noon.",
   showAt, // reminders only
   status: "queued" | "shown" | "expired",
   shownAt,
-  routineId, dangerEventId // set on the two kinds that reference another record
+  routineId // set on the kinds that reference a routine
 }
 
 // recordings: optional, after M3. Only exists once recordings leave the phone.
@@ -389,14 +383,6 @@ Both services derive `patientId` from an authenticated caregiver session or scop
   referenceImages: ["s3://..."], // taken with that person's own consent
   faceEmbeddings: [/* one per reference photo */],
   consentedAt, consentedBy // the caregiver who enrolled them, and when
-}
-
-// danger_events: a hand overlapping a hazard for longer than the confirmation window
-{
-  _id, patientId, hazardLabel: "stove burner",
-  firstSeenAt, lastSeenAt, expiresAt, status: "open" | "closed",
-  bbox, frameSize, keyframeKey, // for the dashboard's live-view highlight
-  acknowledgedAt, acknowledgedBy // set once a caregiver has seen it
 }
 
 // routines: caregiver-defined rules the wearer never has to trigger by asking
@@ -428,7 +414,7 @@ The built schemas live in `packages/db/src/schema/`, one zod schema per collecti
 - Three collections the sketch leaves out: `capture_sessions`, one per frame socket connection, paused or live, for the dashboard badge; `description_jobs`, the keyframe queue with leases, retries, and supersession; and `meta`, the schema fingerprint `db:setup` last applied.
 - `caregivers` is one row per real account. A caregiver owns exactly one `patientId` in the MVP; a `caregiver_patients` join table for multiple caregivers per wearer, or one caregiver watching several wearers, is a follow-on and not required for the demo. There's no cross-pair sharing anywhere in the schema: every query, index, and background job is keyed on `patientId`, so a second family's data is structurally unreachable from the first family's session or device token, not just filtered out by convention.
 - `devices` rows are created by redeeming a short-lived pairing code the caregiver generates on the dashboard, not by sharing the caregiver's login. `/wear` and `/sim` prompt for that code once, on first run, and store the resulting device token the same way they already store the camera choice.
-- The perception safety MVP adds `frame_observations`, encrypted `people.faceEmbeddings`, conservative `danger_events` fields, and `notifications.dangerEventId`; these are single-frame evidence records rather than proof of an emergency.
+- The perception safety MVP adds `frame_observations` and encrypted `people.faceEmbeddings`; frame observations are single-frame evidence records.
 
 Indexes, as declared in `packages/db/src/registry.ts`:
 
@@ -457,7 +443,6 @@ Indexes, as declared in `packages/db/src/registry.ts`:
 | `devices` | `{ patientId: 1, createdAt: -1 }` | a wearer's devices |
 | `caregivers` | unique `{ email: 1 }` | login |
 | `people` | `{ patientId: 1, name: 1 }` | face enrollment list |
-| `danger_events` | `{ patientId: 1, status: 1, lastSeenAt: -1 }` | open hazards, dashboard alert badge |
 | `routines` | `{ patientId: 1, active: 1 }` | the routine evaluator's per-wearer scan |
 | every collection with `expiresAt` | TTL a day after `expiresAt` | backstop only; `pnpm db:sweep` is the cleanup job, and reads filter expired records at once |
 
@@ -529,8 +514,8 @@ MVP by M3: read-only item cards, latest question/answer, latency, and capture/pa
 - **Add an item.** Name, aliases and a few photos. Saving pushes the new prompt list to the perception service.
 - **People.** Enroll a family member or caregiver: name, relation, a few reference photos taken with that person's consent. Saving pushes the new face embeddings to the perception service, the same way an item's photos push a prompt list.
 - **Rooms.** Enroll a room by walking through it. Mark rooms private for the later on-device privacy gate; do not present server-side labels as a pre-upload privacy guarantee. One enrolled room, the "door," feeds the leaving-the-house routine trigger.
-- **Alerts.** Danger events and lost/out-of-area alerts, newest first, each with its keyframe and an acknowledge action. These also arrive as a push notification with a distinct sound the moment they fire; this tab is the log, not the only way to see them.
-- **Routines.** Add and edit the time-based and leaving-the-house reminders described under "Faces, danger, and routines," and see when each last fired.
+- **Alerts.** Lost/out-of-area alerts, newest first, each with an acknowledge action. These also arrive as a push notification with a distinct sound the moment they fire; this tab is the log, not the only way to see them.
+- **Routines.** Add and edit the time-based and leaving-the-house reminders described under "Faces and routines," and see when each last fired.
 - **Questions.** A log of what the wearer asked and what they heard. A chart of questions per day per item. A jump in repeated questions can flag a hard day. The dashboard states it as a count and nothing more. It isn't a diagnostic.
 - **Live view.** What the chest camera sees, with item labels, recognized faces, sighting notifications, and the last answer. This is the AR view, and on a laptop it's how the judges watch the demo.
 - **Messages.** Optional. Send a short message on demand, separate from the caregiver's own configured routines. The voice reads it to the wearer.
@@ -540,7 +525,7 @@ MVP by M3: read-only item cards, latest question/answer, latency, and capture/pa
 - **`/wear`.** The chest page. Camera, frame upload, tap-anywhere push-to-talk, local recording, a dim caption screen, and a setup panel for lens choice, pause, and pairing to a patient.
 - **`/sim`.** The same client on a flat page. Webcam and mic in, answer audio out, the caption over the video. It's for laptop development and it's the demo fallback.
 
-MVP updates poll authenticated endpoints every two seconds, except danger and lost alerts, which push immediately (see "Faces, danger, and routines"). Later change streams plus SSE for everything else require reconnect/resume handling, connection cleanup, and deployment-aware timeouts. Vercel streamed responses still have duration limits; a function is not a permanent relay.
+MVP updates poll authenticated endpoints every two seconds, except lost alerts, which push immediately (see "Faces and routines"). Later change streams plus SSE for everything else require reconnect/resume handling, connection cleanup, and deployment-aware timeouts. Vercel streamed responses still have duration limits; a function is not a permanent relay.
 
 Auth is real accounts, not the single env-var login v0 used: a caregiver signs up, and the first login creates their patient (wearer) profile. Everything scopes to that `patientId`, and nothing in the schema, an index, or a query lets one caregiver's session or one patient's device token reach another pair's data, so the same deployment serves many families without cross-talk. Devices don't share the caregiver's login; the caregiver generates a short-lived pairing code on the dashboard, and `/wear` or `/sim` redeems it once, on first run, for a device token scoped to that `patientId`. That token, not a bearer copy of the caregiver's session, is what the phone sends after that.
 
@@ -567,14 +552,13 @@ Next.js:
 | `GET, POST /api/people`, `DELETE /api/people/:id` | Face enrollment. Multipart `name`, `relation`, `consent=yes`, and one to five `photos`, proxied to the perception service with an `api`-scope token. The list carries each person's last match time and confidence |
 | `GET, POST /api/rooms`, `PATCH /api/rooms/:id` | Room CRUD, the private flag, and later enrollment |
 | `GET, POST /api/people`, `PATCH /api/people/:id` | Face enrollment CRUD: name, relation, reference photos; saving pushes new embeddings to the perception service |
-| `GET /api/danger-events`, `POST /api/danger-events/:id/acknowledged` | List open/closed hazard events; the caregiver acknowledges one from the dashboard |
 | `GET, POST /api/routines`, `PATCH /api/routines/:id` | CRUD for the time-based and leaving-the-house reminder rules the routine evaluator checks |
 | `GET /api/interactions` | Question log and latency stats |
 | `GET /api/interactions/:id` | Poll authorized answer text, status, and final server timings |
 | `POST /api/interactions/:id/playback` | Record client playback/turn timings, labeled as client-reported telemetry |
-| `GET /api/notifications`, `POST /api/notifications/:id/shown` | The device polls for the next queued caregiver message, due reminder, or fired routine, then marks it shown. Danger and lost alerts also arrive this way as a fallback, but don't wait for the poll: see push, next |
-| `POST /api/notifications` | The caregiver queues a message or a reminder by hand; the routine evaluator and the danger/lost checks queue the other three kinds automatically |
-| `POST /api/push/subscribe` | Registers a caregiver or wearer device's Web Push subscription, so `danger_alert` and `lost_alert` notifications page immediately instead of waiting for the next poll |
+| `GET /api/notifications`, `POST /api/notifications/:id/shown` | The device polls for the next queued caregiver message, due reminder, or fired routine, then marks it shown. Lost alerts also arrive this way as a fallback, but don't wait for the poll: see push, next |
+| `POST /api/notifications` | The caregiver queues a message or a reminder by hand; the routine evaluator and the lost check queue the other two kinds automatically |
+| `POST /api/push/subscribe` | Registers a caregiver or wearer device's Web Push subscription, so `lost_alert` notifications page immediately instead of waiting for the next poll |
 | `POST /api/recordings`, `POST /api/recordings/:id/chunks` | Optional. Registers a recording and returns a signed upload URL per chunk. Not needed while recordings stay on the phone |
 
 Perception service:
@@ -601,7 +585,6 @@ An always-on camera in someone's home is a serious thing, and the wearer may not
 - The MVP runs in an explicitly approved demo area with a visible capture/pause control. Capture starts paused; reconnects require explicit resumption. Pause before leaving that area. Automatic private-room exclusion is not an MVP capability.
 - State the actual flow: raw frames reach the selected perception host in memory. Face matching against the enrolled `people` set happens there, in memory, before any blurring; only selected, downscaled, face-blurred keyframes may then reach object storage or the external vision provider. Blurring on that host does not mean raw frames never left the capture device. Exclude raw frames from logs and error reporting.
 - Face matching only ever compares against the caregiver's own `people` collection: photos of specific family members and caregivers, each enrolled with that person's consent. It is never sent to, or checked against, a third-party face-recognition API or any database outside this system. A face that doesn't match stays an anonymous "someone unfamiliar" detection; nothing computes or stores an identity for it.
-- A danger alert is evidence worth a caregiver's attention, not a confirmed emergency. Hazard detection will have false positives and false negatives; nothing in this system pages emergency services, and the demo script and any real deployment both keep a human deciding what to do next. Log false positives during testing so the hazard prompt list and the confirmation window can be tuned.
 - Lost-alert geofencing needs a new permission beyond camera and mic: continuous location, which is its own battery and privacy cost on top of an always-on camera. Ask for it separately, explain what it's for, and let the family see and change the geofence itself, since a covert location feature undermines the trust this whole section is about. Keep location history only as long as the lost-alert window needs it, under the same retention policy as everything else.
 - A future automatic privacy gate must run on the capture device before any upload, including debug frames and thumbnails. Private or unknown rooms block transmission and storage until cleared locally. Server-side room recognition cannot enforce this. Bathrooms and bedrooms default to private when that gate is implemented.
 - Debug live view is authenticated, opt-in, transient, and disabled while paused. Pause stops uploads and cancels/drops queued frames and description work; it cannot retract data already sent externally. Document provider retention settings before any real-home use.
@@ -783,13 +766,13 @@ Hours assume a 24-hour hackathon and three or four people. Edit to fit the team.
 |---|---|---|---|
 | M0 Setup and feasibility | 0 to 1 | Accounts, repo skeleton, real caregiver signup/login and device pairing, model downloads. Get the chest harness, earbuds, and a power bank. Put both dev servers behind tunnels and smoke-test camera, lens choice, mic, earbud playback, and wake lock on the demo phone. Record a walkthrough with that phone and select three reliable objects | Phone capture and inference run over HTTPS; two independently signed-up caregiver/wearer pairs stay isolated from each other; the mount is in hand; chosen objects, phone model, and browser limits are recorded |
 | M1 Perception and descriptions | 1 to 6 | Bounded ingestion, tracker, versioned sightings, immediate item updates, basic keyframe descriptions, privacy/pause flow | A real object has a queryable location; pickup invalidates its old resting answer |
-| M1b Faces and danger | 1 to 8, parallel | Face enrollment on the dashboard, embedding + match in the perception service, one hazard prompt (stove/pot) with hand-overlap confirmation, `danger_events`, and the immediate Web Push path to the caregiver | An enrolled face is matched on a live frame; a hand held near the test hazard fires a caregiver push within a couple seconds |
+| M1b Faces | 1 to 8, parallel | Face enrollment on the dashboard, embedding + match in the perception service | An enrolled face is matched on a live frame; a  |
 | M2 Voice and minimal dashboard | 1 to 6, parallel | Push-to-talk `/sim`, one STT/TTS provider, exact lookup, PCM playback, interaction polling, captions, cards and timings. Alongside it, turn `/headset` into `/wear`: drop the stereo view, add tap-anywhere push-to-talk and the dim caption screen | Seeded questions produce audible answers in earbuds and client playback timings on the phone |
 | M2b Routines and lost alerts | 4 to 9, parallel | `routines` CRUD, the time and leaving-the-house evaluator, geofence setting on the dashboard, phone `watchPosition` reporting, the `lost_alert` push | A fixed bedtime reminder speaks on schedule; leaving the geofence pages the caregiver |
 | M3 Join | 6 to 8 | Real sightings/descriptions answer real questions; test movement and immediate queries | Three objects work end to end on path A with the demo phone as the camera, with honest uncertainty and measured accuracy/latency |
 | M4 Reliability | 8 to 12 | Dropped frames, retries, late jobs, ambiguous items, privacy/retention checks, pause and failure UX | Replay checks pass; stale evidence never replaces newer observations |
 | M5 Chest camera | 8 to 16 | Mount angle, tap-to-talk while worn, the dashboard live view with labels, faces, and sighting notifications, the twenty minute heat and battery run | The M3 loop works with the phone on a teammate's chest while they walk around, or path A remains the demo |
-| M6 Optional extension | 12 to 18, only after core checks pass | Choose one: semantic questions, visual enrollment beyond faces, more hazard types, or a richer dashboard. Wake word, room enrollment beyond the door, and recording upload compete for this time | The chosen feature passes an evaluation without destabilizing M3 |
+| M6 Optional extension | 12 to 18, only after core checks pass | Choose one: semantic questions, visual enrollment beyond faces, or a richer dashboard. Wake word, room enrollment beyond the door, and recording upload compete for this time | The chosen feature passes an evaluation without destabilizing M3 |
 | M7 Polish | 18 to 24 | Freeze features, measure accuracy/latency, demo script, backup recording, docs | Two clean rehearsals including the path A fallback |
 
 M3 is the cut line. If it slips, drop M6, and if M1b or M2b are still shaky, demo them on path A with a single scripted trigger rather than cutting them entirely; they're MVP scope now, not stretch. Do not try to build every roadmap feature. Reserve the final six hours for reliability and rehearsal. The subsecond target is aspirational until measured; do not shorten endpointing at the expense of understanding the question.
@@ -800,7 +783,7 @@ M3 is the cut line. If it slips, drop M6, and if M1b or M2b are still shaky, dem
 2. Ask where it is, including once while it remains visible. The wearer hears "I last saw…" with a time in the earbuds, and the judges see the same words and the thumbnail on the dashboard.
 3. Pick it up and ask again. Confirm the system does not confidently send the wearer back to the counter. Put it on a new surface and ask after enrichment.
 4. Ask about an unseen item to demonstrate uncertainty. Show an enrolled alias; demonstrate semantic matching only if that optional feature passed evaluation.
-5. Have an enrolled teammate step into frame and show the live view label their face. Hold a hand near the test hazard and show the caregiver's phone getting a push alert within a couple seconds.
+5. Have an enrolled teammate step into frame and show the live view label their face.
 6. Trigger the leaving-the-house routine by walking the phone toward the enrolled "door" without the demo keys, and hear the reminder spoken. Show the routines and alerts tabs, then the geofence setting, then walk the phone out of it and show the lost alert land.
 7. Show the labels and sighting notifications on the live view if M5 shipped them. Stop the recording and play the file back. Then show the question log, speech/sighting latency, and pause control. Rehearse the same sequence on path A.
 
@@ -824,7 +807,6 @@ M3 is the cut line. If it slips, drop M6, and if M1b or M2b are still shaky, dem
 | Backlogs yield stale answers | Drop old frames, coalesce jobs, and guard item updates by observation version |
 | Room classifier misses private areas | MVP uses manual pause; automatic exclusion requires an on-device pre-upload gate |
 | Face matching false-positives a family member, or misses one in poor light | Require a clear margin over the second-best candidate, not just a threshold; fall back to "someone unfamiliar" rather than guess; test enrollment photos across lighting conditions |
-| Hazard detection false-positives constantly and the caregiver starts ignoring alerts | Tune the confirmation window and hand-overlap threshold against a real stovetop before the demo; one well-tested hazard beats four noisy ones |
 | GPS is inaccurate or slow indoors, and the geofence fires spuriously | Size the geofence radius generously and require the phone to be outside it for a sustained window, not one noisy reading, before firing `lost_alert` |
 | A pairing code leaks or a device token is reused across families | Short expiry on pairing codes, one redemption each, and the same tenant-isolation tests applied to every new route |
 
@@ -852,7 +834,7 @@ Ray-Ban Meta has no display, which the chest build already plans around: everyth
 - Medication-related object location only. Do not infer ingestion or adherence from organizer sightings or hand interaction.
 - Put-down detection. Hand and object overlap marks the moment an item gets set down, which beats "last seen".
 - Episodic memory. "What did I do this morning?"
-- More caregiver alert types, for example when the wallet hasn't been seen in two days, or more hazard classes beyond the one M1b targets.
+- More caregiver alert types, for example when the wallet hasn't been seen in two days.
 - Guidance. "You're getting closer." With world-anchored labels it can be an arrow as well as a voice.
 - Multiple caregivers per wearer, or one caregiver watching several wearers, via the `caregiver_patients` join table the data model leaves as a follow-on.
 - A continuous location trail for the caregiver, instead of the MVP's binary inside/outside-the-geofence check.
@@ -875,7 +857,6 @@ Things to settle before building. Edit this list.
 12. Whether a recording ever keeps the mic track. The default is video only.
 13. Face embedding model. Something small enough to run alongside YOLOE-26 on the same box without blowing the frame budget; benchmark before committing.
 14. How consent is captured for an enrolled face, beyond "the caregiver clicked enroll." At minimum the enrollment flow should say, in plain words, what the photo is used for.
-15. Hazard list beyond the M1 stove/pot target, and whether hand-overlap heuristics are reliable enough or a per-frame VLM safety check is needed instead. Decide after measuring the first hazard's false-positive rate.
 16. Whether the geofence needs a grace period (a few minutes outside it) before firing `lost_alert`, to avoid paging the caregiver every time the wearer sits on the porch.
 
 ## References

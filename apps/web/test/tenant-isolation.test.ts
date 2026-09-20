@@ -1,10 +1,8 @@
-import { seedDangerEvent, seedObservation } from "@memory-glasses/db/observations";
+import { seedObservation } from "@memory-glasses/db/observations";
 import { ObjectId } from "@memory-glasses/db";
 import { GridFSBucket } from "mongodb";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { GET as getCapture } from "@/app/api/capture/route";
-import { POST as postAcknowledged } from "@/app/api/danger-events/[id]/acknowledged/route";
-import { GET as listDangerEvents } from "@/app/api/danger-events/route";
 import { GET as getInteraction } from "@/app/api/interactions/[id]/route";
 import { POST as postPlayback } from "@/app/api/interactions/[id]/playback/route";
 import { GET as listInteractions } from "@/app/api/interactions/route";
@@ -28,7 +26,7 @@ describe("API tenant isolation", () => {
   let env: Awaited<ReturnType<typeof openRouteDb>>;
   let a: Awaited<ReturnType<typeof newHousehold>>;
   let b: Awaited<ReturnType<typeof newHousehold>>;
-  let ids: { item: string; sighting: string; interaction: string; notification: string; room: string; danger: string };
+  let ids: { item: string; sighting: string; interaction: string; notification: string; room: string };
 
   beforeAll(async () => {
     env = await openRouteDb();
@@ -64,18 +62,12 @@ describe("API tenant isolation", () => {
     const { interaction } = await a.repos.interactions.begin({ requestId: "a-1", transcript: "where are my keys" });
     const notification = await a.repos.notifications.create({ kind: "caregiver_message", text: "Lunch is ready" });
     const room = await a.repos.rooms.create({ name: "Kitchen" });
-    const danger = await seedDangerEvent(env.db, {
-      patientId: a.patient._id,
-      kind: "hot_surface_visible",
-      lastSeenAt: new Date(),
-    });
     ids = {
       item: item._id.toHexString(),
       sighting: sighting._id.toHexString(),
       interaction: interaction._id.toHexString(),
       notification: notification._id.toHexString(),
       room: room._id.toHexString(),
-      danger: danger._id.toHexString(),
     };
   });
   afterAll(() => env.close());
@@ -151,21 +143,6 @@ describe("API tenant isolation", () => {
     expect(byItem.sightings).toEqual([]);
     const capture = await (await call(getCapture, { path: "/api/capture", auth: asB() })).json();
     expect(capture.capture).toBeNull();
-    const dangers = await (await call(listDangerEvents, { path: "/api/danger-events?status=open", auth: asB() })).json();
-    expect(dangers.dangerEvents).toEqual([]);
-  });
-
-  it("another wearer's hazard can't be acknowledged", async () => {
-    const response = await call(postAcknowledged, {
-      method: "POST",
-      path: `/api/danger-events/${ids.danger}/acknowledged`,
-      params: { id: ids.danger },
-      auth: asB(),
-    });
-    expect(response.status).toBe(404);
-    expect((await a.repos.dangerEvents.listRecent({ status: "open" })).map((e) => e._id.toHexString())).toEqual([
-      ids.danger,
-    ]);
   });
 
   it("id-guessing against another wearer's item is a 404 and changes nothing", async () => {

@@ -7,7 +7,7 @@ import { notificationDocSchema } from "./schema/notifications";
 import { captureSessionDocSchema, descriptionJobDocSchema } from "./schema/perception";
 import { recordingDocSchema } from "./schema/recordings";
 import { roomDocSchema, roomRefDocSchema } from "./schema/rooms";
-import { dangerEventDocSchema, frameObservationDocSchema, personDocSchema } from "./schema/safety";
+import { frameObservationDocSchema, personDocSchema } from "./schema/safety";
 import { sightingDocSchema } from "./schema/sightings";
 import {
   caregiverDocSchema,
@@ -381,19 +381,6 @@ export const collections = {
         name: "patient_frames",
         key: { patientId: 1, capturedAt: -1 },
         purpose: "recent frames for the dashboard",
-      },
-    ],
-  }),
-
-  dangerEvents: defineCollection({
-    name: "danger_events",
-    schema: dangerEventDocSchema,
-    writers: ["perception"],
-    indexes: [
-      {
-        name: "open_by_last_seen",
-        key: { patientId: 1, status: 1, lastSeenAt: -1 },
-        purpose: "open hazards, dashboard alert badge",
       },
     ],
   }),

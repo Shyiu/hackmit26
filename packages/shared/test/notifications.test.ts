@@ -10,7 +10,7 @@ describe("caregiverNotificationSchema", () => {
   });
 
   it("rejects system kinds a caregiver must not mint", () => {
-    for (const kind of ["danger_alert", "person_recognized"]) {
+    for (const kind of ["person_recognized"]) {
       expect(caregiverNotificationSchema.safeParse({ kind, text: "fake alert" }).success).toBe(false);
     }
   });

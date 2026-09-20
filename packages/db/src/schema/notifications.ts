@@ -2,7 +2,6 @@ import { z } from "zod";
 import {
   idSchema,
   type CaregiverId,
-  type DangerEventId,
   type NotificationId,
   type PatientId,
   type PersonId,
@@ -25,7 +24,6 @@ export const notificationDocSchema = z.strictObject({
   shownAt: z.date().nullable(),
   createdAt: z.date(),
   expiresAt: z.date(),
-  dangerEventId: idSchema<DangerEventId>().optional(),
   /** Set only on a `person_recognized` notification, so its Mongo-backed
    * cooldown (services/perception/app/safety/store.py) can scope by person. */
   personId: idSchema<PersonId>().optional(),
